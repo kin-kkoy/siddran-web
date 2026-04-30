@@ -3,21 +3,21 @@ import { createPortal } from 'react-dom'
 import styles from './TaskCard.module.css'
 import { toast } from '../../utils/toast'
 
-function AddTaskCard({ addTask, addProject, viewMode }) {
-    const [taskType, setTaskType] = useState("normal") // normal: normal add task || daily: add daily tasks || project: add a project card similar to daily tasks
+function AddTaskCard({ addTask, addBundle, viewMode }) {
+    const [taskType, setTaskType] = useState("normal") // normal: normal add task || daily: add daily tasks || bundle: add a bundle card similar to daily tasks
     const [showForm, setShowForm] = useState(false)
     const [title, setTitle] = useState("")
-    const [projectTitle, setProjectTitle] = useState("")
+    const [bundleTitle, setBundleTitle] = useState("")
     const [description, setDescription] = useState("")
     const [priority, setPriority] = useState("normal")
     const [dueDate, setDueDate] = useState("")
-    const [hue, setHue] = useState(120) // For Project color (hue 0-360)
+    const [hue, setHue] = useState(120) // For Bundle color (hue 0-360)
     const color = `hsl(${hue}, 70%, 50%)` // derived from hue for the API
 
     // For daily tasks to be created/submitted to API in a batch (or all at once) (array/list of tasks)
     const [dailyTasksDraft, setDailyTasksDraft] = useState([])
-    // Same thing as above but for project tasks this time
-    const [projectTasksDraft, setProjectTasksDraft] = useState([])
+    // Same thing as above but for bundle tasks this time
+    const [bundleTasksDraft, setBundleTasksDraft] = useState([])
 
     // ---------- for normal tasks ----------
     const handleSubmit = async (e) => {
@@ -54,8 +54,8 @@ function AddTaskCard({ addTask, addProject, viewMode }) {
         setPriority("normal")
     }
 
-    // ---------- For project tasks (draft style) ----------
-    const addToProjectDraft = e => {
+    // ---------- For bundle tasks (draft style) ----------
+    const addToBundleDraft = e => {
         e.preventDefault()
 
         if(!title.trim()){
@@ -63,7 +63,7 @@ function AddTaskCard({ addTask, addProject, viewMode }) {
             return
         }
 
-        setProjectTasksDraft([...projectTasksDraft, {
+        setBundleTasksDraft([...bundleTasksDraft, {
             id: Date.now(),
             title: title.trim(),
             priority
@@ -77,8 +77,8 @@ function AddTaskCard({ addTask, addProject, viewMode }) {
     const removeFromDailyTaskDraft = id => {
         setDailyTasksDraft(dailyTasksDraft.filter( task => task.id !== id ))
     }
-    const removeFromProjectDraft = id => {
-        setProjectTasksDraft(projectTasksDraft.filter( task => task.id !== id ))
+    const removeFromBundleDraft = id => {
+        setBundleTasksDraft(bundleTasksDraft.filter( task => task.id !== id ))
     }
 
     const submitDailyTaskDraft = async () => {
@@ -90,35 +90,37 @@ function AddTaskCard({ addTask, addProject, viewMode }) {
         // title will be an array/list of the tasks instead of a usual string, this happens for daily tasks only
         await addTask(dailyTasksDraft, null, null, null, "daily")
         setDailyTasksDraft([]) // submit
+        setTitle("")
         setShowForm(false) // then close
     }
-    const submitProjectDraft = async () => {
-        if(projectTasksDraft.length === 0) {
+    const submitBundleDraft = async () => {
+        if(bundleTasksDraft.length === 0) {
             toast.warning("Add at least one task to the list")
             return
         }
 
-        // title will be an array/list of the tasks instead of a usual string, this also happens to project tasks
-        await addProject(projectTitle, projectTasksDraft, color)
-        setProjectTasksDraft([])
+        // title will be an array/list of the tasks instead of a usual string, this also happens to bundle tasks
+        await addBundle(bundleTitle, bundleTasksDraft, color)
+        setBundleTasksDraft([])
+        setBundleTitle("")
         setShowForm(false)
     }
 
     const handleTitleKeyDown = (e) => {
-        if (taskType !== 'daily' && taskType !== 'project') return
+        if (taskType !== 'daily' && taskType !== 'bundle') return
         if (e.key === 'Enter' && e.shiftKey) {
             e.preventDefault()
             if(taskType === 'daily'){
                 submitDailyTaskDraft()
             }else{
-                submitProjectDraft()
+                submitBundleDraft()
             }
         } else if (e.key === 'Enter') {
             e.preventDefault()
             if(taskType === 'daily'){
                 addToDailyDraft(e)
             }else{
-                addToProjectDraft(e)
+                addToBundleDraft(e)
             }
         }
     }
@@ -150,21 +152,21 @@ function AddTaskCard({ addTask, addProject, viewMode }) {
                         onClick={() => setTaskType("daily")}
                     >Daily Tasks</button>
 
-                    {/* Project */}
+                    {/* Bundle */}
                     <button type='button'
-                        className={`${styles.toggleBtn} ${taskType === 'project' ? styles.active : ''}`}
-                        onClick={() => setTaskType("project")}
-                    >Project</button>
+                        className={`${styles.toggleBtn} ${taskType === 'bundle' ? styles.active : ''}`}
+                        onClick={() => setTaskType("bundle")}
+                    >Bundle</button>
                 </div>
 
-                {/* Project title + color swatches */}
-                {taskType === 'project' && (
+                {/* Bundle title + color swatches */}
+                {taskType === 'bundle' && (
                     <div className={styles.formContent}>
                         <input
                             type="text"
-                            value={projectTitle}
-                            onChange={e => setProjectTitle(e.target.value)}
-                            placeholder='Project title...'
+                            value={bundleTitle}
+                            onChange={e => setBundleTitle(e.target.value)}
+                            placeholder='Bundle title...'
                             className={styles.input}
                             autoFocus
                             required
@@ -219,7 +221,7 @@ function AddTaskCard({ addTask, addProject, viewMode }) {
                         <button
                             type="button"
                             className={styles.inlineAddBtn}
-                            onClick={taskType === 'daily' ? addToDailyDraft : addToProjectDraft}
+                            onClick={taskType === 'daily' ? addToDailyDraft : addToBundleDraft}
                         >
                             +
                         </button>
@@ -295,8 +297,8 @@ function AddTaskCard({ addTask, addProject, viewMode }) {
                     </div>
                 )}
 
-                {/* Project task fields */}
-                {taskType === 'project' && (
+                {/* Bundle task fields */}
+                {taskType === 'bundle' && (
                     <div className={styles.formContent}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px'}}>
                             <span style={{ color: 'var(--text-secondary)', fontSize: '14px', whiteSpace: 'nowrap' }}>Task's Priority:</span>
@@ -312,16 +314,16 @@ function AddTaskCard({ addTask, addProject, viewMode }) {
                         </div>
 
                         {/* Draft Preview List */}
-                        {projectTasksDraft.length > 0 && (
+                        {bundleTasksDraft.length > 0 && (
                             <div className={styles.draftList}>
-                                <h4 style={{ margin: '0 0 12px 0', color: '#aaa', fontSize: '14px' }}>Tasks to create ({projectTasksDraft.length}):</h4>
-                                {projectTasksDraft.map(task => (
+                                <h4 style={{ margin: '0 0 12px 0', color: '#aaa', fontSize: '14px' }}>Tasks to create ({bundleTasksDraft.length}):</h4>
+                                {bundleTasksDraft.map(task => (
                                     <div key={task.id} className={styles.draftItem}>
                                         <span className={styles.draftText}>{task.title}</span>
                                         <span className={`${styles.draftPriority} ${styles[task.priority]}`}>{task.priority}</span>
                                         <button
                                             type="button"
-                                            onClick={() => removeFromProjectDraft(task.id)}
+                                            onClick={() => removeFromBundleDraft(task.id)}
                                             className={styles.removeBtn}
                                         >
                                             ×
@@ -347,9 +349,9 @@ function AddTaskCard({ addTask, addProject, viewMode }) {
                             Create All ({dailyTasksDraft.length})
                         </button>
                     )}
-                    {taskType === 'project' && projectTasksDraft.length > 0 && (
-                        <button type="button" onClick={submitProjectDraft} className={styles.createAllBtn}>
-                            Create All ({projectTasksDraft.length})
+                    {taskType === 'bundle' && bundleTasksDraft.length > 0 && (
+                        <button type="button" onClick={submitBundleDraft} className={styles.createAllBtn}>
+                            Create All ({bundleTasksDraft.length})
                         </button>
                     )}
                 </div>

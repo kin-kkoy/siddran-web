@@ -160,7 +160,7 @@ function App() {
 
   // ------------- TASKS DATA LOGIC ===================================
   const {
-    tasks, dailyTasks, projects, tasksPagination, dailyTasksPagination, projectsPagination, loadMoreTasks, loadMoreDailyTasks, loadMoreProjects, loadingMore: tasksLoadingMore, loading: tasksLoading, addTask, updateTask, deleteTask, toggleTaskCompletion, addDailyTask, updateDailyTask, deleteDailyTask, toggleDailyTaskCompletion, batchToggleDailyTasks, batchDeleteDailyTasks, addProject, updateProject, deleteProject, addProjectTasks, batchUpdateProjectTasks, toggleProjectTaskCompletion, batchDeleteProjectTasks
+    tasks, dailyTasks, bundles, tasksPagination, dailyTasksPagination, bundlesPagination, loadMoreTasks, loadMoreDailyTasks, loadMoreBundles, loadingMore: tasksLoadingMore, loading: tasksLoading, addTask, updateTask, deleteTask, toggleTaskCompletion, addDailyTask, updateDailyTask, deleteDailyTask, toggleDailyTaskCompletion, batchToggleDailyTasks, batchDeleteDailyTasks, addBundle, updateBundle, deleteBundle, addBundleTasks, batchUpdateBundleTasks, toggleBundleTaskCompletion, batchDeleteBundleTasks
   } = useTasks(authFetch, API, isAuthed)
 
 
@@ -208,16 +208,16 @@ function App() {
       toggleDailyTaskCompletion={toggleDailyTaskCompletion}
       batchToggleDailyTasks={batchToggleDailyTasks}
       batchDeleteDailyTasks={batchDeleteDailyTasks}
-      projects={projects}
-      projectsPagination={projectsPagination}
-      loadMoreProjects={loadMoreProjects}
-      addProject={addProject}
-      updateProject={updateProject}
-      deleteProject={deleteProject}
-      addProjectTasks={addProjectTasks}
-      batchUpdateProjectTasks={batchUpdateProjectTasks}
-      toggleProjectTaskCompletion={toggleProjectTaskCompletion}
-      batchDeleteProjectTasks={batchDeleteProjectTasks}
+      bundles={bundles}
+      bundlesPagination={bundlesPagination}
+      loadMoreBundles={loadMoreBundles}
+      addBundle={addBundle}
+      updateBundle={updateBundle}
+      deleteBundle={deleteBundle}
+      addBundleTasks={addBundleTasks}
+      batchUpdateBundleTasks={batchUpdateBundleTasks}
+      toggleBundleTaskCompletion={toggleBundleTaskCompletion}
+      batchDeleteBundleTasks={batchDeleteBundleTasks}
     />
   )
 

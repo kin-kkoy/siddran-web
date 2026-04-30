@@ -7,7 +7,9 @@ import ConfirmModal from '../Common/ConfirmModal'
 function TaskCard({ task, deleteTask, toggleCompletion, viewMode, isSelectionMode, isSelected, onToggleSelect, onOpenDetail }) {
     const [showDeleteModal, setShowDeleteModal] = useState(false)
 
-    const isOverdue = (task.due_date && !task.is_completed ? new Date() > new Date(task.due_date) : false) 
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const dueDay = task.due_date ? new Date(task.due_date) : null; if (dueDay) dueDay.setHours(0, 0, 0, 0)
+    const isOverdue = !task.is_completed && dueDay !== null && dueDay < today
 
     const handleDelete = e => {
         e.preventDefault()

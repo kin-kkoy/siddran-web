@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useSettings, THEMES } from '../../contexts/SettingsContext'
+import { DIRECTION_ANGLES } from '../Layout/StarCanvas/StarCanvas'
 import styles from './SettingsPopup.module.css'
 
 function SettingsPopup() {
@@ -129,20 +130,104 @@ function InterfaceTab({ settings, updateSetting }) {
         />
       </SettingRow>
 
-      {/* Reduce star size */}
       {settings.showStars !== false && (
-        <SettingRow
-          label="Reduce Star Size"
-          description="Make the background stars smaller and more subtle."
-        >
-          <ToggleSwitch
-            checked={settings.reduceStars === true}
-            onChange={(v) => updateSetting('reduceStars', v)}
-          />
-        </SettingRow>
+        <>
+          <SettingRow
+            label="Reduce Star Size"
+            description="Use smaller base radius when spawning new stars."
+          >
+            <ToggleSwitch
+              checked={settings.reduceStars === true}
+              onChange={(v) => updateSetting('reduceStars', v)}
+            />
+          </SettingRow>
+          <StarTuningBlock settings={settings} updateSetting={updateSetting} />
+        </>
       )}
 
+    </div>
+  )
+}
 
+// ── Star tuning block ──────────────────────────────────────────────
+const STAR_SLIDERS = [
+  { key: 'starSize',         label: 'Size',          min: 0.2, max: 3,   step: 0.05, decimals: 2 },
+  { key: 'starDriftSpeed',   label: 'Drift speed',   min: 0,   max: 5,   step: 0.1,  decimals: 1 },
+  { key: 'starTwinkleSpeed', label: 'Twinkle speed', min: 0,   max: 4,   step: 0.05, decimals: 2 },
+  { key: 'starTwinkleDepth', label: 'Twinkle depth', min: 0,   max: 3,   step: 0.05, decimals: 2 },
+  { key: 'starCount',        label: 'Count',         min: 10,  max: 300, step: 5,    decimals: 0 },
+]
+
+const STAR_INFO = [
+  { label: 'Size',          desc: 'Multiplies the radius of every star.' },
+  { label: 'Drift speed',   desc: 'How fast stars glide. 0 = frozen in place.' },
+  { label: 'Twinkle speed', desc: 'How quickly stars pulse in brightness.' },
+  { label: 'Twinkle depth', desc: 'How much brightness varies. 0 = steady, higher = more dramatic.' },
+  { label: 'Count',         desc: 'Total stars rendered. More = denser sky.' },
+  { label: 'Direction',     desc: 'Direction all stars drift toward. Each star has a slight random offset so the field looks natural.' },
+]
+
+// Two rows of 4 arrows (top=upper directions, bottom=lower directions)
+const DIR_ROWS = [
+  ['↖', '↑', '↗', '→'],
+  ['←', '↙', '↓', '↘'],
+]
+
+function StarTuningBlock({ settings, updateSetting }) {
+  return (
+    <div className={styles.starBlock}>
+      <div className={styles.starBlockHeader}>
+        <span className={styles.starBlockTitle}>Star Tuning</span>
+        <div className={styles.infoWrap}>
+          <span className={styles.infoBtn}>?</span>
+          <div className={styles.infoTooltip}>
+            {STAR_INFO.map(({ label, desc }) => (
+              <div key={label} className={styles.infoRow}>
+                <span className={styles.infoKey}>{label}</span>
+                <span className={styles.infoDesc}>{desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.starSliders}>
+        {STAR_SLIDERS.map(({ key, label, min, max, step, decimals }) => (
+          <div key={key} className={styles.starSliderRow}>
+            <div className={styles.starSliderMeta}>
+              <span className={styles.starSliderLabel}>{label}</span>
+              <span className={styles.starSliderValue}>
+                {(settings[key] ?? min).toFixed(decimals)}
+              </span>
+            </div>
+            <input
+              type="range"
+              className={styles.starSlider}
+              min={min} max={max} step={step}
+              value={settings[key] ?? min}
+              onChange={e => updateSetting(key, parseFloat(e.target.value))}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className={styles.starDirLabel}>Direction</div>
+      <div className={styles.starDirGrid}>
+        {DIR_ROWS.map((row, ri) => (
+          <div key={ri} className={styles.starDirRow}>
+            {row.map(arrow => (
+              <button
+                key={arrow}
+                className={`${styles.dirBtn} ${settings.starDirection === arrow ? styles.dirBtnActive : ''}`}
+                onClick={() => updateSetting('starDirection', arrow)}
+                title={arrow}
+              >
+                {arrow}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

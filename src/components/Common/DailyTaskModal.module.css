@@ -433,3 +433,126 @@
         max-height: 90vh;
     }
 }
+
+/* ===== Project modal additions ===== */
+
+/* Editable title input on tinted header */
+.titleInput {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--font-heading);
+    font-size: 18px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    outline: none;
+    min-width: 0;
+}
+
+.titleInput:focus {
+    background: var(--bg-elevated);
+}
+
+.titleInput::placeholder {
+    color: var(--text-muted);
+}
+
+/* Project modal: header save / close buttons override (tinted bg variant) */
+.header.bundleHeader .saveBtn,
+.bundleHeader .saveBtn {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+}
+
+.bundleHeader .closeBtn {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+}
+
+.bundleHeader .closeBtn:hover {
+    background: var(--border-default);
+}
+
+/* Delete project button in header (distinct from per-task delete) */
+.deleteBundleBtn {
+    background: var(--bg-elevated);
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.deleteBundleBtn:hover {
+    background: rgba(255, 68, 68, 0.18);
+    color: var(--accent-danger, #ff4444);
+}
+
+/* Progress row that holds the hue slider on the right */
+.progressWithSlider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.progressWithSlider .progressBar {
+    margin-bottom: 6px;
+}
+
+.sliderGroup {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Hue slider (rainbow gradient) */
+.hueSlider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 120px;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(to right,
+        hsl(0, 70%, 50%), hsl(60, 70%, 50%), hsl(120, 70%, 50%),
+        hsl(180, 70%, 50%), hsl(240, 70%, 50%), hsl(300, 70%, 50%), hsl(360, 70%, 50%));
+    outline: none;
+    cursor: pointer;
+}
+
+.hueSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    border: 2px solid #fff;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.hueSlider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    border: 2px solid #fff;
+    cursor: pointer;
+}
+
+.colorSwatch {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--border-strong);
+    flex-shrink: 0;
+}

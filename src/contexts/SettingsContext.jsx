@@ -22,6 +22,12 @@ const DEFAULTS = {
   autoHideToolbar: true,
   showStars: true,
   reduceStars: false,
+  starSize: 1.40,
+  starDriftSpeed: 3.90,
+  starTwinkleSpeed: 1.00,
+  starTwinkleDepth: 1.65,
+  starCount: 135,
+  starDirection: '↙',
 }
 
 // ── Color utilities ────────────────────────────────────────────────

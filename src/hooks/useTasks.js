@@ -92,15 +92,15 @@ function whatMessage(action, subAction = null) {
 }
 
 
-// Custom hook for tasks, daily tasks, and projects
+// Custom hook for tasks, daily tasks, and bundles
 export const useTasks = (authFetch, API, isAuthed) => {
 
     const [tasks, setTasks] = useState([])
     const [dailyTasks, setDailyTasks] = useState([])
-    const [projects, setProjects] = useState([])
+    const [bundles, setBundles] = useState([])
     const [tasksPagination, setTasksPagination] = useState(null)
     const [dailyTasksPagination, setDailyTasksPagination] = useState(null)
-    const [projectsPagination, setProjectsPagination] = useState(null)
+    const [bundlesPagination, setBundlesPagination] = useState(null)
     const [loadingMore, setLoadingMore] = useState(false)
     const [loading, setLoading] = useState(true)
 
@@ -129,8 +129,8 @@ export const useTasks = (authFetch, API, isAuthed) => {
                 }
                 if(res3.ok) {
                     const data3 = await res3.json()
-                    setProjects(data3.projects)
-                    setProjectsPagination(data3.pagination)
+                    setBundles(data3.projects)
+                    setBundlesPagination(data3.pagination)
                 }
 
             } catch (error) {
@@ -186,26 +186,26 @@ export const useTasks = (authFetch, API, isAuthed) => {
         }
     }, [authFetch, API, dailyTasksPagination, loadingMore])
 
-    const loadMoreProjects = useCallback(async () => {
-        if(!projectsPagination?.hasNextPage || loadingMore) return
+    const loadMoreBundles = useCallback(async () => {
+        if(!bundlesPagination?.hasNextPage || loadingMore) return
 
         setLoadingMore(true)
         try {
             const response = await authFetch(
-                `${API}/projects?cursor=${projectsPagination.nextCursor}&limit=${projectsPagination.limit}`
+                `${API}/projects?cursor=${bundlesPagination.nextCursor}&limit=${bundlesPagination.limit}`
             )
             if(response.ok){
                 const data = await response.json()
-                setProjects(prev => [...prev, ...data.projects])
-                setProjectsPagination(data.pagination)
+                setBundles(prev => [...prev, ...data.projects])
+                setBundlesPagination(data.pagination)
             }
         } catch (error) {
-            logger.error('Error loading more projects:', error);
+            logger.error('Error loading more bundles:', error);
         }finally {
             setLoadingMore(false)
         }
 
-    }, [authFetch, API, projectsPagination, loadingMore])
+    }, [authFetch, API, bundlesPagination, loadingMore])
 
 
     // ----------- Task Operations ===========================
@@ -450,10 +450,10 @@ export const useTasks = (authFetch, API, isAuthed) => {
     }, [authFetch, API])
 
 
-    // ----------- Project CRUD ===========================
+    // ----------- Bundle CRUD ===========================
 
-    // POST create a project with tasks
-    const addProject = useCallback(async (title, tasks, color) => {
+    // POST create a bundle with tasks
+    const addBundle = useCallback(async (title, tasks, color) => {
 
         // Validate - title
         if(!title.trim()){
@@ -474,21 +474,21 @@ export const useTasks = (authFetch, API, isAuthed) => {
             });
 
             if (res.ok){
-                const newProject = await res.json();
-                setProjects(prev => [newProject, ...prev])
+                const newBundle = await res.json();
+                setBundles(prev => [newBundle, ...prev])
                 toast.success(whatMessage("created"))
             }
 
         } catch (error) {
-            logger.error("Error adding project:", error)
+            logger.error("Error adding bundle:", error)
             toast.error(whatMessage("failed", "create"))
         }
 
 
     }, [authFetch, API])
 
-    // PUT update project metadata (title, color, is_completed)
-    const updateProject = useCallback(async (id, { title, color, is_completed }) => {
+    // PUT update bundle metadata (title, color, is_completed)
+    const updateBundle = useCallback(async (id, { title, color, is_completed }) => {
         try {
 
             // -- (dynamically take the params that are only defined) ---
@@ -505,11 +505,11 @@ export const useTasks = (authFetch, API, isAuthed) => {
             })
 
             if(res.ok){
-                setProjects(prev => prev.map(p => p.id === id ? { ...p, ...cleanParams } : p))
+                setBundles(prev => prev.map(p => p.id === id ? { ...p, ...cleanParams } : p))
             }
 
         } catch (error) {
-            logger.error("Error updating project:", error)
+            logger.error("Error updating bundle:", error)
             toast.error(whatMessage("failed", "update"))
         }
 
@@ -517,25 +517,25 @@ export const useTasks = (authFetch, API, isAuthed) => {
 
     }, [authFetch, API])
 
-    // DELETE delete project (cascades to its tasks)
-    const deleteProject = useCallback(async (id) => {
+    // DELETE delete bundle (cascades to its tasks)
+    const deleteBundle = useCallback(async (id) => {
         try {
             const res = await authFetch(`${API}/projects/${id}`, { method: 'DELETE' })
             if(res.ok){
                 toast.success(whatMessage("deleted"))
-                setProjects(prev => prev.filter(p => p.id !== id))
+                setBundles(prev => prev.filter(p => p.id !== id))
             }
         } catch (error) {
-            logger.error("Error deleting project:", error)
+            logger.error("Error deleting bundle:", error)
             toast.error(whatMessage("failed", "delete"))
         }
     }, [authFetch, API])
 
 
-    // ----------- Project Task Operations ===========================
+    // ----------- Bundle Task Operations ===========================
 
-    // POST batch add tasks to a project
-    const addProjectTasks = useCallback(async (projectId, tasks) => {
+    // POST batch add tasks to a bundle
+    const addBundleTasks = useCallback(async (bundleId, tasks) => {
         try {
 
             // Validate - tasks
@@ -544,25 +544,25 @@ export const useTasks = (authFetch, API, isAuthed) => {
                 return
             }
 
-            const res = await authFetch(`${API}/projects/${projectId}/tasks`, {
+            const res = await authFetch(`${API}/projects/${bundleId}/tasks`, {
                 method: 'POST',
                 body: JSON.stringify({ tasks })
             })
 
             if(res.ok){
-                const updatedProject = await res.json()
+                const updatedBundle = await res.json()
                 toast.success(whatMessage("created"));
-                setProjects(project => project.map( p => p.id === projectId ? { ...p, tasks: updatedProject.tasks } : p ));
+                setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: updatedBundle.tasks } : p ));
             }
 
         } catch (error) {
-            logger.error("Error creating tasks in the project:", error)
+            logger.error("Error creating tasks in the bundle:", error)
             toast.error(whatMessage("failed", "create"))
         }
     }, [authFetch, API])
 
-    // PUT batch update project tasks
-    const batchUpdateProjectTasks = useCallback(async (projectId, tasks) => {
+    // PUT batch update bundle tasks
+    const batchUpdateBundleTasks = useCallback(async (bundleId, tasks) => {
 
         try {
 
@@ -572,7 +572,7 @@ export const useTasks = (authFetch, API, isAuthed) => {
                 return
             }
 
-            const res = await authFetch(`${API}/projects/${projectId}/tasks`, {
+            const res = await authFetch(`${API}/projects/${bundleId}/tasks`, {
                 method: 'PUT',
                 body: JSON.stringify({ tasks })
             });
@@ -580,40 +580,40 @@ export const useTasks = (authFetch, API, isAuthed) => {
             if(res.ok){
                 const data = await res.json()
                 toast.success(whatMessage("updated"));
-                setProjects(project => project.map( p => p.id === projectId ? { ...p, tasks: data.allTasks } : p ))
+                setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: data.allTasks } : p ))
             }
 
         } catch (error) {
-            logger.error("Error updating tasks in the project:", error)
+            logger.error("Error updating tasks in the bundle:", error)
             toast.error(whatMessage("failed", "update"))
         }
     }, [authFetch, API])
 
     // PUT toggle single task completion
-    const toggleProjectTaskCompletion = useCallback(async (projectId, taskId, isCompleted) => {
+    const toggleBundleTaskCompletion = useCallback(async (bundleId, taskId, isCompleted) => {
 
-        // Find the project, find the task inside it, flip is_completed
+        // Find the bundle, find the task inside it, flip is_completed
         // On error, revert
 
         try {
             // optimistic update like toggleDailyTaskCompletion
-            setProjects(project => project.map( p => p.id === projectId ? { ...p, tasks: p.tasks.map( task => task.id === taskId ? {...task, is_completed: isCompleted} : task) } : p ))
+            setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: p.tasks.map( task => task.id === taskId ? {...task, is_completed: isCompleted} : task) } : p ))
 
-            await authFetch(`${API}/projects/${projectId}/tasks/${taskId}`, {
+            await authFetch(`${API}/projects/${bundleId}/tasks/${taskId}`, {
                 method: 'PUT',
                 body: JSON.stringify({ is_completed: isCompleted })
             })
 
         } catch (error) {
             // if failed then revert back (have to add this since we're going omptimistic update)
-            setProjects(project => project.map( p => p.id === projectId ? { ...p, tasks: p.tasks.map( task => task.id === taskId ? {...task, is_completed: !isCompleted} : task) } : p ))
-            logger.error("Error completing task in the project:", error)
+            setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: p.tasks.map( task => task.id === taskId ? {...task, is_completed: !isCompleted} : task) } : p ))
+            logger.error("Error completing task in the bundle:", error)
             toast.error(whatMessage("failed", "complete"))
         }
     }, [authFetch, API])
 
-    // DELETE batch delete project tasks
-    const batchDeleteProjectTasks = useCallback(async (projectId, taskIds) => {
+    // DELETE batch delete bundle tasks
+    const batchDeleteBundleTasks = useCallback(async (bundleId, taskIds) => {
         try {
 
             // Validate - task IDs
@@ -622,18 +622,18 @@ export const useTasks = (authFetch, API, isAuthed) => {
                 return
             }
 
-            const res = await authFetch(`${API}/projects/${projectId}/tasks`, {
+            const res = await authFetch(`${API}/projects/${bundleId}/tasks`, {
                 method: 'DELETE',
                 body: JSON.stringify({ tasks: taskIds.map(id => ({ id })) })
             })
 
             if(res.ok){
                 toast.success(whatMessage("deleted"))
-                setProjects(project => project.map( p => p.id === projectId ? {...p, tasks: p.tasks.filter(task => !taskIds.includes(task.id))} : p ))
+                setBundles(bundle => bundle.map( p => p.id === bundleId ? {...p, tasks: p.tasks.filter(task => !taskIds.includes(task.id))} : p ))
             }
 
         } catch (error) {
-            logger.error("Error deleting tasks in the project:", error)
+            logger.error("Error deleting tasks in the bundle:", error)
             toast.error(whatMessage("failed", "delete"))
         }
     }, [authFetch, API])
@@ -642,13 +642,13 @@ export const useTasks = (authFetch, API, isAuthed) => {
     return {
         tasks,
         dailyTasks,
-        projects,
+        bundles,
         tasksPagination,
         dailyTasksPagination,
-        projectsPagination,
+        bundlesPagination,
         loadMoreTasks,
         loadMoreDailyTasks,
-        loadMoreProjects,
+        loadMoreBundles,
         loadingMore,
         loading,
         addTask,
@@ -661,12 +661,12 @@ export const useTasks = (authFetch, API, isAuthed) => {
         toggleDailyTaskCompletion,
         batchToggleDailyTasks,
         batchDeleteDailyTasks,
-        addProject,
-        updateProject,
-        deleteProject,
-        addProjectTasks,
-        batchUpdateProjectTasks,
-        toggleProjectTaskCompletion,
-        batchDeleteProjectTasks,
+        addBundle,
+        updateBundle,
+        deleteBundle,
+        addBundleTasks,
+        batchUpdateBundleTasks,
+        toggleBundleTaskCompletion,
+        batchDeleteBundleTasks,
     }
 }

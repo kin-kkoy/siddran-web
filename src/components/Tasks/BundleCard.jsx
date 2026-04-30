@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { FaCheck } from 'react-icons/fa'
 import { HiOutlineTrash } from 'react-icons/hi'
-import styles from './ProjectCard.module.css'
+import styles from './BundleCard.module.css'
 import ConfirmModal from '../Common/ConfirmModal'
 
-function ProjectCard({ project, toggleProjectTaskCompletion, deleteProject, onOpenDetail }) {
+function BundleCard({ bundle, toggleBundleTaskCompletion, deleteBundle, onOpenDetail }) {
 
     const [ showDeleteModal, setShowDeleteModal ] = useState(false);
 
@@ -15,34 +15,34 @@ function ProjectCard({ project, toggleProjectTaskCompletion, deleteProject, onOp
     }
 
     const confirmDelete = () => {
-        deleteProject(project.id)
+        deleteBundle(bundle.id)
         setShowDeleteModal(false)
     }
 
     const priorityOrder = { high: 0, normal: 1, low: 2 }
-    const sortedTasks = [...project.tasks].sort((a, b) => {
+    const sortedTasks = [...bundle.tasks].sort((a, b) => {
         if(a.is_completed !== b.is_completed) return a.is_completed ? 1 : -1
         return (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1)
     })
 
-    const totalCount = project.tasks.length;
-    const completedCount = project.tasks.filter(task => task.is_completed).length;
+    const totalCount = bundle.tasks.length;
+    const completedCount = bundle.tasks.filter(task => task.is_completed).length;
 
     return (
         <div
             className={styles.card}
-            onClick={() => onOpenDetail(project)}
-            style={project.color ? { backgroundColor: `color-mix(in srgb, ${project.color} 12%, var(--bg-elevated))` } : undefined}
+            onClick={() => onOpenDetail(bundle)}
+            style={bundle.color ? { backgroundColor: `color-mix(in srgb, ${bundle.color} 12%, var(--bg-elevated))` } : undefined}
         >
 
-            {/* Header: title + project priority + delete button */}
-            <div className={styles.header} style={project.color ? { backgroundColor: `color-mix(in srgb, ${project.color} 18%, var(--bg-elevated))` } : undefined}>
+            {/* Header: title + bundle priority + delete button */}
+            <div className={styles.header} style={bundle.color ? { backgroundColor: `color-mix(in srgb, ${bundle.color} 18%, var(--bg-elevated))` } : undefined}>
                 <div className={styles.headerLeft}>
-                    <h3 className={styles.title}>{project.title}</h3>
+                    <h3 className={styles.title}>{bundle.title}</h3>
                 </div>
                 <div className={styles.headerRight}>
-                    <span className={styles.projectPriority}>
-                        {project.priority}
+                    <span className={`${styles.bundlePriority} ${styles[`pp_${bundle.priority}`] || ''}`}>
+                        {bundle.priority?.replace(/_/g, ' ')}
                     </span>
                     <button className={styles.deleteBtn} onClick={handleDelete}>
                         <HiOutlineTrash size={18} />
@@ -54,18 +54,16 @@ function ProjectCard({ project, toggleProjectTaskCompletion, deleteProject, onOp
             <ul className={styles.taskList}>
                 {sortedTasks.map(task => (
                     <li key={task.id} className={`${styles.taskItem} ${task.is_completed ? styles.completed : ''}`}>
-                        {/* Checkbox */}
                         <button
                             className={`${styles.checkbox} ${task.is_completed ? styles.checked : ''}`}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                toggleProjectTaskCompletion(project.id, task.id, !task.is_completed)
+                                toggleBundleTaskCompletion(bundle.id, task.id, !task.is_completed)
                             }}
                         >
                             {task.is_completed && <FaCheck size={12} />}
                         </button>
 
-                        {/* Task Content */}
                         <div className={styles.taskContent}>
                             <span className={styles.taskTitle}>{task.title}</span>
                         </div>
@@ -79,13 +77,13 @@ function ProjectCard({ project, toggleProjectTaskCompletion, deleteProject, onOp
 
             {/* Footer: progress bar + "X / Y completed" */}
             {totalCount > 0 && (
-                <div className={styles.footer} style={project.color ? { backgroundColor: `color-mix(in srgb, ${project.color} 6%, var(--bg-primary))` } : undefined}>
+                <div className={styles.footer} style={bundle.color ? { backgroundColor: `color-mix(in srgb, ${bundle.color} 6%, var(--bg-primary))` } : undefined}>
                     <div className={styles.progressBar}>
                         <div
                             className={styles.progressFill}
                             style={{
                                 width: `${(completedCount / totalCount) * 100}%`,
-                                backgroundColor: project.color || undefined,
+                                backgroundColor: bundle.color || undefined,
                             }}
                         />
                     </div>
@@ -95,14 +93,13 @@ function ProjectCard({ project, toggleProjectTaskCompletion, deleteProject, onOp
                 </div>
             )}
 
-            {/* Delete Confirmation Modal */}
             <div>
                 <ConfirmModal
                     isOpen={showDeleteModal}
                     onClose={() => setShowDeleteModal(false)}
                     onConfirm={confirmDelete}
-                    title="Delete Project"
-                    message={`Are you sure you want to delete "${project.title}"? This action cannot be undone.`}
+                    title="Delete Bundle"
+                    message={`Are you sure you want to delete "${bundle.title}"? This action cannot be undone.`}
                     confirmText="Delete"
                     cancelText="Cancel"
                 />
@@ -112,4 +109,4 @@ function ProjectCard({ project, toggleProjectTaskCompletion, deleteProject, onOp
     )
 }
 
-export default ProjectCard
+export default BundleCard

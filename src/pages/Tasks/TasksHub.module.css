@@ -193,3 +193,58 @@
     opacity: 0.4;
     cursor: not-allowed;
 }
+
+/* ── Packed layout (row-masonry via JS) ─────────────────────── */
+.packedGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-auto-rows: 8px;
+    gap: 16px;
+    align-items: start;
+    position: relative;
+    z-index: 1;
+    animation: fadeUp 0.4s ease both;
+    animation-delay: 0.1s;
+}
+
+.packedGrid > * {
+    align-self: start;
+}
+
+.packedSentinel {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+/* ── Sectioned layout containers ────────────────────────────── */
+.sectionedWrapper {
+    position: relative;
+    z-index: 1;
+    animation: fadeUp 0.4s ease both;
+    animation-delay: 0.1s;
+}
+
+.sectionedPinned {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.sectionedBundles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.emptyStatePacked {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--text-dim);
+    margin-top: 40px;
+    font-style: italic;
+}

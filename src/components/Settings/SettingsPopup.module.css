@@ -298,3 +298,175 @@
 .themeSelected .swatchLabel {
   color: var(--accent-blue);
 }
+
+/* ── Star tuning block ───────────────────────────────────────── */
+.starBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+
+.starBlockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.starBlockTitle {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Info "?" button + tooltip */
+.infoWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.infoBtn {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  user-select: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.infoWrap:hover .infoBtn {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.infoTooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: 300px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px var(--shadow-color);
+  z-index: 200;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.infoWrap:hover .infoTooltip {
+  display: flex;
+}
+
+.infoRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.infoKey {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.infoDesc {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* Sliders */
+.starSliders {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.starSliderRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.starSliderMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.starSliderLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.starSliderValue {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.starSlider {
+  width: 100%;
+  accent-color: var(--accent-blue);
+  cursor: pointer;
+  height: 4px;
+}
+
+/* Direction picker */
+.starDirLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: -4px;
+}
+
+.starDirGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.starDirRow {
+  display: flex;
+  gap: 4px;
+}
+
+.dirBtn {
+  flex: 1;
+  height: 28px;
+  border-radius: 5px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.dirBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.dirBtnActive {
+  background: color-mix(in srgb, var(--accent-blue) 15%, transparent);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}

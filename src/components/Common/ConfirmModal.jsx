@@ -1,15 +1,19 @@
+import { createPortal } from 'react-dom'
 import styles from './ConfirmModal.module.css'
 
 function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmText = 'Delete', cancelText = 'Cancel' }) {
     if (!isOpen) return null
 
+    const stop = (e) => e.stopPropagation()
+
     const handleBackdropClick = (e) => {
+        e.stopPropagation()
         if (e.target === e.currentTarget) onClose()
     }
 
-    return (
-        <div className={styles.backdrop} onClick={handleBackdropClick}>
-            <div className={styles.modal}>
+    return createPortal(
+        <div className={styles.backdrop} onClick={handleBackdropClick} onMouseDown={stop}>
+            <div className={styles.modal} onClick={stop}>
                 <div className={styles.header}>
                     <h2>{title}</h2>
                     <button onClick={onClose} className={styles.closeBtn}>×</button>
@@ -28,7 +32,8 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmText 
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
 

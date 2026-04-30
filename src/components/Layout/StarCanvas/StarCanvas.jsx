@@ -4,20 +4,18 @@ import styles from './StarCanvas.module.css'
 
 const TWO_PI = Math.PI * 2
 
-// Color palette — weighted towards white/cool but with visible variety
 const STAR_COLORS = [
-  { color: [255, 210,  95], weight: 6  }, // warm gold
-  { color: [255, 175,  80], weight: 4  }, // amber
-  { color: [200, 150, 255], weight: 6  }, // violet
-  { color: [150, 185, 255], weight: 7  }, // sky blue
-  { color: [120, 225, 210], weight: 4  }, // teal
-  { color: [255, 175, 195], weight: 3  }, // rose
-  { color: [220, 215, 240], weight: 40 }, // near-white (majority)
-  { color: [200, 210, 255], weight: 20 }, // cool white
-  { color: [235, 230, 255], weight: 10 }, // bright white
+  { color: [255, 210,  95], weight: 6  },
+  { color: [255, 175,  80], weight: 4  },
+  { color: [200, 150, 255], weight: 6  },
+  { color: [150, 185, 255], weight: 7  },
+  { color: [120, 225, 210], weight: 4  },
+  { color: [255, 175, 195], weight: 3  },
+  { color: [220, 215, 240], weight: 40 },
+  { color: [200, 210, 255], weight: 20 },
+  { color: [235, 230, 255], weight: 10 },
 ]
 
-// Build a weighted random picker once
 const COLOR_TABLE = STAR_COLORS.flatMap(({ color, weight }) =>
   Array(weight).fill(color)
 )
@@ -26,11 +24,62 @@ function pickColor() {
   return COLOR_TABLE[Math.floor(Math.random() * COLOR_TABLE.length)]
 }
 
+// Label → angle map (canvas coords: y-down, so sin > 0 moves toward bottom)
+export const DIRECTION_ANGLES = {
+  '↑': Math.PI * 3 / 2,
+  '↗': Math.PI * 7 / 4,
+  '→': 0,
+  '↘': Math.PI / 4,
+  '↓': Math.PI / 2,
+  '↙': Math.PI * 3 / 4,
+  '←': Math.PI,
+  '↖': Math.PI * 5 / 4,
+}
+
+function makeStar(radiusRange, radiusBase) {
+  return {
+    x:              Math.random(),
+    y:              Math.random(),
+    radius:         Math.random() * radiusRange + radiusBase,
+    baseOpacity:    Math.random() * 0.45 + 0.15,
+    range:          Math.random() * 0.12 + 0.04,
+    phase:          Math.random() * Math.PI * 2,
+    speed:          Math.random() * 0.6 + 0.2,
+    driftMagnitude: Math.random() * 0.0025 + 0.0006,
+    angleOffset:    (Math.random() - 0.5) * (Math.PI / 6),
+    color:          pickColor(),
+  }
+}
+
 function StarCanvas() {
   const canvasRef = useRef(null)
   const { settings } = useSettings()
-  const showStars = settings.showStars !== false
+  const showStars   = settings.showStars   !== false
   const reduceStars = settings.reduceStars === true
+
+  // Animation refs — no state needed; settings sync updates these directly
+  const sizeRef         = useRef(settings.starSize         ?? 1.40)
+  const driftSpeedRef   = useRef(settings.starDriftSpeed   ?? 3.90)
+  const twinkleSpeedRef = useRef(settings.starTwinkleSpeed ?? 1.00)
+  const twinkleDepthRef = useRef(settings.starTwinkleDepth ?? 1.65)
+  const countRef        = useRef(settings.starCount        ?? 135)
+  const directionRef    = useRef(DIRECTION_ANGLES[settings.starDirection ?? '↙'] ?? Math.PI * 3 / 4)
+  const starsRef        = useRef([])
+  const radiusRangeRef  = useRef(1.3)
+  const radiusBaseRef   = useRef(0.4)
+
+  // Keep refs in sync with settings so the canvas updates live while Settings is open
+  useEffect(() => {
+    sizeRef.current         = settings.starSize         ?? 1.40
+    driftSpeedRef.current   = settings.starDriftSpeed   ?? 3.90
+    twinkleSpeedRef.current = settings.starTwinkleSpeed ?? 1.00
+    twinkleDepthRef.current = settings.starTwinkleDepth ?? 1.65
+    countRef.current        = settings.starCount        ?? 135
+    directionRef.current    = DIRECTION_ANGLES[settings.starDirection ?? '↙'] ?? Math.PI * 3 / 4
+  }, [
+    settings.starSize, settings.starDriftSpeed, settings.starTwinkleSpeed,
+    settings.starTwinkleDepth, settings.starCount, settings.starDirection,
+  ])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -46,28 +95,23 @@ function StarCanvas() {
     let animId
 
     const resize = () => {
-      canvas.width = window.innerWidth
+      canvas.width  = window.innerWidth
       canvas.height = window.innerHeight
     }
     resize()
     window.addEventListener('resize', resize)
 
-    const count = reduceStars ? 80 : 120
-    const radiusRange = reduceStars ? 1.0 : 2.0
-    const radiusBase = reduceStars ? 0.3 : 0.6
+    const radiusRange = reduceStars ? 0.7 : 1.3
+    const radiusBase  = reduceStars ? 0.2 : 0.4
+    radiusRangeRef.current = radiusRange
+    radiusBaseRef.current  = radiusBase
 
-    const stars = Array.from({ length: count }, () => ({
-      x: Math.random(),
-      y: Math.random(),
-      radius: Math.random() * radiusRange + radiusBase,
-      baseOpacity: Math.random() * 0.5 + 0.2,
-      range: Math.random() * 0.4 + 0.15,
-      phase: Math.random() * Math.PI * 2,
-      speed: Math.random() * 2.0 + 0.8,
-      color: pickColor(),
-    }))
+    starsRef.current = Array.from({ length: countRef.current }, () =>
+      makeStar(radiusRange, radiusBase)
+    )
 
-    let paused = false
+    let paused   = false
+    let lastTime = 0
     const onVisibility = () => { paused = document.hidden }
     document.addEventListener('visibilitychange', onVisibility)
 
@@ -75,17 +119,40 @@ function StarCanvas() {
       animId = requestAnimationFrame(draw)
       if (paused) return
 
+      const dt = lastTime ? (time - lastTime) / 1000 : 0
+      lastTime = time
+
+      const target = countRef.current
+      while (starsRef.current.length < target)
+        starsRef.current.push(makeStar(radiusRangeRef.current, radiusBaseRef.current))
+      while (starsRef.current.length > target)
+        starsRef.current.pop()
+
+      const sz  = sizeRef.current
+      const ds  = driftSpeedRef.current
+      const ts  = twinkleSpeedRef.current
+      const td  = twinkleDepthRef.current
+      const dir = directionRef.current
+
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       const t = time / 1000
 
-      for (const star of stars) {
-        const opacity = star.baseOpacity + Math.sin(t * star.speed + star.phase) * star.range
+      for (const star of starsRef.current) {
+        const angle = dir + star.angleOffset
+        star.x += Math.cos(angle) * star.driftMagnitude * ds * dt
+        star.y += Math.sin(angle) * star.driftMagnitude * ds * dt
+        if (star.x < 0) star.x += 1
+        if (star.x > 1) star.x -= 1
+        if (star.y < 0) star.y += 1
+        if (star.y > 1) star.y -= 1
+
+        const opacity = star.baseOpacity + Math.sin(t * star.speed * ts + star.phase) * star.range * td
         const [r, g, b] = star.color
         ctx.beginPath()
         ctx.arc(
           star.x * canvas.width,
           star.y * canvas.height,
-          star.radius,
+          star.radius * sz,
           0,
           TWO_PI
         )
