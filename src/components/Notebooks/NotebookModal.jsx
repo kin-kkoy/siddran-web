@@ -3,11 +3,8 @@ import styles from './NotebookModal.module.css'
 import { useNavigate } from 'react-router-dom'
 import { MdChromeReaderMode } from 'react-icons/md'
 import { HiOutlineX, HiPlus } from 'react-icons/hi'
-import logger from '../../utils/logger'
 
-function NotebookModal({ notebook, onClose, authFetch, API, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook, notebookNotesCache, allNotes }) {
-    const [notebookNotes, setNotebookNotes] = useState([])
-    const [loading, setLoading] = useState(false)
+function NotebookModal({ notebook, onClose, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook, notebookNotes, allNotes }) {
     const [tags, setTags] = useState(notebook?.tags || '')
     const [name, setName] = useState(notebook?.name || '')
     const [showPicker, setShowPicker] = useState(false)
@@ -15,30 +12,11 @@ function NotebookModal({ notebook, onClose, authFetch, API, updateNotebookTags, 
     const navigate = useNavigate()
 
     const availableNotes = allNotes.filter(n => !n.notebook_id)
-
-    useEffect(() => {
-        if (notebookNotesCache.current[notebook.id]) {
-            setNotebookNotes(notebookNotesCache.current[notebook.id])
-            return
-        }
-
-        async function fetchNotebookNotes() {
-            setLoading(true)
-            try {
-                const res = await authFetch(`${API}/notebooks/${notebook.id}/notes`);
-                if(!res.ok) throw new Error("Failed to fetch the notes of the notebook");
-                const data = await res.json()
-                setNotebookNotes(data.notes)
-                notebookNotesCache.current[notebook.id] = data.notes
-            } catch (error) {
-                logger.error(`Error fetching notebook's notes:`, error)
-            } finally {
-                setLoading(false)
-            }
-        }
-
-        fetchNotebookNotes()
-    }, [notebook.id, authFetch, API, notebookNotesCache])
+    // Hook prefetches notebook notes on auth; this prop reflects the cached list.
+    // It may be undefined for a beat right after the notebook was just created
+    // and before its prefetch lands — render an empty list in that case.
+    const notes = notebookNotes || []
+    const loading = notebookNotes === undefined
 
     useEffect(() => {
         setTags(notebook?.tags || '')
@@ -82,9 +60,6 @@ function NotebookModal({ notebook, onClose, authFetch, API, updateNotebookTags, 
     const handleRemoveNote = (e, noteId) => {
         e.stopPropagation()
         removeNoteFromNotebook(notebook.id, noteId)
-        const updated = notebookNotes.filter(n => n.id !== noteId)
-        setNotebookNotes(updated)
-        notebookNotesCache.current[notebook.id] = updated
     }
 
     const togglePickerNote = (noteId) => {
@@ -95,12 +70,7 @@ function NotebookModal({ notebook, onClose, authFetch, API, updateNotebookTags, 
 
     const handleAddNotes = async () => {
         if (selectedNoteIds.length === 0) return
-        const added = await addNotesToNotebook(notebook.id, selectedNoteIds)
-        if (added.length > 0) {
-            const updated = [...notebookNotes, ...added]
-            setNotebookNotes(updated)
-            notebookNotesCache.current[notebook.id] = updated
-        }
+        await addNotesToNotebook(notebook.id, selectedNoteIds)
         setSelectedNoteIds([])
         setShowPicker(false)
     }
@@ -144,13 +114,13 @@ function NotebookModal({ notebook, onClose, authFetch, API, updateNotebookTags, 
                         <p className={styles.loading}>Loading notes....</p>
                     ) : (
                         <>
-                            {notebookNotes.length === 0 && !showPicker && (
+                            {notes.length === 0 && !showPicker && (
                                 <p className={styles.empty}>No notes in this notebook yet</p>
                             )}
 
-                            {notebookNotes.length > 0 && (
+                            {notes.length > 0 && (
                                 <div className={styles.noteList}>
-                                    {notebookNotes.map( note => (
+                                    {notes.map( note => (
                                         <div key={note.id}
                                             className={styles.noteItem}
                                             onClick={() => handleNoteClick(note.id)}

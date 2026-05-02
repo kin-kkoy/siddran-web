@@ -15,6 +15,34 @@
     margin-bottom: 20px;
 }
 
+.viewToggleWrapper {
+    position: sticky;
+    top: 12px;
+    z-index: 20;
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: -40px;
+    pointer-events: none;
+}
+
+.viewToggleFloating {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    transition: color 0.2s;
+}
+
+.viewToggleFloating:hover {
+    color: var(--text-primary);
+}
+
 .backBtn {
     display: flex;
     align-items: center;

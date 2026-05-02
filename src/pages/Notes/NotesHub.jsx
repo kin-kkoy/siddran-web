@@ -8,13 +8,15 @@ import HorizontalNotebookCard from '../../components/Notebooks/HorizontalNoteboo
 import NotebookCard from '../../components/Notebooks/NotebookCard'
 import NotebookModal from '../../components/Notebooks/NotebookModal'
 import CreateNotebookModal from '../../components/Notebooks/CreateNotebookModal'
+import ImportNotebookModal from '../../components/Notebooks/ImportNotebookModal'
 import ConfirmModal from '../../components/Common/ConfirmModal'
-import { HiOutlineTrash, HiOutlineViewGrid, HiOutlineViewList } from 'react-icons/hi'
+import { HiOutlineTrash, HiOutlineViewGrid, HiOutlineViewList, HiOutlineUpload } from 'react-icons/hi'
 import { LuNotebookPen } from 'react-icons/lu'
 import { toast } from '../../utils/toast'
+import { compareByFavorite } from '../../utils/noteSorting'
 
 // obtains the notes and
-function NotesHub({ notes, notebooks, notesPagination, notebooksPagination, loadMoreNotes, loadMoreNotebooks, loadingMore, addNote, deleteNote, toggleFavorite, updateColor, createNotebook, deleteNotebook, toggleFavoriteNotebook, updateNotebookColor, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook, authFetch, API }) {
+function NotesHub({ notes, notebooks, notebookNotesById, notesPagination, notebooksPagination, loadMoreNotes, loadMoreNotebooks, loadingMore, addNote, deleteNote, toggleFavorite, updateColor, createNotebook, deleteNotebook, toggleFavoriteNotebook, updateNotebookColor, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook, importMarkdownFiles, authFetch, API }) {
 
   // Persist view mode in localStorage
   const [viewMode, setViewMode] = useState(() => {
@@ -27,12 +29,11 @@ function NotesHub({ notes, notebooks, notesPagination, notebooksPagination, load
   const [searchQuery, setSearchQuery] = useState("")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [pendingImportFiles, setPendingImportFiles] = useState(null)
+  const importInputRef = useRef(null)
 
   // Helper to check if in any selection mode
   const isSelectionMode = selectionMode !== null
-
-  // Cache for notebook notes (avoids refetching on every modal open)
-  const notebookNotesCache = useRef({})
 
   // Refs for infinite scroll sentinels
   const notesSentinelRef = useRef(null)
@@ -162,6 +163,25 @@ function NotesHub({ notes, notebooks, notesPagination, notebooksPagination, load
     setShowCreateModal(false)
   }
 
+  const handleImportClick = () => importInputRef.current?.click()
+
+  const handleImportFilesSelected = (e) => {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (files.length === 0) return
+    if (files.length === 1) {
+      importMarkdownFiles(files, null)
+    } else {
+      setPendingImportFiles(files)
+    }
+  }
+
+  const handleConfirmImportNotebook = async (notebookName) => {
+    const files = pendingImportFiles
+    setPendingImportFiles(null)
+    if (files) await importMarkdownFiles(files, notebookName)
+  }
+
   const handleOpenNotebook = notebook => setSelectedNotebook(notebook)
 
   const handleCloseModal = () => setSelectedNotebook(null)
@@ -181,15 +201,14 @@ function NotesHub({ notes, notebooks, notesPagination, notebooksPagination, load
     if (tags.includes(searchTerm)) return true
 
     return false
-  }).sort((a, b) => {
-    // Sort by favorite status (favorites first ofc)
-    if (a.is_favorite && !b.is_favorite) return -1
-    if (!a.is_favorite && b.is_favorite) return 1
-    return 0
-  })
+  }).sort(compareByFavorite)
 
   // Filter notes that aren't a part of any notebook, then apply search filter, then sort by favorites first
-  const loneNotes = notes.filter(note => !note.notebook_id).filter(note => {
+  const loneNotes = notes.filter(note =>
+      !note.notebook_id
+      || note.notebook_id === "null"
+      || !notebooks.some(nb => nb.id === note.notebook_id)
+    ).filter(note => {
       if (!searchQuery.trim()) return true // if search bar is empty then return everything (show everythign basically)
 
       const query = searchQuery.toLowerCase().trim()
@@ -203,12 +222,7 @@ function NotesHub({ notes, notebooks, notesPagination, notebooksPagination, load
 
       return false
     })
-    .sort((a, b) => {
-      // Sort by favorite status (favorites first ofc)
-      if (a.is_favorite && !b.is_favorite) return -1
-      if (!a.is_favorite && b.is_favorite) return 1
-      return 0
-    })
+    .sort(compareByFavorite)
 
 
   return (
@@ -232,6 +246,25 @@ function NotesHub({ notes, notebooks, notesPagination, notebooksPagination, load
         />
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".md,text/markdown"
+            multiple
+            style={{ display: 'none' }}
+            onChange={handleImportFilesSelected}
+          />
+
+          {!isSelectionMode && (
+            <button
+              onClick={handleImportClick}
+              className={styles.toggleBtn}
+              title="Import markdown files"
+            >
+              <HiOutlineUpload size={18} />
+            </button>
+          )}
+
           {/* Create Notebook button - visible when not in delete mode */}
           {selectionMode !== 'delete' && (
             <button
@@ -282,27 +315,35 @@ function NotesHub({ notes, notebooks, notesPagination, notebooksPagination, load
         {/* display NOTEBOOKS FIRST */}
         {!isSelectionMode && (
           viewMode === "list" ?
-            filteredNotebooks.map(notebook => (
-              <HorizontalNotebookCard
-                key={notebook.id}
-                notebook={notebook}
-                deleteNotebook={deleteNotebook}
-                onOpen={handleOpenNotebook}
-                toggleFavoriteNotebook={toggleFavoriteNotebook}
-                updateNotebookColor={updateNotebookColor}
-              />
-            ))
+            filteredNotebooks.map(notebook => {
+              const noteCount = notes.filter(n => n.notebook_id === notebook.id).length
+              return (
+                <HorizontalNotebookCard
+                  key={notebook.id}
+                  notebook={notebook}
+                  noteCount={noteCount}
+                  deleteNotebook={deleteNotebook}
+                  onOpen={handleOpenNotebook}
+                  toggleFavoriteNotebook={toggleFavoriteNotebook}
+                  updateNotebookColor={updateNotebookColor}
+                />
+              )
+            })
             :
-            filteredNotebooks.map(notebook => (
-              <NotebookCard
-                key={notebook.id}
-                notebook={notebook}
-                deleteNotebook={deleteNotebook}
-                onOpen={handleOpenNotebook}
-                toggleFavoriteNotebook={toggleFavoriteNotebook}
-                updateNotebookColor={updateNotebookColor}
-              />
-            ))
+            filteredNotebooks.map(notebook => {
+              const noteCount = notes.filter(n => n.notebook_id === notebook.id).length
+              return (
+                <NotebookCard
+                  key={notebook.id}
+                  notebook={notebook}
+                  noteCount={noteCount}
+                  deleteNotebook={deleteNotebook}
+                  onOpen={handleOpenNotebook}
+                  toggleFavoriteNotebook={toggleFavoriteNotebook}
+                  updateNotebookColor={updateNotebookColor}
+                />
+              )
+            })
         )}
 
         {/* afterwards display the LONE NOTES (notes that aren't part of a notebook) */}
@@ -357,7 +398,7 @@ function NotesHub({ notes, notebooks, notesPagination, notebooksPagination, load
           renameNotebook={renameNotebook}
           removeNoteFromNotebook={removeNoteFromNotebook}
           addNotesToNotebook={addNotesToNotebook}
-          notebookNotesCache={notebookNotesCache}
+          notebookNotes={notebookNotesById[selectedNotebook.id]}
           allNotes={notes}
         />
       )}
@@ -368,6 +409,15 @@ function NotesHub({ notes, notebooks, notesPagination, notebooksPagination, load
           onClose={() => setShowCreateModal(false)}
           onCreate={handleCreateNotebook}
           selectedNotesCount={selectedNotes.length}
+        />
+      )}
+
+      {/* Import Notebook Modal (bulk import) */}
+      {pendingImportFiles && (
+        <ImportNotebookModal
+          fileCount={pendingImportFiles.length}
+          onClose={() => setPendingImportFiles(null)}
+          onConfirm={handleConfirmImportNotebook}
         />
       )}
 

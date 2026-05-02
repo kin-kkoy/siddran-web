@@ -33,6 +33,7 @@ import { $setBlocksType } from '@lexical/selection';
 import { $createCodeNode, $isCodeNode } from '@lexical/code';
 import { $findMatchingParent, $getNearestNodeOfType, mergeRegister } from '@lexical/utils';
 import { TOGGLE_LINK_COMMAND, $isLinkNode, $createLinkNode } from '@lexical/link';
+import { INSERT_TABLE_COMMAND } from '@lexical/table';
 
 import {
   FaBold,
@@ -46,12 +47,16 @@ import {
   FaUndo,
   FaRedo,
   FaCheckSquare,
+  FaTable,
+  FaImage,
 } from 'react-icons/fa';
 import { LuHeading1, LuHeading2, LuHeading3, LuPilcrow } from 'react-icons/lu';
 
 import styles from './ToolbarPlugin.module.css';
 import LinkPopover from './LinkPopover';
 import { useSettings } from '../../../contexts/SettingsContext';
+import { useApi } from '../../../contexts/ApiContext';
+import { insertImagesFromFiles } from './ImagePlugin';
 
 function ToolbarPlugin({ isReadMode }) {
   const [editor] = useLexicalComposerContext();
@@ -450,6 +455,36 @@ function ToolbarPlugin({ isReadMode }) {
     editor.focus();
   }, [editor]);
 
+  const { authFetch, API } = useApi();
+
+  const openImagePicker = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+    input.multiple = true;
+    input.style.display = 'none';
+    input.addEventListener('change', (e) => {
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        insertImagesFromFiles(editor, authFetch, API, files);
+      }
+      input.remove();
+    });
+    document.body.appendChild(input);
+    input.click();
+  }, [editor, authFetch, API]);
+
+  const insertTable = useCallback(() => {
+    // 2x2 default (header row + one body row, two columns). Lexical inserts
+    // at the current selection — clicking with caret on an empty paragraph
+    // drops the table cleanly into the document flow.
+    editor.dispatchCommand(INSERT_TABLE_COMMAND, {
+      columns: '2',
+      rows: '2',
+      includeHeaders: true,
+    });
+  }, [editor]);
+
   const undo = () => editor.dispatchCommand(UNDO_COMMAND, undefined);
   const redo = () => editor.dispatchCommand(REDO_COMMAND, undefined);
 
@@ -622,6 +657,26 @@ function ToolbarPlugin({ isReadMode }) {
             tabIndex={shouldShowDock ? 0 : -1}
           >
             <FaLink />
+          </button>
+
+          {/* Table */}
+          <button
+            onClick={insertTable}
+            className={styles.toolbarBtn}
+            title="Insert Table"
+            tabIndex={shouldShowDock ? 0 : -1}
+          >
+            <FaTable />
+          </button>
+
+          {/* Image */}
+          <button
+            onClick={openImagePicker}
+            className={styles.toolbarBtn}
+            title="Insert Image"
+            tabIndex={shouldShowDock ? 0 : -1}
+          >
+            <FaImage />
           </button>
         </div>
 

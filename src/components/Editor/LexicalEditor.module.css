@@ -153,6 +153,34 @@
   color: var(--text-dim);
 }
 
+/* Wrapper li (a list item whose only child is a nested ul/ol) — Lexical
+   still applies the checked/unchecked classes to it, which would render a
+   stray checkbox alongside the real children. Suppress all checkbox
+   affordances on these wrapper items via :has(). */
+:global(.editor-listitem-checked):has(> ul),
+:global(.editor-listitem-checked):has(> ol),
+:global(.editor-listitem-unchecked):has(> ul),
+:global(.editor-listitem-unchecked):has(> ol) {
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  list-style: none;
+  cursor: default;
+  text-decoration: none;
+  color: inherit;
+}
+
+:global(.editor-listitem-checked):has(> ul)::before,
+:global(.editor-listitem-checked):has(> ol)::before,
+:global(.editor-listitem-unchecked):has(> ul)::before,
+:global(.editor-listitem-unchecked):has(> ol)::before,
+:global(.editor-listitem-checked):has(> ul)::after,
+:global(.editor-listitem-checked):has(> ol)::after,
+:global(.editor-listitem-unchecked):has(> ul)::after,
+:global(.editor-listitem-unchecked):has(> ol)::after {
+  content: none !important;
+  display: none !important;
+}
+
 /* Quote */
 :global(.editor-quote) {
   border-left: 4px solid var(--accent-blue);
@@ -258,4 +286,77 @@
   height: auto;
   border-radius: 4px;
   margin: 16px 0;
+}
+
+/* Spoiler — Discord-style click-to-reveal */
+:global(.spoiler) {
+  border-radius: 3px;
+  padding: 0 4px;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+:global(.spoiler.spoiler-hidden) {
+  background-color: var(--text-primary);
+  color: transparent;
+  cursor: pointer;
+  user-select: none;
+  text-shadow: none;
+}
+
+:global(.spoiler.spoiler-hidden) * {
+  color: transparent !important;
+  background-color: transparent !important;
+}
+
+:global(.spoiler.spoiler-revealed) {
+  background-color: var(--bg-secondary, rgba(127, 127, 127, 0.18));
+  color: inherit;
+}
+
+/* Tables — round-tripped via remark-gfm. table-layout: fixed keeps column
+   width edits predictable; width:100% keeps large tables inside the same
+   readable edge as normal text instead of spilling out of the editor. */
+:global(.editor-table) {
+  border-collapse: collapse;
+  margin: 16px 0;
+  table-layout: fixed;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+:global(.editor-table-row) {
+  /* purely structural — kept here so future row-level styling has an anchor */
+}
+
+:global(.editor-table-cell) {
+  border: 1px solid var(--border-default);
+  padding: 8px 12px;
+  vertical-align: top;
+  min-width: 0;
+  position: relative;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+:global(.editor-table-cell-header) {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: left;
+}
+
+/* Multi-cell selection. @lexical/table applies these classes while the user
+   drags across cells; the right-click context menu detects the same state
+   via $isTableSelection. caret-color: transparent suppresses the blinking
+   caret on individual cells while a multi-cell selection is active. */
+:global(.editor-table-cell-selected) {
+  background-color: rgba(127, 127, 127, 0.22);
+  caret-color: transparent;
+}
+
+:global(.editor-table-selected) {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: -2px;
 }

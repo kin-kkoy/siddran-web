@@ -5,7 +5,7 @@ import ProfileDropdown from "../ProfileDropdown/ProfileDropdown";
 import logger from "../../../utils/logger";
 
 
-function Sidebar({ username, isCollapsed, toggleSidebar, notes, currentNoteID, setIsAuthed }) {
+function Sidebar({ username, isCollapsed, toggleSidebar, notes, notebooks, currentNoteID, setIsAuthed }) {
 
     const navigate = useNavigate()
     const location = useLocation()
@@ -97,6 +97,20 @@ function Sidebar({ username, isCollapsed, toggleSidebar, notes, currentNoteID, s
                             <span className={styles.navLabel}>Tasks</span>
                     </Link>
 
+                    <Link to="/sandboxes"
+                        className={`${styles.menuBtn} ${location.pathname === '/sandboxes' ? styles.active : ''}`}
+                        title="SandBoxes">
+                            <span className={styles.navDot}></span>
+                            <span className={styles.navLabel}>SandBoxes</span>
+                    </Link>
+
+                    <Link to="/calendar"
+                        className={`${styles.menuBtn} ${location.pathname === '/calendar' ? styles.active : ''}`}
+                        title="Calendar">
+                            <span className={styles.navDot}></span>
+                            <span className={styles.navLabel}>Calendar</span>
+                    </Link>
+
                     <div className={styles.divider} />
 
                     <Link to="/mods"
@@ -112,7 +126,14 @@ function Sidebar({ username, isCollapsed, toggleSidebar, notes, currentNoteID, s
 
             {/* MIDDLE SECTION: the list of notes/tasks/mods */}
             <div className={styles.menuSection}>
-                {onNotePage && (<SidebarList isCollapsed={isCollapsed} notes={notes} currentNoteID={currentNoteID}/>)}
+                {onNotePage && (
+                    <SidebarList
+                        isCollapsed={isCollapsed}
+                        notes={notes}
+                        notebooks={notebooks}
+                        currentNoteID={currentNoteID}
+                    />
+                )}
             </div>
 
 

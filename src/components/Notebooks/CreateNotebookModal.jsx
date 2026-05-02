@@ -5,15 +5,22 @@ import { toast } from '../../utils/toast'
 function CreateNotebookModal({ onClose, onCreate, selectedNotesCount }) {
     const [name, setName] = useState('')
     const [tags, setTags] = useState('')
+    const [submitting, setSubmitting] = useState(false)
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
+        if (submitting) return
         if (!name.trim()) {
             toast.warning('Please enter a notebook name')
             return
         }
-        onCreate(name, tags)
-        onClose()
+        setSubmitting(true)
+        try {
+            await onCreate(name, tags)
+            onClose()
+        } finally {
+            setSubmitting(false)
+        }
     }
 
     const handleBackdropClick = (e) => {
@@ -60,11 +67,11 @@ function CreateNotebookModal({ onClose, onCreate, selectedNotesCount }) {
                     </div>
 
                     <div className={styles.actions}>
-                        <button type="button" onClick={onClose} className={styles.cancelBtn}>
+                        <button type="button" onClick={onClose} className={styles.cancelBtn} disabled={submitting}>
                             Cancel
                         </button>
-                        <button type="submit" className={styles.createBtn}>
-                            Create Notebook
+                        <button type="submit" className={styles.createBtn} disabled={submitting}>
+                            {submitting ? 'Creating…' : 'Create Notebook'}
                         </button>
                     </div>
                 </form>

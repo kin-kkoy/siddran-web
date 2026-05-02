@@ -1,0 +1,20 @@
+.resizerRoot {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+}
+
+.resizer {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+  border-radius: 2px;
+}
+
+@media (pointer: coarse) {
+  .resizer {
+    background-color: var(--accent-blue);
+    opacity: 0.35;
+  }
+}

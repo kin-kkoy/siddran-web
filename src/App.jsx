@@ -8,32 +8,50 @@ import NotesHub from "./pages/Notes/NotesHub.jsx"
 import LoginPage from "./pages/Auth/LoginPage.jsx"
 import RegisterPage from "./pages/Auth/RegisterPage.jsx"
 import TasksHub from "./pages/Tasks/TasksHub.jsx"
+import SandBoxes from "./pages/Sandbox/SandBoxes.jsx"
+import Calendar from "./pages/Calendar/Calendar.jsx"
 import ModsHub from "./pages/Mods/ModsHub.jsx"
 import NotFoundPage from "./pages/NotFoundPage.jsx"
 import { useNotes } from "./hooks/useNotes.js"
 import { useTasks } from "./hooks/useTasks.js"
 import { SettingsProvider } from "./contexts/SettingsContext.jsx"
+import { ApiProvider } from "./contexts/ApiContext.jsx"
 import SettingsPopup from "./components/Settings/SettingsPopup.jsx"
 import ToastContainer from "./components/Common/ToastContainer.jsx"
 import logger from "./utils/logger.js"
 
 // Wrapper component to get the ID from route parameters
-function NotePageWrapper({ notes, editTitle, editBody, updateTags, toggleFavorite, updateColor, onNoteChange}){
+function NotePageWrapper({ notes, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, onNoteChange}){
   const { id } = useParams()
 
   useEffect(() => {
     onNoteChange(id)
   }, [id, onNoteChange])
 
-  return <NotePage notes={notes} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} />
+  return <NotePage notes={notes} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} exportNote={exportNote} />
 }
 
 function App() {
 
   const [isAuthed, setIsAuthed] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState(false) // for sidebar's margin. It's setter logic will be done on the sidebar (which is the child)
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth < 1090 || window.innerHeight < 600
+  })
   const [currentNoteID, setCurrentNoteID] = useState(null)
   const [username, setUsername] = useState(null)
+
+  // Auto-collapse sidebar on small viewports. One-way: shrink on small,
+  // never auto-expand — once big again the user can toggle manually.
+  useEffect(() => {
+    const checkViewport = () => {
+      if (window.innerWidth < 1090 || window.innerHeight < 600) {
+        setIsCollapsed(true)
+      }
+    }
+    window.addEventListener('resize', checkViewport)
+    return () => window.removeEventListener('resize', checkViewport)
+  }, [])
 
   const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -155,7 +173,7 @@ function App() {
 
   // ------------- DATA LOGIC (Adding, deleting, etc. of Notes and Notebooks) ===================================
   const {
-    notes, notebooks, notesPagination, notebooksPagination, loadMoreNotes, loadMoreNotebooks, loadingMore, addNote, deleteNote, editTitle, editBody, toggleFavorite, updateColor, updateTags, createNotebook, deleteNotebook, toggleFavoriteNotebook, updateNotebookColor, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook
+    notes, notebooks, notebookNotesById, notesPagination, notebooksPagination, loadMoreNotes, loadMoreNotebooks, loadingMore, addNote, deleteNote, editTitle, editBody, toggleFavorite, updateColor, updateTags, createNotebook, deleteNotebook, toggleFavoriteNotebook, updateNotebookColor, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook, importMarkdownFiles, exportNote
   } = useNotes(authFetch, API, isAuthed)
 
   // ------------- TASKS DATA LOGIC ===================================
@@ -168,6 +186,7 @@ function App() {
   const notesHubElement = (
     <NotesHub notes={notes}
     notebooks={notebooks}
+    notebookNotesById={notebookNotesById}
     notesPagination={notesPagination}
     notebooksPagination={notebooksPagination}
     loadMoreNotes={loadMoreNotes}
@@ -185,6 +204,7 @@ function App() {
     renameNotebook={renameNotebook}
     removeNoteFromNotebook={removeNoteFromNotebook}
     addNotesToNotebook={addNotesToNotebook}
+    importMarkdownFiles={importMarkdownFiles}
     authFetch={authFetch}
     API={API}/>
   )
@@ -233,6 +253,7 @@ function App() {
   return (
 
     <SettingsProvider authFetch={authFetch} API={API} isAuthed={isAuthed}>
+    <ApiProvider authFetch={authFetch} API={API}>
     <div style={style}>
 
       {/* Background effects */}
@@ -267,6 +288,7 @@ function App() {
               isCollapsed={isCollapsed}
               toggleSidebar={setIsCollapsed}
               notes={notes}
+              notebooks={notebooks}
               currentNoteID={currentNoteID}
               setIsAuthed={setIsAuthed}
             />
@@ -307,6 +329,7 @@ function App() {
                       updateTags={updateTags}
                       toggleFavorite={toggleFavorite}
                       updateColor={updateColor}
+                      exportNote={exportNote}
                       onNoteChange={setCurrentNoteID}
                       />
                     }
@@ -314,6 +337,8 @@ function App() {
                   {/* <Route path="/notebooks/:id" element={Notebook} */}
 
                   <Route path="/tasks" element={tasksHubElement} />
+                  <Route path="/sandboxes" element={<SandBoxes />} />
+                  <Route path="/calendar" element={<Calendar />} />
                   <Route path="/mods" element={<ModsHub />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </>
@@ -334,6 +359,7 @@ function App() {
 
       </BrowserRouter>
     </div>
+    </ApiProvider>
     </SettingsProvider>
 
   )

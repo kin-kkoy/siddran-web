@@ -18,19 +18,25 @@ function AddTaskCard({ addTask, addBundle, viewMode }) {
     const [dailyTasksDraft, setDailyTasksDraft] = useState([])
     // Same thing as above but for bundle tasks this time
     const [bundleTasksDraft, setBundleTasksDraft] = useState([])
+    const [submitting, setSubmitting] = useState(false)
 
     // ---------- for normal tasks ----------
     const handleSubmit = async (e) => {
         e.preventDefault()
+        if (submitting) return
 
         if(taskType === 'normal'){
-            await addTask(title, description, priority, dueDate, taskType)
-            // Clear form and close
-            setTitle("")
-            setDescription("")
-            setPriority("normal")
-            setDueDate("")
-            setShowForm(false)
+            setSubmitting(true)
+            try {
+                await addTask(title, description, priority, dueDate, taskType)
+                setTitle("")
+                setDescription("")
+                setPriority("normal")
+                setDueDate("")
+                setShowForm(false)
+            } finally {
+                setSubmitting(false)
+            }
         }
     }
 
@@ -82,28 +88,40 @@ function AddTaskCard({ addTask, addBundle, viewMode }) {
     }
 
     const submitDailyTaskDraft = async () => {
+        if (submitting) return
         if(dailyTasksDraft.length === 0){
             toast.warning("Add at least one task to the list")
             return
         }
 
-        // title will be an array/list of the tasks instead of a usual string, this happens for daily tasks only
-        await addTask(dailyTasksDraft, null, null, null, "daily")
-        setDailyTasksDraft([]) // submit
-        setTitle("")
-        setShowForm(false) // then close
+        setSubmitting(true)
+        try {
+            // title will be an array/list of the tasks instead of a usual string, this happens for daily tasks only
+            await addTask(dailyTasksDraft, null, null, null, "daily")
+            setDailyTasksDraft([])
+            setTitle("")
+            setShowForm(false)
+        } finally {
+            setSubmitting(false)
+        }
     }
     const submitBundleDraft = async () => {
+        if (submitting) return
         if(bundleTasksDraft.length === 0) {
             toast.warning("Add at least one task to the list")
             return
         }
 
-        // title will be an array/list of the tasks instead of a usual string, this also happens to bundle tasks
-        await addBundle(bundleTitle, bundleTasksDraft, color)
-        setBundleTasksDraft([])
-        setBundleTitle("")
-        setShowForm(false)
+        setSubmitting(true)
+        try {
+            // title will be an array/list of the tasks instead of a usual string, this also happens to bundle tasks
+            await addBundle(bundleTitle, bundleTasksDraft, color)
+            setBundleTasksDraft([])
+            setBundleTitle("")
+            setShowForm(false)
+        } finally {
+            setSubmitting(false)
+        }
     }
 
     const handleTitleKeyDown = (e) => {
@@ -342,16 +360,18 @@ function AddTaskCard({ addTask, addBundle, viewMode }) {
                     </button>
 
                     {taskType === 'normal' && (
-                        <button type="submit" className={styles.submitBtn}>Create Task</button>
+                        <button type="submit" className={styles.submitBtn} disabled={submitting}>
+                            {submitting ? 'Creating…' : 'Create Task'}
+                        </button>
                     )}
                     {taskType === 'daily' && dailyTasksDraft.length > 0 && (
-                        <button type="button" onClick={submitDailyTaskDraft} className={styles.createAllBtn}>
-                            Create All ({dailyTasksDraft.length})
+                        <button type="button" onClick={submitDailyTaskDraft} className={styles.createAllBtn} disabled={submitting}>
+                            {submitting ? 'Creating…' : `Create All (${dailyTasksDraft.length})`}
                         </button>
                     )}
                     {taskType === 'bundle' && bundleTasksDraft.length > 0 && (
-                        <button type="button" onClick={submitBundleDraft} className={styles.createAllBtn}>
-                            Create All ({bundleTasksDraft.length})
+                        <button type="button" onClick={submitBundleDraft} className={styles.createAllBtn} disabled={submitting}>
+                            {submitting ? 'Creating…' : `Create All (${bundleTasksDraft.length})`}
                         </button>
                     )}
                 </div>

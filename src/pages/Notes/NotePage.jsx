@@ -5,10 +5,11 @@ import { IoMdArrowRoundBack } from "react-icons/io"
 import { FaStar, FaRegStar, FaEllipsisV } from 'react-icons/fa'
 import { MdChromeReaderMode } from "react-icons/md";
 import { HiPencilSquare } from "react-icons/hi2";
+import { HiOutlineDownload } from "react-icons/hi";
 import LexicalEditor from '../../components/Editor/LexicalEditor'
 import { toast } from '../../utils/toast'
 
-function NotePage({ notes, editTitle, editBody, updateTags, toggleFavorite, updateColor }) {
+function NotePage({ notes, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote }) {
 
   const { id } = useParams() //what note
   const navigate = useNavigate()
@@ -25,6 +26,8 @@ function NotePage({ notes, editTitle, editBody, updateTags, toggleFavorite, upda
   const menuRef = useRef(null)
   const buttonRef = useRef(null)
   const isDirtyRef = useRef(false)
+  const headerRowRef = useRef(null)
+  const [headerVisible, setHeaderVisible] = useState(true)
 
   // re-renders if note changes (parent changes)
   useEffect(() => {
@@ -33,6 +36,17 @@ function NotePage({ notes, editTitle, editBody, updateTags, toggleFavorite, upda
       setNewTags(note.tags || "")
     }
   }, [note])
+
+  useEffect(() => {
+    const el = headerRowRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setHeaderVisible(entry.isIntersecting),
+      { threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   // Click outside detection for menu
   useEffect(() => {
@@ -175,8 +189,20 @@ function NotePage({ notes, editTitle, editBody, updateTags, toggleFavorite, upda
   return (
     <div className={styles.container}>
 
+      {!headerVisible && (
+        <div className={styles.viewToggleWrapper}>
+          <button
+            onClick={toggleViewMode}
+            className={styles.viewToggleFloating}
+            aria-label={viewMode ? 'Switch to edit mode' : 'Switch to read mode'}
+          >
+            {viewMode ? <HiPencilSquare /> : <MdChromeReaderMode />}
+          </button>
+        </div>
+      )}
+
       {/* Header row with back button, tags input, and menu */}
-      <div className={styles.headerRow}>
+      <div className={styles.headerRow} ref={headerRowRef}>
         <button onClick={handleGoBackBtn} className={styles.backBtn}>
           <IoMdArrowRoundBack /> Back to Notes
         </button>
@@ -191,7 +217,7 @@ function NotePage({ notes, editTitle, editBody, updateTags, toggleFavorite, upda
           readOnly={viewMode}
         />
 
-        <button onClick={toggleViewMode} className={styles.backBtn}>
+        <button onClick={toggleViewMode} className={styles.backBtn} aria-label={viewMode ? 'Switch to edit mode' : 'Switch to read mode'}>
           {viewMode ? <HiPencilSquare /> : <MdChromeReaderMode />}
         </button>
 
@@ -205,6 +231,14 @@ function NotePage({ notes, editTitle, editBody, updateTags, toggleFavorite, upda
               <button onClick={handleFavoriteToggle} className={styles.menuItem}>
                 {note.is_favorite ? <FaStar color="#fbbf24" /> : <FaRegStar />}
                 <span>{note.is_favorite ? 'Unfavorite' : 'Favorite'}</span>
+              </button>
+
+              <button
+                onClick={() => { exportNote?.(note.id); setMenuOpen(false) }}
+                className={styles.menuItem}
+              >
+                <HiOutlineDownload />
+                <span>Export as markdown</span>
               </button>
 
               <div className={styles.colorPicker}>

@@ -164,8 +164,8 @@
 
 .noteItem:hover {
   background-color: var(--bg-elevated);
-  border-color: rgba(249, 115, 22, 0.5);
-  border-left-color: #fb923c;
+  border-color: color-mix(in srgb, var(--text-primary) 40%, transparent);
+  border-left-color: var(--text-primary);
 }
 
 .noteItemContent {

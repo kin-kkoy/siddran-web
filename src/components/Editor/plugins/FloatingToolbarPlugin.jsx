@@ -4,6 +4,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import {
   $getSelection,
   $isRangeSelection,
+  $createTextNode,
   FORMAT_TEXT_COMMAND,
   SELECTION_CHANGE_COMMAND,
   COMMAND_PRIORITY_LOW,
@@ -11,10 +12,11 @@ import {
 import { TOGGLE_LINK_COMMAND, $isLinkNode } from '@lexical/link';
 import { mergeRegister } from '@lexical/utils';
 
-import { FaBold, FaItalic, FaStrikethrough, FaLink, FaCode } from 'react-icons/fa';
+import { FaBold, FaItalic, FaStrikethrough, FaLink, FaCode, FaEyeSlash } from 'react-icons/fa';
 
 import styles from './FloatingToolbarPlugin.module.css';
 import LinkPopover from './LinkPopover';
+import { $createSpoilerNode, $isSpoilerNode } from '../nodes/SpoilerNode';
 
 function FloatingToolbar({ editor, isReadMode }) {
   const toolbarRef = useRef(null);
@@ -25,19 +27,28 @@ function FloatingToolbar({ editor, isReadMode }) {
   const [isStrikethrough, setIsStrikethrough] = useState(false);
   const [isCode, setIsCode] = useState(false);
   const [isLink, setIsLink] = useState(false);
+  const [isSpoiler, setIsSpoiler] = useState(false);
 
   // Link popover state
   const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
   const [linkPopoverPosition, setLinkPopoverPosition] = useState({ x: 0, y: 0 });
 
-  const updateToolbar = useCallback(() => {
-    // Don't show if in read mode
-    if (isReadMode){
+  // Drag-state guard. Set true on mousedown, cleared on mouseup. We use mouse
+  // events rather than pointer events because trackpad two-finger scrolling
+  // fires `pointercancel` mid-drag, which would prematurely clear the flag
+  // and re-introduce the sling. Mouse events stay clean during scroll-wheel
+  // and trackpad-scroll usage.
+  const isDraggingRef = useRef(false);
+
+  // rAF coalescer for selection-change / update-listener double-fires.
+  const rafRef = useRef(null);
+
+  const updateToolbarImpl = useCallback(() => {
+    if (isReadMode) {
       setIsVisible(false);
       return;
     }
 
-    // Don't hide toolbar if link popover is open
     if (linkPopoverOpen) return;
 
     const selection = $getSelection();
@@ -47,7 +58,6 @@ function FloatingToolbar({ editor, isReadMode }) {
       return;
     }
 
-    // Update format states
     setIsBold(selection.hasFormat('bold'));
     setIsItalic(selection.hasFormat('italic'));
     setIsStrikethrough(selection.hasFormat('strikethrough'));
@@ -56,8 +66,8 @@ function FloatingToolbar({ editor, isReadMode }) {
     const node = selection.anchor.getNode();
     const parent = node.getParent();
     setIsLink($isLinkNode(parent) || $isLinkNode(node));
+    setIsSpoiler($isSpoilerNode(parent) || $isSpoilerNode(node));
 
-    // Calculate position
     const nativeSelection = window.getSelection();
     if (!nativeSelection || nativeSelection.rangeCount === 0) {
       setIsVisible(false);
@@ -67,7 +77,7 @@ function FloatingToolbar({ editor, isReadMode }) {
     const range = nativeSelection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
 
-    if (rect.width === 0 || rect.height === 0) {
+    if (!(rect.width > 0 && rect.height > 0 && rect.bottom > rect.top)) {
       setIsVisible(false);
       return;
     }
@@ -79,25 +89,84 @@ function FloatingToolbar({ editor, isReadMode }) {
     setIsVisible(true);
   }, [linkPopoverOpen, isReadMode]);
 
+  // Coalesce all incoming triggers (selection changes, editor updates,
+  // mouseup) into one rAF tick. Skipped while a mouse drag is in flight.
+  const scheduleUpdate = useCallback(() => {
+    if (isDraggingRef.current) return;
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      editor.getEditorState().read(updateToolbarImpl);
+    });
+  }, [editor, updateToolbarImpl]);
+
   useEffect(() => {
     return mergeRegister(
-      editor.registerUpdateListener(({ editorState }) => {
-        editorState.read(() => {
-          updateToolbar();
-        });
+      editor.registerUpdateListener(() => {
+        scheduleUpdate();
       }),
       editor.registerCommand(
         SELECTION_CHANGE_COMMAND,
         () => {
-          updateToolbar();
+          scheduleUpdate();
           return false;
         },
         COMMAND_PRIORITY_LOW
       )
     );
-  }, [editor, updateToolbar]);
+  }, [editor, scheduleUpdate]);
 
-  // Hide on click outside
+  // Mouse-event drag tracking. mousedown sets the flag; mouseup clears it
+  // and schedules one final settled-state update via rAF (bypassing the
+  // in-flight guard by reading the editor state directly).
+  useEffect(() => {
+    const handleMouseDown = () => {
+      isDraggingRef.current = true;
+    };
+    const handleMouseUp = () => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        editor.getEditorState().read(updateToolbarImpl);
+      });
+    };
+
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [editor, updateToolbarImpl]);
+
+  // Hide on scroll. Standard editor UX (Notion, Medium, etc.): the moment any
+  // scroll happens, hide the floating toolbar — its absolute coordinates were
+  // captured against the pre-scroll viewport, so leaving it visible after a
+  // scroll-wheel tick or trackpad scroll causes the cached position to fight
+  // the new layout, which is what produced the "sling" when users scrolled
+  // mid-drag or shift-clicked after scrolling. Capture phase + true on the
+  // third arg because `scroll` events don't bubble; this catches scroll on
+  // any ancestor (window, the editor's overflow container, modal scroll
+  // wrappers). The toolbar will reappear naturally on the next selection
+  // change or mouseup.
+  useEffect(() => {
+    const handleScroll = () => {
+      // Reading state via setter idempotency — React bails when value
+      // unchanged, so calling on every scroll tick is cheap.
+      setIsVisible(false);
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    return () => window.removeEventListener('scroll', handleScroll, true);
+  }, []);
+
+  // Hide on click outside (existing — kept for parity)
   useEffect(() => {
     const handleMouseDown = (e) => {
       if (toolbarRef.current && !toolbarRef.current.contains(e.target)) {
@@ -129,17 +198,43 @@ function FloatingToolbar({ editor, isReadMode }) {
     editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code');
   };
 
+  const toggleSpoiler = (e) => {
+    e.preventDefault();
+    editor.update(() => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return;
+
+      const anchorNode = selection.anchor.getNode();
+      const existingSpoiler = $isSpoilerNode(anchorNode)
+        ? anchorNode
+        : $isSpoilerNode(anchorNode.getParent())
+          ? anchorNode.getParent()
+          : null;
+
+      if (existingSpoiler) {
+        const text = existingSpoiler.getTextContent();
+        if (text) existingSpoiler.replace($createTextNode(text));
+        else existingSpoiler.remove();
+        return;
+      }
+
+      const text = selection.getTextContent();
+      if (!text) return;
+      const spoilerNode = $createSpoilerNode();
+      spoilerNode.append($createTextNode(text));
+      selection.insertNodes([spoilerNode]);
+    });
+  };
+
   const insertLink = useCallback(
     (e) => {
       e.preventDefault();
 
       if (isLink) {
-        // Remove existing link
         editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
         return;
       }
 
-      // Get selection position for popover
       const nativeSelection = window.getSelection();
       if (nativeSelection && nativeSelection.rangeCount > 0) {
         const range = nativeSelection.getRangeAt(0);
@@ -156,19 +251,34 @@ function FloatingToolbar({ editor, isReadMode }) {
     [isLink, editor]
   );
 
+  // Refocus without triggering scrollIntoView. Lexical's editor.focus() ends
+  // up calling .focus() on the contenteditable without preventScroll.
+  const refocusEditor = useCallback(() => {
+    const root = editor.getRootElement();
+    if (root) root.focus({ preventScroll: true });
+  }, [editor]);
+
   const handleLinkConfirm = useCallback(
     (url) => {
-      editor.focus();
-      // In floating toolbar, there's always selected text
+      refocusEditor();
       editor.dispatchCommand(TOGGLE_LINK_COMMAND, url);
     },
-    [editor]
+    [editor, refocusEditor]
   );
 
   const handleLinkPopoverClose = useCallback(() => {
     setLinkPopoverOpen(false);
-    editor.focus();
-  }, [editor]);
+    refocusEditor();
+  }, [refocusEditor]);
+
+  // Container-level focus guard. Any mousedown on the toolbar (including
+  // padding, gaps between buttons, the toolbar background) is preventDefault'd
+  // so it can never steal focus from the editor and thus never collapse the
+  // selection out from under us. Per-button handlers still preventDefault
+  // their own events as belt-and-suspenders.
+  const handleToolbarMouseDown = (e) => {
+    e.preventDefault();
+  };
 
   if (!isVisible && !linkPopoverOpen) return null;
 
@@ -178,6 +288,7 @@ function FloatingToolbar({ editor, isReadMode }) {
         <div
           ref={toolbarRef}
           className={styles.floatingToolbar}
+          onMouseDown={handleToolbarMouseDown}
           style={{
             position: 'absolute',
             left: `${position.x}px`,
@@ -220,6 +331,13 @@ function FloatingToolbar({ editor, isReadMode }) {
             title="Link"
           >
             <FaLink />
+          </button>
+          <button
+            onMouseDown={toggleSpoiler}
+            className={`${styles.btn} ${isSpoiler ? styles.active : ''}`}
+            title={isSpoiler ? 'Unhide' : 'Hide (spoiler)'}
+          >
+            <FaEyeSlash />
           </button>
         </div>
       )}

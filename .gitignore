@@ -34,5 +34,7 @@ AGENTS.md
 CLAUDE.md
 toName.md
 API-Specification.md
+.claude/
+.codex
 
 Handoff.md
