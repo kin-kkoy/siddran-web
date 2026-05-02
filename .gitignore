@@ -27,3 +27,14 @@ notebookCardReference.png
 
 # For prod/dev
 .env
+
+# For teacher Obstinate
+AGENTS.md
+/.github/
+CLAUDE.md
+toName.md
+API-Specification.md
+.claude/
+.codex
+
+Handoff.md

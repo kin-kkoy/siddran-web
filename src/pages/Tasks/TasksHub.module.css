@@ -1,32 +1,52 @@
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 0 20px 20px;
 }
 
 .header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg-primary);
+    padding: 24px 20px 16px;
+    margin: 0 -20px 8px;
     display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap;
     align-items: center;
-    margin-bottom: 20px;
+    gap: 12px;
+    animation: topIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes topIn {
+    from { transform: translateY(-10px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
 }
 
 .header h1 {
-    font-size: 32px;
+    font-family: var(--font-heading);
+    font-size: 28px;
+    font-weight: 500;
     color: var(--text-primary);
+    margin-right: auto;
+}
+
+.accent {
+    color: var(--accent-warning);
 }
 
 .toggleBtn {
     padding: 8px 16px;
-    background-color: var(--border-default);
+    background-color: var(--bg-elevated);
     color: var(--text-primary);
-    border: 1px solid var(--text-faint);
+    border: 1px solid var(--border-default);
     border-radius: 6px;
     cursor: pointer;
+    transition: background-color 0.2s;
 }
 
 .toggleBtn:hover {
-    background-color: var(--border-strong);
+    background-color: var(--bg-hover);
 }
 
 .controls {
@@ -37,12 +57,29 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    position: relative;
+    z-index: 1;
+    animation: fadeUp 0.4s ease both;
+    animation-delay: 0.1s;
 }
 
 .gridView {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 16px;
+    columns: 300px;
+    column-gap: 16px;
+    position: relative;
+    z-index: 1;
+    animation: fadeUp 0.4s ease both;
+    animation-delay: 0.1s;
+}
+
+@keyframes fadeUp {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+
+.gridView > * {
+    break-inside: avoid;
+    margin-bottom: 16px;
 }
 
 .emptyState {
@@ -82,7 +119,7 @@
     justify-content: center;
     align-items: center;
     padding: 20px;
-    grid-column: 1 / -1; /* Span full width in grid view */
+    column-span: all; /* Span full width in masonry view */
 }
 
 .moreDots {
@@ -103,6 +140,34 @@
     50% { opacity: 1; }
 }
 
+/* Sort dropdowns */
+.sortSelect {
+    padding: 8px 10px;
+    background-color: var(--bg-elevated);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    outline: none;
+    transition: background-color 0.2s, border-color 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+}
+
+.sortSelect:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--border-strong);
+}
+
+.sortSelect:focus {
+    border-color: var(--accent-blue);
+}
+
 /* Batch delete button */
 .batchDeleteBtn {
     display: flex;
@@ -119,7 +184,7 @@
 }
 
 .batchDeleteBtn:hover:not(:disabled) {
-    background-color: rgba(239, 68, 68, 0.1);
+    background-color: rgba(224, 92, 92, 0.09);
     border-color: var(--accent-danger);
     color: var(--accent-danger);
 }
@@ -127,4 +192,59 @@
 .batchDeleteBtn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+}
+
+/* ── Packed layout (row-masonry via JS) ─────────────────────── */
+.packedGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-auto-rows: 8px;
+    gap: 16px;
+    align-items: start;
+    position: relative;
+    z-index: 1;
+    animation: fadeUp 0.4s ease both;
+    animation-delay: 0.1s;
+}
+
+.packedGrid > * {
+    align-self: start;
+}
+
+.packedSentinel {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+/* ── Sectioned layout containers ────────────────────────────── */
+.sectionedWrapper {
+    position: relative;
+    z-index: 1;
+    animation: fadeUp 0.4s ease both;
+    animation-delay: 0.1s;
+}
+
+.sectionedPinned {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.sectionedBundles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.emptyStatePacked {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--text-dim);
+    margin-top: 40px;
+    font-style: italic;
 }

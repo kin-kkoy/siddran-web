@@ -1,13 +1,11 @@
 /* Main sidebar container */
 .sidebar {
-    width: 250px;
+    width: 220px;
     height: 100vh;
-    background-color: var(--bg-surface);
+    background: rgba(11, 11, 18, 0.98);
     border-right: 1px solid var(--border-default);
     display: flex;
     flex-direction: column;
-    padding: 20px;
-    gap: 20px;
     position: fixed;
     top: 0;
     left: 0;
@@ -15,17 +13,22 @@
     margin: 0;
     transition: width 0.3s ease, padding 0.3s ease;
     z-index: 1000;
+    animation: sideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes sideIn {
+    from { transform: translateX(-16px); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
 }
 
 /* Collapsed state */
 .sidebar.collapsed {
     width: 70px;
-    padding: 20px 10px;
 }
 
 /* Scrollbar styling for sidebar */
 .sidebar::-webkit-scrollbar {
-    width: 6px;
+    width: 3px;
 }
 
 .sidebar::-webkit-scrollbar-track {
@@ -41,35 +44,160 @@
     background: var(--text-faint);
 }
 
-/* Top section (toggle button + navigation links) */
+/* Top section */
 .topSection {
     display: flex;
     flex-direction: column;
-    gap: 10px;
 }
 
-.toggleBtn {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 20px;
+/* Brand section */
+.brand {
+    padding: 1.4rem 1.25rem 1.2rem;
+    border-bottom: 1px solid var(--border-default);
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
     cursor: pointer;
-    padding: 8px;
-    border-radius: 6px;
-    transition: background-color 0.2s;
-    align-self: flex-start;
-    margin-bottom: 10px;
+    user-select: none;
+    overflow: hidden;
 }
 
-.sidebar.collapsed .toggleBtn {
-    align-self: center;
+.brandIcon {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
-.toggleBtn:hover {
-    background-color: var(--bg-elevated);
+.brandName {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: var(--text-primary);
+    line-height: 1;
 }
 
-/* Section labels (optional labels for grouping) */
+.brandSub {
+    font-size: 0.58rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+
+/* Brand text wrapper — fades and clips during collapse */
+.brandText {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s ease 0.15s;
+}
+
+.sidebar.collapsed .brandText {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+/* Navigation section */
+.navSection {
+    padding: 1rem 0.9rem 0.3rem;
+}
+
+/* Menu buttons (nav items) */
+.menuBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: 5px;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    letter-spacing: 0.04em;
+    transition: color 0.18s, background 0.18s, border-color 0.18s;
+    user-select: none;
+    overflow: hidden;
+    white-space: nowrap;
+    min-height: 2.2rem;
+    margin-bottom: 2px;
+    border: 1px solid transparent;
+    text-decoration: none;
+    width: 100%;
+}
+
+
+.sidebar.collapsed .menuBtn.active {
+    background: transparent;
+    border-color: transparent;
+}
+
+.sidebar.collapsed .menuBtn.active .navDot {
+    background: var(--accent-warning);
+    box-shadow: 0 0 6px var(--accent-warning), 0 0 14px rgba(240, 184, 64, 0.3);
+}
+
+.menuBtn:hover {
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.menuBtn:hover .navDot {
+    background: var(--text-muted);
+}
+
+.menuBtn.active {
+    color: var(--accent-warning);
+    background: var(--accent-warning-alpha);
+    border-color: rgba(240, 184, 64, 0.13);
+}
+
+.menuBtn.active .navDot {
+    background: var(--accent-warning);
+    box-shadow: 0 0 5px var(--accent-warning);
+}
+
+/* Nav dot */
+.navDot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+/* Nav label — fades during collapse */
+.navLabel {
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s ease 0.15s;
+}
+
+.sidebar.collapsed .navLabel {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+/* Nav count */
+.navCount {
+    margin-left: auto;
+    font-size: 0.58rem;
+    color: var(--text-faint);
+    letter-spacing: 0.06em;
+}
+
+/* Divider */
+.divider {
+    height: 1px;
+    background: var(--border-default);
+    margin: 0.5rem 0;
+}
+
+/* Section labels */
 .sectionLabel {
     font-size: 11px;
     color: var(--text-dim);
@@ -80,50 +208,8 @@
 }
 
 .sidebar.collapsed .sectionLabel {
-    display: none;
-}
-
-/* Menu buttons (for navigation links and profile/settings) */
-.menuBtn {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    border-radius: 8px;
-    transition: background-color 0.2s;
-    width: 100%;
-    text-align: left;
-    font-size: 14px;
-    text-decoration: none;
-    font-family: inherit;
-}
-
-.sidebar.collapsed .menuBtn {
-    justify-content: center;
-    padding: 12px 8px;
-}
-
-.menuBtn:hover {
-    background-color: var(--bg-elevated);
-}
-
-.menuBtn.active {
-    background-color: var(--bg-hover);
-    color: var(--text-primary);
-    font-weight: 600;
-}
-
-/* Icon within button */
-.icon {
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.15s ease;
 }
 
 /* Middle section (notes list container) */
@@ -134,15 +220,8 @@
     overflow: hidden;
 }
 
-/* Bottom section (profile, settings, logout) */
+/* Bottom section */
 .bottomSection {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
     margin-top: auto;
-}.bottomSection {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 10px;
+    border-top: 1px solid var(--border-default);
 }

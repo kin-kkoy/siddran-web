@@ -1,8 +1,52 @@
+import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import styles from './SidebarList.module.css'
+import { compareByFavorite } from '../../../utils/noteSorting'
+import { HiChevronDown } from 'react-icons/hi'
 
 
-function SidebarList({ isCollapsed, notes, currentNoteID }) {
+function SidebarList({ isCollapsed, notes, notebooks = [], currentNoteID }) {
+
+    const [collapsedIds, setCollapsedIds] = useState(() => new Set())
+
+    const toggleNotebook = (id) => {
+        setCollapsedIds(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }
+
+    const { notebookGroups, standaloneNotes } = useMemo(() => {
+        const notebookById = new Map(notebooks.map(notebook => [notebook.id, notebook]))
+        const grouped = new Map()
+        const standalone = []
+
+        notes.forEach(note => {
+            const notebook = notebookById.get(note.notebook_id)
+            if (notebook) {
+                if (!grouped.has(notebook.id)) {
+                    grouped.set(notebook.id, { notebook, notes: [] })
+                }
+                grouped.get(notebook.id).notes.push(note)
+                return
+            }
+            standalone.push(note)
+        })
+
+        const notebookGroups = Array.from(grouped.values())
+            .sort((a, b) => compareByFavorite(a.notebook, b.notebook))
+            .map(group => ({
+                ...group,
+                notes: group.notes.slice().sort(compareByFavorite)
+            }))
+
+        return {
+            notebookGroups,
+            standaloneNotes: standalone.slice().sort(compareByFavorite)
+        }
+    }, [notes, notebooks])
 
     if (isCollapsed) return null; // don't show list if collapsed
 
@@ -13,15 +57,53 @@ function SidebarList({ isCollapsed, notes, currentNoteID }) {
                 {notes.length === 0 ? (
                     <p className={styles.emptyMessage}>No notes yet</p>
                 ) : (
-                    notes.map( note => (
-                        // if u're wondering why naay key, reason is it's list
-                        <Link key={note.id}
-                            to={`/notes/${note.id}`}
-                            className={`${styles.noteItem} ${currentNoteID == note.id ? styles.active : ''}`}
-                        >
-                            <span className={styles.noteTitle}>{note.title || 'Untitled'}</span>
-                        </Link>
-                    ))
+                    <>
+                        {notebookGroups.map(group => {
+                            const isCollapsed = collapsedIds.has(group.notebook.id)
+
+                            return (
+                            <div
+                                key={group.notebook.id}
+                                className={styles.notebookGroup}
+                                style={{ '--notebook-color': group.notebook.color || '#4a9eff' }}
+                            >
+                                <div
+                                    className={styles.notebookHeader}
+                                    onClick={() => toggleNotebook(group.notebook.id)}
+                                >
+                                    <span className={styles.notebookLabel}>
+                                        {group.notebook.name || 'Untitled Notebook'}
+                                    </span>
+                                    <HiChevronDown
+                                        className={`${styles.chevron} ${isCollapsed ? styles.chevronCollapsed : ''}`}
+                                    />
+                                </div>
+                                {!isCollapsed && (
+                                    <div className={styles.notebookNotes}>
+                                        {group.notes.map(note => (
+                                            <Link
+                                                key={note.id}
+                                                to={`/notes/${note.id}`}
+                                                className={`${styles.noteItem} ${styles.groupedNote} ${currentNoteID == note.id ? styles.active : ''}`}
+                                            >
+                                                <span className={styles.noteTitle}>{note.title || 'Untitled'}</span>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            )
+                        })}
+
+                        {standaloneNotes.map(note => (
+                            <Link key={note.id}
+                                to={`/notes/${note.id}`}
+                                className={`${styles.noteItem} ${currentNoteID == note.id ? styles.active : ''}`}
+                            >
+                                <span className={styles.noteTitle}>{note.title || 'Untitled'}</span>
+                            </Link>
+                        ))}
+                    </>
                 )}
             </div>
         </div>

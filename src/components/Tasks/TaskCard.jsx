@@ -4,8 +4,12 @@ import { FaCheck } from "react-icons/fa"
 import { HiOutlineTrash } from "react-icons/hi"
 import ConfirmModal from '../Common/ConfirmModal'
 
-function TaskCard({ task, deleteTask, toggleCompletion, viewMode, isSelectionMode, isSelected, onToggleSelect }) {
+function TaskCard({ task, deleteTask, toggleCompletion, viewMode, isSelectionMode, isSelected, onToggleSelect, onOpenDetail }) {
     const [showDeleteModal, setShowDeleteModal] = useState(false)
+
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const dueDay = task.due_date ? new Date(task.due_date) : null; if (dueDay) dueDay.setHours(0, 0, 0, 0)
+    const isOverdue = !task.is_completed && dueDay !== null && dueDay < today
 
     const handleDelete = e => {
         e.preventDefault()
@@ -27,15 +31,23 @@ function TaskCard({ task, deleteTask, toggleCompletion, viewMode, isSelectionMod
     const handleCardClick = () => {
         if (isSelectionMode) {
             onToggleSelect()
+        }else{
+            onOpenDetail(task);
         }
     }
 
 
     return (
         <div
-            className={`${styles.card} ${task.is_completed ? styles.completed : ''} ${isSelected ? styles.selected : ''}`}
+            className={`
+                ${styles.card} 
+                ${task.is_completed ? styles.completed : ''} 
+                ${isSelected ? styles.selected : ''}
+                ${isOverdue ? styles.overdue : ''}
+            `}
             onClick={handleCardClick}
-            style={{ cursor: isSelectionMode ? 'pointer' : 'default' }}
+            // style={{ cursor: isSelectionMode ? 'pointer' : 'default' }}
+            style={{cursor: 'pointer'}}
         >
 
             {/* Selection checkbox in selection mode */}
@@ -73,32 +85,30 @@ function TaskCard({ task, deleteTask, toggleCompletion, viewMode, isSelectionMod
 
                 {/* --- Metadata --- */}
                 <div className={styles.metadata}>
-                    <span className={`${styles.priority} ${styles[task.priority]}`}>
-                        {task.priority}
-                    </span>
-                    {task.due_date && (
-                        <span className={styles.dueDate}>
-                        Due: {new Date(task.due_date).toLocaleDateString()}
-                        </span>
-                    )}
-                </div>
-
-                {/* Checklist Preview */}
-                {task.checklist && task.checklist.length > 0 && (
-                    <div className={styles.checklistPreview}>
-                        <small>
-                        ✓ {task.checklist.filter(c => c.is_completed).length}/{task.checklist.length} completed
-                        </small>
+                    <div className={styles.metaLeft}>
+                        {task.due_date && (
+                            <span className={styles.dueDate}>
+                                Due: {new Date(task.due_date).toLocaleDateString()}
+                            </span>
+                        )}
+                        {isOverdue && (
+                            <span className={styles.overdueTag}>Overdue</span>
+                        )}
                     </div>
-                )}
+                </div>
 
             </div>
 
-            {/* ------- Delete Button ------- */}
+            {/* ------- Right Column: Priority + Delete ------- */}
             {!isSelectionMode && (
-                <button className={styles.deleteBtn} onClick={handleDelete}>
-                    <HiOutlineTrash size={18} />
-                </button>
+                <div className={styles.rightCol}>
+                    <span className={`${styles.priority} ${styles[task.priority]}`}>
+                        {task.priority}
+                    </span>
+                    <button className={styles.deleteBtn} onClick={handleDelete}>
+                        <HiOutlineTrash size={18} />
+                    </button>
+                </div>
             )}
 
             {/* Delete Confirmation Modal */}

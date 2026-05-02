@@ -5,7 +5,6 @@ import { HiOutlineTrash } from 'react-icons/hi'
 import { useState, useRef, useEffect } from 'react'
 import ConfirmModal from '../Common/ConfirmModal'
 import { MdChromeReaderMode } from 'react-icons/md'
-import { useSettings } from '../../contexts/SettingsContext'
 import { NOTE_COLORS, getNoteBackground, getSwatchColor } from './noteColors'
 
 function HorizontalCard({ note, deleteNote, isSelectionMode, isSelected, onToggleSelect, toggleFavorite, updateColor }) {
@@ -15,8 +14,7 @@ function HorizontalCard({ note, deleteNote, isSelectionMode, isSelected, onToggl
   const menuRef = useRef(null)
   const buttonRef = useRef(null)
   const navigate = useNavigate();
-  const { settings } = useSettings()
-  const noteBackground = getNoteBackground(note.color, settings.mode)
+  const noteBackground = getNoteBackground(note.color)
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -137,7 +135,7 @@ function HorizontalCard({ note, deleteNote, isSelectionMode, isSelected, onToggl
                           key={c.name}
                           onClick={(e) => handleColorChange(e, c.key)}
                           className={styles.colorBtn}
-                          style={{ backgroundColor: getSwatchColor(c, settings.mode) || 'var(--bg-surface)' }}
+                          style={{ backgroundColor: getSwatchColor(c) || 'var(--bg-surface)' }}
                           title={c.name}
                         ></button>
                       ))}

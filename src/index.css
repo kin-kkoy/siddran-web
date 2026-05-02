@@ -1,24 +1,26 @@
 :root {
-  --bg-primary: #121212;
-  --bg-surface: #1e1e1e;
-  --bg-surface-alt: #232323;
-  --bg-elevated: #2a2a2a;
-  --bg-hover: #3a3a3a;
-  --border-default: #333;
-  --border-strong: #444;
-  --text-primary: #ffffff;
-  --text-secondary: #e0e0e0;
-  --text-muted: #888;
-  --text-dim: #666;
-  --text-faint: #555;
-  --accent-blue: #4a9eff;
-  --accent-danger: #ef4444;
-  --accent-warning: #f97316;
-  --accent-warning-alpha: rgba(249, 115, 22, 0.1);
-  --accent-success: #4ade80;
+  --bg-primary: #09090f;
+  --bg-surface: #12121e;
+  --bg-surface-alt: #181826;
+  --bg-elevated: #1e1e2e;
+  --bg-hover: #252538;
+  --border-default: #252538;
+  --border-strong: #333350;
+  --text-primary: #e2ddf5;
+  --text-secondary: #b8b3d0;
+  --text-muted: #635f80;
+  --text-dim: #635f80;
+  --text-faint: #363550;
+  --accent-blue: #5a9cf0;
+  --accent-danger: #e05c5c;
+  --accent-warning: #f0b840;
+  --accent-warning-alpha: rgba(240, 184, 64, 0.07);
+  --accent-success: #52c47a;
   --shadow-color: rgba(0, 0, 0, 0.5);
-  --font-body: 'Inter', sans-serif;
-  --font-display: 'Merriweather', serif;
+  --font-display: 'Syne', sans-serif;
+  --font-heading: 'Fraunces', serif;
+  --font-body: 'Crimson Pro', serif;
+  --font-mono: 'DM Mono', monospace;
 }
 
 * {
@@ -31,19 +33,42 @@ button, input, select, textarea {
   font-family: inherit;
 }
 
-html, body, #root {
+html, body {
   margin: 0;
   padding: 0;
   width: 100%;
+  overflow: hidden;
+}
+
+html, body, #root {
   overflow-x: hidden;
 }
 
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: var(--font-body);
+  font-family: var(--font-mono);
+  font-size: 15px;
 }
 
 #root {
   min-height: 100vh;
+}
+
+/* Global scrollbar styling */
+::-webkit-scrollbar {
+  width: 3px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
 }

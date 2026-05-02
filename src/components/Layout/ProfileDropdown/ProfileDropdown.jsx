@@ -1,7 +1,6 @@
 import { useRef, useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import styles from './ProfileDropdown.module.css'
-import { FaRegUser } from "react-icons/fa";
 import { IoMdSettings } from "react-icons/io";
 import { TbLogout2 } from "react-icons/tb";
 import { useSettings } from "../../../contexts/SettingsContext";
@@ -76,15 +75,15 @@ function ProfileDropdown({ username, isCollapsed, handleLogout }) {
         <>
             <button
                 ref={buttonRef}  // ← Add ref
-                className={`${styles.profileBtn} ${isCollapsed ? styles.collapsed : ''}`}
+                className={styles.profileBtn}
                 onClick={() => setIsOpen(!isOpen)}
                 title={isCollapsed ? "Profile" : undefined}
             >
-                <span className={styles.icon}><FaRegUser /></span>
-                {!isCollapsed && <span>{username}</span>}
-                {!isCollapsed && (
-                    <span className={`${styles.arrow} ${isOpen ? styles.arrowUp : ''}`}>▼</span>
-                )}
+                <span className={styles.avatar}>{username ? username.charAt(0).toUpperCase() : '?'}</span>
+                <span className={`${styles.userInfo} ${isCollapsed ? styles.userInfoHidden : ''}`}>
+                    <span>{username}</span>
+                    <span className={styles.userTitle}>star chaser</span>
+                </span>
             </button>
 
             {/* Render dropdown using Portal */}

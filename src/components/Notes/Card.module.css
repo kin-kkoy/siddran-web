@@ -1,5 +1,6 @@
 /* Grid Card */
 .card {
+  font-family: var(--font-body);
   background-color: var(--bg-surface-alt);
   border: 1px solid var(--border-default);
   border-radius: 8px;
@@ -37,7 +38,7 @@
 }
 
 .title {
-  font-family: var(--font-display);
+  font-family: var(--font-heading);
   font-size: 20px;
   font-weight: 700;
   margin: 0;
@@ -60,6 +61,7 @@
 }
 
 .tags {
+  font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -233,6 +235,7 @@
 
 /* Horizontal Card (List View) */
 .horizontalCard {
+  font-family: var(--font-body);
   background-color: var(--bg-surface-alt);
   border: 1px solid var(--border-default);
   border-radius: 6px;
@@ -260,7 +263,7 @@
 }
 
 .horizontalCard h4 {
-  font-family: var(--font-display);
+  font-family: var(--font-heading);
   font-size: 16px;
   font-weight: 600;
   margin: 0;
@@ -324,6 +327,7 @@
 
 /* Add Card (Grid) */
 .addCard {
+  font-family: var(--font-body);
   background-color: var(--bg-elevated);
   border: 2px dashed var(--text-faint);
   border-radius: 8px;
@@ -359,6 +363,7 @@
 
 /* Add Card (List) */
 .addCardList {
+  font-family: var(--font-body);
   background-color: var(--bg-elevated);
   border: 2px dashed var(--text-faint);
   border-radius: 6px;
@@ -421,13 +426,8 @@
   margin-bottom: 0;
 }
 
-/* Mode-aware hover for colored cards */
+/* Hover for colored cards */
 .card.hasColor:hover,
 .horizontalCard.hasColor:hover {
   filter: brightness(1.15);
-}
-
-:global([data-mode="light"]) .card.hasColor:hover,
-:global([data-mode="light"]) .horizontalCard.hasColor:hover {
-  filter: brightness(0.92);
 }

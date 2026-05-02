@@ -1,6 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "../utils/toast";
 import logger from "../utils/logger";
+import {
+    parseMarkdownFile,
+    serializeNoteToMarkdown,
+    slugifyForFilename,
+    downloadMarkdown,
+    readFileAsText,
+    MAX_IMPORT_BYTES,
+    IMPORTED_TAG,
+} from "../utils/markdownIO";
 
 // Custom hook for the notes/notebooks
 export const useNotes = (authFetch, API, isAuthed) => {
@@ -10,6 +19,11 @@ export const useNotes = (authFetch, API, isAuthed) => {
     const [notesPagination, setNotesPagination] = useState(null)
     const [notebooksPagination, setNotebooksPagination] = useState(null)
     const [loadingMore, setLoadingMore] = useState(false)
+    // Map of notebookId -> notes[], hydrated by parallel prefetch so opening a
+    // notebook is instant. Swap the prefetch effect for `?include=notes` once
+    // the batch endpoint exists on the backend.
+    const [notebookNotesById, setNotebookNotesById] = useState({})
+    const prefetchedNotebookIdsRef = useRef(new Set())
 
 
     // ----------- Fetch data ================================================================
@@ -40,6 +54,69 @@ export const useNotes = (authFetch, API, isAuthed) => {
         fetchData()
 
     }, [isAuthed, authFetch, API])
+
+    // ----------- Prefetch each notebook's notes in parallel ===============================
+    useEffect(() => {
+        if (!isAuthed || notebooks.length === 0) return
+
+        const idsToFetch = notebooks
+            .map(nb => nb.id)
+            .filter(id => !prefetchedNotebookIdsRef.current.has(id))
+        if (idsToFetch.length === 0) return
+
+        idsToFetch.forEach(id => prefetchedNotebookIdsRef.current.add(id))
+
+        let cancelled = false
+        const prefetch = async () => {
+            const results = await Promise.allSettled(
+                idsToFetch.map(async (id) => {
+                    const res = await authFetch(`${API}/notebooks/${id}/notes`)
+                    if (!res.ok) throw new Error(`Failed to prefetch notes for notebook ${id}`)
+                    const data = await res.json()
+                    return { id, notes: data.notes }
+                })
+            )
+            if (cancelled) return
+            setNotebookNotesById(prev => {
+                const next = { ...prev }
+                for (const r of results) {
+                    if (r.status === 'fulfilled') {
+                        next[r.value.id] = r.value.notes
+                    } else {
+                        logger.error('Notebook prefetch failed:', r.reason)
+                    }
+                }
+                return next
+            })
+        }
+        prefetch()
+        return () => { cancelled = true }
+    }, [isAuthed, authFetch, API, notebooks])
+
+    // Helper used by mutations to keep notebookNotesById in sync.
+    const updateNoteInNotebookCache = useCallback((noteId, updater) => {
+        setNotebookNotesById(prev => {
+            let changed = false
+            const next = {}
+            for (const [nbId, list] of Object.entries(prev)) {
+                const idx = list.findIndex(n => n.id === noteId)
+                if (idx === -1) {
+                    next[nbId] = list
+                    continue
+                }
+                const updated = updater(list[idx])
+                if (updated === null) {
+                    next[nbId] = list.filter(n => n.id !== noteId)
+                } else {
+                    const copy = list.slice()
+                    copy[idx] = updated
+                    next[nbId] = copy
+                }
+                changed = true
+            }
+            return changed ? next : prev
+        })
+    }, [])
 
     // ----------- Load More Functions (Pagination) ==========================================
     const loadMoreNotes = useCallback(async () => {
@@ -94,9 +171,11 @@ export const useNotes = (authFetch, API, isAuthed) => {
 
             const newNote = await res.json()
             setNotes(currentNotes => [...currentNotes, newNote])
+            return newNote
 
         } catch (error) {
             logger.error(error)
+            return null
         }
     }, [authFetch, API])
 
@@ -105,16 +184,18 @@ export const useNotes = (authFetch, API, isAuthed) => {
             const res = await authFetch(`${API}/notes/${id}`, { method: "DELETE" })
             if(!res.ok) throw new Error(`Failed to delete note`)
             setNotes(allNotes => allNotes.filter( note => note.id !== id))
+            updateNoteInNotebookCache(id, () => null)
 
         } catch (error) {
             logger.error(error)
         }
-    }, [authFetch, API])
+    }, [authFetch, API, updateNoteInNotebookCache])
 
     const editTitle = useCallback(async (id, newTitle) => {
         // For this, we'll go the optimistic way: The notes will always be updated so just set the frontend side to already have the updated title. In the background we'll do the api call to actually update
 
         setNotes(allNotes => allNotes.map( note => note.id === id ? {...note, title: newTitle} : note))
+        updateNoteInNotebookCache(id, (note) => ({ ...note, title: newTitle }))
 
         try {
             await authFetch(`${API}/notes/${id}`, {
@@ -124,7 +205,7 @@ export const useNotes = (authFetch, API, isAuthed) => {
         } catch (error) {
             logger.error(error)
         }
-    }, [authFetch, API])
+    }, [authFetch, API, updateNoteInNotebookCache])
 
     const editBody = useCallback(async (id, newBody) => {
         // Not optimistic here kay i think it's better because the body is quite big
@@ -142,6 +223,7 @@ export const useNotes = (authFetch, API, isAuthed) => {
                 if(!res.ok) throw new Error("Failed to update body/description/contents");
                 const data = await res.json()
                 setNotes(allNotes => allNotes.map( note => note.id === id ? data : note))
+                updateNoteInNotebookCache(id, () => data)
                 return true
 
             } catch (error) {
@@ -154,7 +236,7 @@ export const useNotes = (authFetch, API, isAuthed) => {
 
         toast.error('Failed to save note. Your changes are backed up locally.')
         return false
-    }, [authFetch, API])
+    }, [authFetch, API, updateNoteInNotebookCache])
 
     const toggleFavorite = useCallback(async (id) => {
         // Get current state before update
@@ -167,6 +249,8 @@ export const useNotes = (authFetch, API, isAuthed) => {
                 n.id === id ? {...n, is_favorite: newFavoriteState} : n
             )
 
+            updateNoteInNotebookCache(id, (n) => ({ ...n, is_favorite: newFavoriteState }))
+
             // Make API call
             authFetch(`${API}/notes/${id}`, {
                 method: "PUT",
@@ -177,17 +261,19 @@ export const useNotes = (authFetch, API, isAuthed) => {
                 setNotes(prevNotes => prevNotes.map(n =>
                     n.id === id ? {...n, is_favorite: !newFavoriteState} : n
                 ))
+                updateNoteInNotebookCache(id, (n) => ({ ...n, is_favorite: !newFavoriteState }))
             })
 
             return updatedNotes
         })
-    }, [authFetch, API])
+    }, [authFetch, API, updateNoteInNotebookCache])
 
     const updateColor = useCallback(async (id, color) => {
         // Optimistic update
         setNotes(allNotes => allNotes.map( note =>
             note.id === id ? {...note, color} : note
         ))
+        updateNoteInNotebookCache(id, (note) => ({ ...note, color }))
 
         try {
             await authFetch(`${API}/notes/${id}`, {
@@ -197,13 +283,14 @@ export const useNotes = (authFetch, API, isAuthed) => {
         } catch (error) {
             logger.error(error)
         }
-    }, [authFetch, API])
+    }, [authFetch, API, updateNoteInNotebookCache])
 
     const updateTags = useCallback(async (id, tags) => {
         // Optimistic update
         setNotes(allNotes => allNotes.map( note =>
             note.id === id ? {...note, tags} : note
         ))
+        updateNoteInNotebookCache(id, (note) => ({ ...note, tags }))
 
         try {
             await authFetch(`${API}/notes/${id}`, {
@@ -213,7 +300,7 @@ export const useNotes = (authFetch, API, isAuthed) => {
         } catch (error) {
             logger.error(error)
         }
-    }, [authFetch, API])
+    }, [authFetch, API, updateNoteInNotebookCache])
 
 
     // ----------- Notebook Operations like: Creating, deleting, etc. ===========================
@@ -237,6 +324,12 @@ export const useNotes = (authFetch, API, isAuthed) => {
 
             // add notebook
             setNotebooks(currNotebooks => [notebook, ...currNotebooks])
+
+            // Seed cache for the new notebook so its modal opens instantly.
+            const seedNotes = updatedNotes.filter(n => n.notebook_id === notebook.id)
+            setNotebookNotesById(prev => ({ ...prev, [notebook.id]: seedNotes }))
+            prefetchedNotebookIdsRef.current.add(notebook.id)
+
             toast.success("Notebook created successfully")
 
         } catch (error) {
@@ -250,6 +343,13 @@ export const useNotes = (authFetch, API, isAuthed) => {
             if(!res.ok) throw new Error("Failed to delete notebook");
 
             setNotebooks(currentNotebooks => currentNotebooks.filter(note => note.id !== id))
+            setNotebookNotesById(prev => {
+                if (!(id in prev)) return prev
+                const next = { ...prev }
+                delete next[id]
+                return next
+            })
+            prefetchedNotebookIdsRef.current.delete(id)
 
             // Refresh the notes to update their notebook_id and appear on the lists of notes
             const noteRes = await authFetch(`${API}/notes`) // just call GET again
@@ -345,6 +445,13 @@ export const useNotes = (authFetch, API, isAuthed) => {
                 notebook.id === notebookId ? {...notebook, note_count: Math.max(0, (notebook.note_count || 0) - 1)} : notebook
             ))
 
+            // Drop from cached notebook notes
+            setNotebookNotesById(prev => {
+                const list = prev[notebookId]
+                if (!list) return prev
+                return { ...prev, [notebookId]: list.filter(n => n.id !== noteId) }
+            })
+
         } catch (error) {
             logger.error(error)
         }
@@ -372,6 +479,14 @@ export const useNotes = (authFetch, API, isAuthed) => {
                     : notebook
             ))
 
+            // Append to cached notebook notes
+            setNotebookNotesById(prev => {
+                const existing = prev[notebookId] || []
+                const existingIds = new Set(existing.map(n => n.id))
+                const merged = [...existing, ...updatedNotes.filter(n => !existingIds.has(n.id))]
+                return { ...prev, [notebookId]: merged }
+            })
+
             return updatedNotes
         } catch (error) {
             logger.error(error)
@@ -380,9 +495,85 @@ export const useNotes = (authFetch, API, isAuthed) => {
     }, [authFetch, API])
 
 
+    const importMarkdownFiles = useCallback(async (files, notebookName) => {
+        const fileList = Array.from(files || [])
+        if (fileList.length === 0) return { noteIds: [], notebookId: null, warnings: [] }
+
+        const valid = []
+        let rejected = 0
+        for (const f of fileList) {
+            const isMd = /\.md$/i.test(f.name) || f.type === 'text/markdown'
+            if (!isMd || f.size > MAX_IMPORT_BYTES) {
+                rejected++
+                continue
+            }
+            valid.push(f)
+        }
+        if (rejected > 0) {
+            toast.warning(`Skipped ${rejected} file${rejected === 1 ? '' : 's'} (must be .md and ≤ 1MB)`)
+        }
+        if (valid.length === 0) return { noteIds: [], notebookId: null, warnings: [] }
+
+        const allWarnings = new Set()
+        const newNoteIds = []
+        let failed = 0
+
+        for (const file of valid) {
+            try {
+                const text = await readFileAsText(file)
+                const parsed = parseMarkdownFile(text, file.name)
+                parsed.warnings.forEach(w => allWarnings.add(w))
+
+                const created = await addNote(parsed.title || 'Untitled')
+                if (!created) { failed++; continue }
+
+                if (parsed.body) await editBody(created.id, parsed.body)
+                if (parsed.tags) await updateTags(created.id, parsed.tags)
+                if (parsed.color) await updateColor(created.id, parsed.color)
+                if (parsed.isFavorite && !created.is_favorite) await toggleFavorite(created.id)
+
+                newNoteIds.push(created.id)
+            } catch (err) {
+                logger.error('Import failed for file:', file.name, err)
+                failed++
+            }
+        }
+
+        let notebookId = null
+        if (newNoteIds.length > 1 && notebookName) {
+            await createNotebook(notebookName, newNoteIds, IMPORTED_TAG)
+        }
+
+        if (newNoteIds.length > 0) {
+            toast.success(`Imported ${newNoteIds.length} note${newNoteIds.length === 1 ? '' : 's'}`)
+        }
+        if (failed > 0) {
+            toast.error(`${failed} file${failed === 1 ? '' : 's'} failed to import`)
+        }
+        if (allWarnings.size > 0) {
+            toast.warning(Array.from(allWarnings).join(' • '))
+        }
+
+        return { noteIds: newNoteIds, notebookId, warnings: Array.from(allWarnings) }
+    }, [addNote, editBody, updateTags, updateColor, toggleFavorite, createNotebook])
+
+    const exportNote = useCallback((noteId) => {
+        const note = notes.find(n => n.id === noteId)
+        if (!note) {
+            toast.error('Note not found')
+            return
+        }
+        const contents = serializeNoteToMarkdown(note)
+        const filename = `${slugifyForFilename(note.title)}.md`
+        downloadMarkdown(filename, contents)
+        toast.success(`Exported "${note.title || 'Untitled'}"`)
+    }, [notes])
+
+
     return {
         notes,
         notebooks,
+        notebookNotesById,
         notesPagination,
         notebooksPagination,
         loadMoreNotes,
@@ -402,6 +593,8 @@ export const useNotes = (authFetch, API, isAuthed) => {
         updateNotebookTags,
         renameNotebook,
         removeNoteFromNotebook,
-        addNotesToNotebook
+        addNotesToNotebook,
+        importMarkdownFiles,
+        exportNote
     }
 }

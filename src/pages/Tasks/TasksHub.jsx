@@ -4,7 +4,12 @@ import AddTaskCard from "../../components/Tasks/AddTaskCard"
 import styles from './TasksHub.module.css'
 import DailyTaskCard from "../../components/Tasks/DailyTaskCard"
 import ConfirmModal from "../../components/Common/ConfirmModal"
-import { HiOutlineTrash } from 'react-icons/hi'
+import TaskDetailsModal from "../../components/Common/TaskDetailsModal"
+import DailyTaskModal from "../../components/Common/DailyTaskModal"
+import { HiOutlineTrash, HiOutlineViewGrid, HiOutlineViewList, HiOutlineTemplate, HiOutlineViewBoards } from 'react-icons/hi'
+import BundleCard from "../../components/Tasks/BundleCard"
+import BundleDetailModal from "../../components/Common/BundleDetailModal"
+import { useRowMasonry } from '../../hooks/useRowMasonry'
 
 function TasksHub({
   tasks,
@@ -16,35 +21,111 @@ function TasksHub({
   loadingMore,
   loading,
   addTask,
+  updateTask,
   deleteTask,
   toggleTaskCompletion,
+  addDailyTask,
+  updateDailyTask,
   deleteDailyTask,
-  toggleDailyTaskCompletion
+  toggleDailyTaskCompletion,
+  batchToggleDailyTasks,
+  batchDeleteDailyTasks,
+  bundles,
+  bundlesPagination,
+  loadMoreBundles,
+  addBundle,
+  updateBundle,
+  deleteBundle,
+  addBundleTasks,
+  batchUpdateBundleTasks,
+  toggleBundleTaskCompletion,
+  batchDeleteBundleTasks,
 }) {
 
   // Persist view mode in localStorage
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem('tasksViewMode') || 'card'
   })
+  const [layoutMode, setLayoutMode] = useState(() => {
+    return localStorage.getItem('tasksLayoutMode') || 'packed'
+  })
+  const [sortBy, setSortBy] = useState('priority')
+  const [sortDir, setSortDir] = useState('asc') // sorting direction (ascending/descending)
+  const [showCompleted, setShowCompleted] = useState(true)
+  const [deadlineFilter, setDeadlineFilter] = useState('all')
+  const [deadlineRange, setDeadlineRange] = useState('all')
   const [isSelectionMode, setIsSelectionMode] = useState(false)
-  const [selectedTasks, setSelectedTasks] = useState([])
+  const [selectedTasks, setSelectedTasks] = useState([]) // for deleting
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [openTask, setOpenTask] = useState(null)
+  const [openDailyTask, setOpenDailyTask] = useState(null)
+  const [openBundle, setOpenBundle] = useState(null)
+  const [isDailyCardOpen, setIsDailyCardOpen] = useState(false)
   const tasksSentinelRef = useRef(null)
   const dailyTasksSentinelRef = useRef(null)
+  const bundlesSentinelRef = useRef(null)
   const scrollIntentTimeoutRef = useRef(null)
+  const packedRef = useRef(null)
 
   const hasMoreTasks = tasksPagination?.hasNextPage
   const hasMoreDailyTasks = dailyTasksPagination?.hasNextPage
+  const hasMoreBundles = bundlesPagination?.hasNextPage
+
+  // Filter tasks: show completed/in progress then show including any of the 3: today within today/3 days/ this week
+  const filteredTasks = tasks.filter(task => {
+    if(!showCompleted) return task.is_completed === false
+    return true
+  }).filter(task => {
+    if (deadlineFilter === 'all') return true
+    if (!task.due_date) return false
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const due = new Date(task.due_date)
+    due.setHours(0, 0, 0, 0)
+
+    if (deadlineFilter === 'today')   return due.getTime() === today.getTime()
+    if (deadlineFilter === 'overdue') return due.getTime() < today.getTime()
+
+    // deadlineFilter === 'hasDeadline'
+    if (deadlineRange === 'all') return true
+    if (deadlineRange === '3days') {
+      const threeDays = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
+      return due <= threeDays
+    }
+    if (deadlineRange === 'week') {
+      const week = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+      return due <= week
+    }
+  })
 
   // Sort tasks: incomplete first, then by priority (High -> Normal -> Low)
   const priorityOrder = { high: 0, normal: 1, low: 2 }
-  const sortedTasks = [...tasks].sort((a, b) => {
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
     // First sort by completion status (incomplete first)
     if (a.is_completed !== b.is_completed) {
       return a.is_completed ? 1 : -1
     }
-    // Then sort by priority within each group
-    return (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1)
+
+    // Sort by priority within each group
+    if(sortBy === 'priority') return (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1)
+
+    // Or sort by due date
+    if(sortBy === 'dueDate'){
+
+      // check if both have date or are null
+      if(!a.due_date && !b.due_date) return 0
+      if(!a.due_date) return 1
+      if(!b.due_date) return -1
+
+      //if both have dates then compare and sort
+      if(sortDir === 'dsc'){
+        return new Date(a.due_date) - new Date(b.due_date)
+      }else{
+        return new Date(b.due_date) - new Date(a.due_date)
+      }
+    }
+
   })
 
   // Intersection Observer for tasks infinite scroll
@@ -114,12 +195,52 @@ function TasksHub({
     return () => observer.disconnect()
   }, [hasMoreDailyTasks, loadingMore, loadMoreDailyTasks])
 
+  // Intersection Observer for bundles infinite scroll
+  useEffect(() => {
+    if (!hasMoreBundles || loadingMore) return
+
+    const sentinel = bundlesSentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries
+        if (entry.isIntersecting && !loadingMore) {
+          setTimeout(() => {
+            loadMoreBundles()
+          }, 300)
+        }
+      },
+      { root: null, rootMargin: '100px', threshold: 0 }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMoreBundles, loadingMore, loadMoreBundles])
+
+  useRowMasonry(packedRef, [sortedTasks.length, sortBy, sortDir, showCompleted, deadlineFilter, deadlineRange, dailyTasks.length, bundles.length, isDailyCardOpen, layoutMode, viewMode])
+
   const changeView = () => {
     const newMode = viewMode === "card" ? "list" : "card"
     setViewMode(newMode)
     localStorage.setItem('tasksViewMode', newMode)
   }
 
+  const changeLayout = () => {
+    const newMode = layoutMode === 'packed' ? 'sectioned' : 'packed'
+    setLayoutMode(newMode)
+    localStorage.setItem('tasksLayoutMode', newMode)
+  }
+
+  // Selecting Task Logic
+  const openDailyCardDetails = (task) => {
+    setOpenDailyTask(task);
+  }
+  const openCardDetails = (task) => {
+    setOpenTask(task);
+  }
+  
+  // Toggle Selection for DELETING ------
   const toggleSelectionMode = () => {
     setIsSelectionMode(!isSelectionMode)
     setSelectedTasks([])
@@ -148,8 +269,49 @@ function TasksHub({
     <div className={styles.container}>
 
         <div className={styles.header}>
-          <h1>Tasks</h1>
+          <h1>Tasks<span className={styles.accent}>Hub</span><span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: '10px', fontSize: '14px', fontFamily: 'var(--font-body, inherit)' }}>{tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}{isSelectionMode && ` (${selectedTasks.length} selected)`}</span></h1>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {/* Filter options */}
+            <button
+              onClick={() => setShowCompleted(prev => !prev)}
+              className={styles.toggleBtn}
+            >
+              {showCompleted ? 'Hide completed' : 'Show completed'}
+            </button>
+            <select
+              value={deadlineFilter}
+              onChange={e => { setDeadlineFilter(e.target.value); setDeadlineRange('all') }}
+              className={styles.sortSelect}
+            >
+              <option value="all">All tasks</option>
+              <option value="today">Due Today</option>
+              <option value="overdue">Overdue</option>
+              <option value="hasDeadline">Other deadline</option>
+            </select>
+            {deadlineFilter === 'hasDeadline' && (
+              <select value={deadlineRange} onChange={e => setDeadlineRange(e.target.value)} className={styles.sortSelect}>
+                <option value="all">Any date</option>
+                <option value="3days">Within 3 days</option>
+                <option value="week">Within a week</option>
+              </select>
+            )}
+
+            {/* Sort options */}
+            <select
+              value={sortBy}
+              onChange={ e => setSortBy(e.target.value)}
+              className={styles.sortSelect}
+            >
+              <option value="priority">Priority</option>
+              <option value="dueDate">Deadline</option>
+            </select>
+            {sortBy === 'dueDate' && (
+              <select value={sortDir} onChange={ e => setSortDir(e.target.value)} className={styles.sortSelect}>
+                <option value="asc">Earliest</option>
+                <option value="dsc">Furthest</option>
+              </select>
+            )}
+
             {/* Delete button - always visible */}
             <button
               onClick={isSelectionMode ? handleBatchDelete : toggleSelectionMode}
@@ -167,63 +329,170 @@ function TasksHub({
               </button>
             )}
 
-            <button onClick={changeView} className={styles.toggleBtn}>
-              {viewMode === "list" ? "Card View" : "List View"}
+            {viewMode === 'card' && (
+              <button onClick={changeLayout} className={styles.toggleBtn} title={layoutMode === 'packed' ? 'Sectioned view' : 'Packed view'}>
+                {layoutMode === 'packed' ? <HiOutlineTemplate size={18} /> : <HiOutlineViewBoards size={18} />}
+              </button>
+            )}
+            <button onClick={changeView} className={styles.toggleBtn} title={viewMode === "list" ? "Card View" : "List View"}>
+              {viewMode === "list" ? <HiOutlineViewGrid size={18} /> : <HiOutlineViewList size={18} />}
             </button>
           </div>
         </div>
 
-        <div className={styles.controls}>
-          <p style={{ color: '#888', fontSize: '14px' }}>
-            {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
-            {isSelectionMode && ` (${selectedTasks.length} selected)`}
-          </p>
-        </div>
+        
+        {/* BODY ================================================================ */}
 
+        {/* List mode */}
+        {viewMode === 'list' && (
+          <div className={styles.listView}>
+            <AddTaskCard addTask={addTask} addBundle={addBundle} viewMode={viewMode} />
+            <DailyTaskCard tasks={dailyTasks} toggleCompletion={toggleDailyTaskCompletion} deleteTask={deleteDailyTask} onOpenDetail={openDailyCardDetails} onOpenCard={() => setIsDailyCardOpen(true)} />
+            {hasMoreDailyTasks && (
+              <div ref={dailyTasksSentinelRef} className={styles.sentinel}>
+                {loadingMore ? <span className={styles.loadingDots}>...</span> : <span className={styles.moreDots}>...</span>}
+              </div>
+            )}
+            {bundles.length > 0 && bundles.map(bundle => (
+              <BundleCard key={bundle.id} bundle={bundle} toggleBundleTaskCompletion={toggleBundleTaskCompletion} deleteBundle={deleteBundle} onOpenDetail={setOpenBundle} />
+            ))}
+            {hasMoreBundles && (
+              <div ref={bundlesSentinelRef} className={styles.sentinel}>
+                {loadingMore ? <span className={styles.loadingDots}>...</span> : <span className={styles.moreDots}>...</span>}
+              </div>
+            )}
+            {loading ? (
+              <p>Loading tasks...</p>
+            ) : sortedTasks.length > 0 ? (
+              sortedTasks.map(task => (
+                <TaskCard key={task.id} task={task} deleteTask={deleteTask} toggleCompletion={toggleTaskCompletion} viewMode={viewMode} isSelectionMode={isSelectionMode} isSelected={selectedTasks.includes(task.id)} onToggleSelect={() => toggleTaskSelection(task.id)} onOpenDetail={openCardDetails} />
+              ))
+            ) : (
+              <div className={styles.emptyState}><p>No tasks yet. Create today's set of tasks or create a new task to do</p></div>
+            )}
+            {hasMoreTasks && (
+              <div ref={tasksSentinelRef} className={styles.sentinel}>
+                {loadingMore ? <span className={styles.loadingDots}>...</span> : <span className={styles.moreDots}>...</span>}
+              </div>
+            )}
+          </div>
+        )}
 
-        <div className={viewMode === "card" ? styles.gridView : styles.listView}>
+        {/* Packed card mode — single JS row-masonry grid */}
+        {viewMode === 'card' && layoutMode === 'packed' && (
+          <div className={styles.packedGrid} ref={packedRef}>
+            <AddTaskCard addTask={addTask} addBundle={addBundle} viewMode={viewMode} />
+            <DailyTaskCard tasks={dailyTasks} toggleCompletion={toggleDailyTaskCompletion} deleteTask={deleteDailyTask} onOpenDetail={openDailyCardDetails} onOpenCard={() => setIsDailyCardOpen(true)} />
+            {hasMoreDailyTasks && (
+              <div ref={dailyTasksSentinelRef} className={styles.packedSentinel}>
+                {loadingMore ? <span className={styles.loadingDots}>...</span> : <span className={styles.moreDots}>...</span>}
+              </div>
+            )}
+            {bundles.length > 0 && bundles.map(bundle => (
+              <BundleCard key={bundle.id} bundle={bundle} toggleBundleTaskCompletion={toggleBundleTaskCompletion} deleteBundle={deleteBundle} onOpenDetail={setOpenBundle} />
+            ))}
+            {hasMoreBundles && (
+              <div ref={bundlesSentinelRef} className={styles.packedSentinel}>
+                {loadingMore ? <span className={styles.loadingDots}>...</span> : <span className={styles.moreDots}>...</span>}
+              </div>
+            )}
+            {loading ? (
+              <p style={{ gridColumn: '1 / -1' }}>Loading tasks...</p>
+            ) : sortedTasks.length > 0 ? (
+              sortedTasks.map(task => (
+                <TaskCard key={task.id} task={task} deleteTask={deleteTask} toggleCompletion={toggleTaskCompletion} viewMode={viewMode} isSelectionMode={isSelectionMode} isSelected={selectedTasks.includes(task.id)} onToggleSelect={() => toggleTaskSelection(task.id)} onOpenDetail={openCardDetails} />
+              ))
+            ) : (
+              <div className={styles.emptyStatePacked}><p>No tasks yet. Create today's set of tasks or create a new task to do</p></div>
+            )}
+            {hasMoreTasks && (
+              <div ref={tasksSentinelRef} className={styles.packedSentinel}>
+                {loadingMore ? <span className={styles.loadingDots}>...</span> : <span className={styles.moreDots}>...</span>}
+              </div>
+            )}
+          </div>
+        )}
 
-          {/* Add Task Component */}
-          <AddTaskCard addTask={addTask} viewMode={viewMode} />
-
-          {/* Daily Tasks Section */}
-          <DailyTaskCard tasks={dailyTasks} toggleCompletion={toggleDailyTaskCompletion} deleteTask={deleteDailyTask} />
-
-          {/* Daily tasks infinite scroll sentinel */}
-          {hasMoreDailyTasks && (
-            <div ref={dailyTasksSentinelRef} className={styles.sentinel}>
-              {loadingMore ? <span className={styles.loadingDots}>...</span> : <span className={styles.moreDots}>...</span>}
+        {/* Sectioned card mode — pinned row, projects grid, tasks masonry */}
+        {viewMode === 'card' && layoutMode === 'sectioned' && (
+          <div className={styles.sectionedWrapper}>
+            <div className={styles.sectionedPinned}>
+              <AddTaskCard addTask={addTask} addBundle={addBundle} viewMode={viewMode} />
+              <DailyTaskCard tasks={dailyTasks} toggleCompletion={toggleDailyTaskCompletion} deleteTask={deleteDailyTask} onOpenDetail={openDailyCardDetails} onOpenCard={() => setIsDailyCardOpen(true)} />
+              {hasMoreDailyTasks && (
+                <div ref={dailyTasksSentinelRef} className={styles.sentinel}>
+                  {loadingMore ? <span className={styles.loadingDots}>...</span> : <span className={styles.moreDots}>...</span>}
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Normal Tasks Section - sorted by priority (High -> Normal -> Low) */}
-          {loading ? (
-            <p>Loading tasks...</p>
-          ) : sortedTasks.length > 0 ? (
-            sortedTasks.map(task => (
-              <TaskCard key={task.id}
-               task={task}
-               deleteTask={deleteTask}
-               toggleCompletion={toggleTaskCompletion}
-               viewMode={viewMode}
-               isSelectionMode={isSelectionMode}
-               isSelected={selectedTasks.includes(task.id)}
-               onToggleSelect={() => toggleTaskSelection(task.id)}
-              />
-            ))
-          ) : (
-            <div className={styles.emptyState}>
-              <p>No tasks yet. Create today's set of tasks or create a new task to do</p>
-            </div>
-          )}
+            {(bundles.length > 0 || hasMoreBundles) && (
+              <div className={styles.sectionedBundles}>
+                {bundles.map(bundle => (
+                  <BundleCard key={bundle.id} bundle={bundle} toggleBundleTaskCompletion={toggleBundleTaskCompletion} deleteBundle={deleteBundle} onOpenDetail={setOpenBundle} />
+                ))}
+                {hasMoreBundles && (
+                  <div ref={bundlesSentinelRef} className={styles.sentinel}>
+                    {loadingMore ? <span className={styles.loadingDots}>...</span> : <span className={styles.moreDots}>...</span>}
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* Tasks infinite scroll sentinel (...) */}
-          {hasMoreTasks && (
-            <div ref={tasksSentinelRef} className={styles.sentinel}>
-              {loadingMore ? <span className={styles.loadingDots}>...</span> : <span className={styles.moreDots}>...</span>}
+            <div className={styles.gridView}>
+              {loading ? (
+                <p>Loading tasks...</p>
+              ) : sortedTasks.length > 0 ? (
+                sortedTasks.map(task => (
+                  <TaskCard key={task.id} task={task} deleteTask={deleteTask} toggleCompletion={toggleTaskCompletion} viewMode={viewMode} isSelectionMode={isSelectionMode} isSelected={selectedTasks.includes(task.id)} onToggleSelect={() => toggleTaskSelection(task.id)} onOpenDetail={openCardDetails} />
+                ))
+              ) : (
+                <div className={styles.emptyState}><p>No tasks yet. Create today's set of tasks or create a new task to do</p></div>
+              )}
+              {hasMoreTasks && (
+                <div ref={tasksSentinelRef} className={styles.sentinel}>
+                  {loadingMore ? <span className={styles.loadingDots}>...</span> : <span className={styles.moreDots}>...</span>}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Open task details Modal for DAILY TASK */}
+        {isDailyCardOpen && <DailyTaskModal
+          tasks={dailyTasks}
+          toggleCompletion={toggleDailyTaskCompletion}
+          addDailyTask={addDailyTask}
+          deleteTask={deleteDailyTask}
+          batchToggleDailyTasks={batchToggleDailyTasks}
+          batchDeleteDailyTasks={batchDeleteDailyTasks}
+          onOpenDetail={openDailyCardDetails}
+          onClose={() => setIsDailyCardOpen(false)}
+        />}
+        {openDailyTask && <TaskDetailsModal 
+          onClose={() => setOpenDailyTask(null)}
+          task = {openDailyTask}
+          updateTask={updateDailyTask}
+          isDailyTask={true}
+        />}
+        
+        {/* Open Task details Modal for NORMAL TASK*/}
+        {openTask && <TaskDetailsModal 
+          onClose={() => setOpenTask(null)}
+          task = {openTask}
+          updateTask={updateTask}
+        />}
+
+        {openBundle && <BundleDetailModal
+          bundle={openBundle}
+          onClose={() => setOpenBundle(null)}
+          updateBundle={updateBundle}
+          deleteBundle={deleteBundle}
+          addBundleTasks={addBundleTasks}
+          batchUpdateBundleTasks={batchUpdateBundleTasks}
+          batchDeleteBundleTasks={batchDeleteBundleTasks}
+          toggleBundleTaskCompletion={toggleBundleTaskCompletion}
+        />}
 
         {/* Delete Confirmation Modal */}
         <ConfirmModal

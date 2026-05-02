@@ -1,39 +1,59 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { BrowserRouter, Route, Routes, useParams } from 'react-router-dom'
 import Sidebar from "./components/Layout/Sidebar/Sidebar.jsx"
+import StarCanvas from "./components/Layout/StarCanvas/StarCanvas.jsx"
+
 import NotePage from "./pages/Notes/NotePage.jsx"
 import NotesHub from "./pages/Notes/NotesHub.jsx"
 import LoginPage from "./pages/Auth/LoginPage.jsx"
 import RegisterPage from "./pages/Auth/RegisterPage.jsx"
 import TasksHub from "./pages/Tasks/TasksHub.jsx"
+import SandBoxes from "./pages/Sandbox/SandBoxes.jsx"
+import Calendar from "./pages/Calendar/Calendar.jsx"
 import ModsHub from "./pages/Mods/ModsHub.jsx"
 import NotFoundPage from "./pages/NotFoundPage.jsx"
 import { useNotes } from "./hooks/useNotes.js"
 import { useTasks } from "./hooks/useTasks.js"
 import { SettingsProvider } from "./contexts/SettingsContext.jsx"
+import { ApiProvider } from "./contexts/ApiContext.jsx"
 import SettingsPopup from "./components/Settings/SettingsPopup.jsx"
 import ToastContainer from "./components/Common/ToastContainer.jsx"
 import logger from "./utils/logger.js"
 
 // Wrapper component to get the ID from route parameters
-function NotePageWrapper({ notes, editTitle, editBody, updateTags, toggleFavorite, updateColor, onNoteChange}){
+function NotePageWrapper({ notes, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, onNoteChange}){
   const { id } = useParams()
 
   useEffect(() => {
     onNoteChange(id)
   }, [id, onNoteChange])
 
-  return <NotePage notes={notes} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} />
+  return <NotePage notes={notes} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} exportNote={exportNote} />
 }
 
 function App() {
 
   const [isAuthed, setIsAuthed] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState(false) // for sidebar's margin. It's setter logic will be done on the sidebar (which is the child)
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth < 1090 || window.innerHeight < 600
+  })
   const [currentNoteID, setCurrentNoteID] = useState(null)
   const [username, setUsername] = useState(null)
 
-  const API = import.meta.env.VITE_API_URL || 'http://localhost:3000' 
+  // Auto-collapse sidebar on small viewports. One-way: shrink on small,
+  // never auto-expand — once big again the user can toggle manually.
+  useEffect(() => {
+    const checkViewport = () => {
+      if (window.innerWidth < 1090 || window.innerHeight < 600) {
+        setIsCollapsed(true)
+      }
+    }
+    window.addEventListener('resize', checkViewport)
+    return () => window.removeEventListener('resize', checkViewport)
+  }, [])
+
+  const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 
   // helper function for getting username from token
@@ -153,12 +173,12 @@ function App() {
 
   // ------------- DATA LOGIC (Adding, deleting, etc. of Notes and Notebooks) ===================================
   const {
-    notes, notebooks, notesPagination, notebooksPagination, loadMoreNotes, loadMoreNotebooks, loadingMore, addNote, deleteNote, editTitle, editBody, toggleFavorite, updateColor, updateTags, createNotebook, deleteNotebook, toggleFavoriteNotebook, updateNotebookColor, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook
+    notes, notebooks, notebookNotesById, notesPagination, notebooksPagination, loadMoreNotes, loadMoreNotebooks, loadingMore, addNote, deleteNote, editTitle, editBody, toggleFavorite, updateColor, updateTags, createNotebook, deleteNotebook, toggleFavoriteNotebook, updateNotebookColor, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook, importMarkdownFiles, exportNote
   } = useNotes(authFetch, API, isAuthed)
 
   // ------------- TASKS DATA LOGIC ===================================
   const {
-    tasks, dailyTasks, tasksPagination, dailyTasksPagination, loadMoreTasks, loadMoreDailyTasks, loadingMore: tasksLoadingMore, loading: tasksLoading, addTask, deleteTask, toggleTaskCompletion, deleteDailyTask, toggleDailyTaskCompletion
+    tasks, dailyTasks, bundles, tasksPagination, dailyTasksPagination, bundlesPagination, loadMoreTasks, loadMoreDailyTasks, loadMoreBundles, loadingMore: tasksLoadingMore, loading: tasksLoading, addTask, updateTask, deleteTask, toggleTaskCompletion, addDailyTask, updateDailyTask, deleteDailyTask, toggleDailyTaskCompletion, batchToggleDailyTasks, batchDeleteDailyTasks, addBundle, updateBundle, deleteBundle, addBundleTasks, batchUpdateBundleTasks, toggleBundleTaskCompletion, batchDeleteBundleTasks
   } = useTasks(authFetch, API, isAuthed)
 
 
@@ -166,6 +186,7 @@ function App() {
   const notesHubElement = (
     <NotesHub notes={notes}
     notebooks={notebooks}
+    notebookNotesById={notebookNotesById}
     notesPagination={notesPagination}
     notebooksPagination={notebooksPagination}
     loadMoreNotes={loadMoreNotes}
@@ -183,8 +204,41 @@ function App() {
     renameNotebook={renameNotebook}
     removeNoteFromNotebook={removeNoteFromNotebook}
     addNotesToNotebook={addNotesToNotebook}
+    importMarkdownFiles={importMarkdownFiles}
     authFetch={authFetch}
     API={API}/>
+  )
+  const tasksHubElement = (
+    <TasksHub
+      tasks={tasks}
+      dailyTasks={dailyTasks}
+      tasksPagination={tasksPagination}
+      dailyTasksPagination={dailyTasksPagination}
+      loadMoreTasks={loadMoreTasks}
+      loadMoreDailyTasks={loadMoreDailyTasks}
+      loadingMore={tasksLoadingMore}
+      loading={tasksLoading}
+      addTask={addTask}
+      updateTask={updateTask}
+      deleteTask={deleteTask}
+      toggleTaskCompletion={toggleTaskCompletion}
+      addDailyTask={addDailyTask}
+      updateDailyTask={updateDailyTask}
+      deleteDailyTask={deleteDailyTask}
+      toggleDailyTaskCompletion={toggleDailyTaskCompletion}
+      batchToggleDailyTasks={batchToggleDailyTasks}
+      batchDeleteDailyTasks={batchDeleteDailyTasks}
+      bundles={bundles}
+      bundlesPagination={bundlesPagination}
+      loadMoreBundles={loadMoreBundles}
+      addBundle={addBundle}
+      updateBundle={updateBundle}
+      deleteBundle={deleteBundle}
+      addBundleTasks={addBundleTasks}
+      batchUpdateBundleTasks={batchUpdateBundleTasks}
+      toggleBundleTaskCompletion={toggleBundleTaskCompletion}
+      batchDeleteBundleTasks={batchDeleteBundleTasks}
+    />
   )
 
   const style = {
@@ -199,22 +253,43 @@ function App() {
   return (
 
     <SettingsProvider authFetch={authFetch} API={API} isAuthed={isAuthed}>
+    <ApiProvider authFetch={authFetch} API={API}>
     <div style={style}>
+
+      {/* Background effects */}
+      <StarCanvas />
+      {isAuthed && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '1px',
+          background: 'linear-gradient(90deg, transparent 0%, rgba(240,184,64,0.3) 30%, rgba(240,184,64,0.5) 50%, rgba(240,184,64,0.3) 70%, transparent 100%)',
+          zIndex: 999,
+          pointerEvents: 'none',
+        }} />
+      )}
+
       <BrowserRouter>
         <div style={{ display: "flex",
           flexDirection: "row",
+          height: '100vh',
           margin: 0,
           padding: 0,
-          backgroundColor: 'var(--bg-primary)'
+          backgroundColor: 'transparent',
+          position: 'relative',
+          zIndex: 5,
         }}>
 
           {/* Only show sidebar when logged in */}
           {isAuthed && (
             <Sidebar username={username}
-              isCollapsed={isCollapsed} 
-              toggleSidebar={setIsCollapsed} 
-              notes={notes} 
-              currentNoteID={currentNoteID} 
+              isCollapsed={isCollapsed}
+              toggleSidebar={setIsCollapsed}
+              notes={notes}
+              notebooks={notebooks}
+              currentNoteID={currentNoteID}
               setIsAuthed={setIsAuthed}
             />
           )}
@@ -223,7 +298,7 @@ function App() {
           {/* blank space reserved for fixed sidebar */}
           {isAuthed && (
             <div style={{
-              width: isCollapsed ? '70px' : '250px',
+              width: isCollapsed ? '70px' : '220px',
               flexShrink: 0,  /* Prevents this from shrinking */
               transition: 'width 0.3s ease'
             }} />
@@ -232,10 +307,12 @@ function App() {
 
           {/* The main page/s (the contents on the right, not sidebar) */}
           <div style={{ flex: 1,
-            padding: isAuthed ? '20px 40px' : '0',
+            padding: isAuthed ? '0 40px' : '0',
             overflowY: 'auto',
-            backgroundColor: 'var(--bg-primary)',
-            minWidth: 0  /* Allows flex item to shrink below content size */
+            backgroundColor: 'transparent',
+            minWidth: 0,  /* Allows flex item to shrink below content size */
+            position: 'relative',
+            zIndex: 5,
           }}>
 
 
@@ -252,29 +329,16 @@ function App() {
                       updateTags={updateTags}
                       toggleFavorite={toggleFavorite}
                       updateColor={updateColor}
+                      exportNote={exportNote}
                       onNoteChange={setCurrentNoteID}
                       />
                     }
                   />
                   {/* <Route path="/notebooks/:id" element={Notebook} */}
 
-                  <Route path="/tasks" element={
-                    <TasksHub
-                      tasks={tasks}
-                      dailyTasks={dailyTasks}
-                      tasksPagination={tasksPagination}
-                      dailyTasksPagination={dailyTasksPagination}
-                      loadMoreTasks={loadMoreTasks}
-                      loadMoreDailyTasks={loadMoreDailyTasks}
-                      loadingMore={tasksLoadingMore}
-                      loading={tasksLoading}
-                      addTask={addTask}
-                      deleteTask={deleteTask}
-                      toggleTaskCompletion={toggleTaskCompletion}
-                      deleteDailyTask={deleteDailyTask}
-                      toggleDailyTaskCompletion={toggleDailyTaskCompletion}
-                    />
-                  } />
+                  <Route path="/tasks" element={tasksHubElement} />
+                  <Route path="/sandboxes" element={<SandBoxes />} />
+                  <Route path="/calendar" element={<Calendar />} />
                   <Route path="/mods" element={<ModsHub />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </>
@@ -295,6 +359,7 @@ function App() {
 
       </BrowserRouter>
     </div>
+    </ApiProvider>
     </SettingsProvider>
 
   )

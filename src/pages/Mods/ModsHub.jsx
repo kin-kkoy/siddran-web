@@ -1,12 +1,27 @@
 
 function ModsHub() {
   return (
-    <div>
-        <h1>Mods</h1>
-        <h3>This page is to be implemented/developed</h3>
-        <p>Will have 1 button. But show the downloaded mods by default as a card in the hub</p>
-        <p>Pressing the button will alternate between: marketplace and inventory, yk this</p>
-        <p>Sidebar will change to show the lists of mods downloaded and of course interactable. Maybe embed the game to here then</p>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '65vh',
+      flexDirection: 'column',
+      gap: '1rem',
+      opacity: 0.3,
+    }}>
+      <div style={{ fontSize: '2.2rem', color: 'var(--accent-warning)' }}>&#10022;</div>
+      <div style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: '1rem',
+        fontWeight: 700,
+        letterSpacing: '0.12em',
+      }}>COMING SOON</div>
+      <div style={{
+        fontSize: '0.7rem',
+        color: 'var(--text-muted)',
+        letterSpacing: '0.1em',
+      }}>This module is in the works</div>
     </div>
   )
 }

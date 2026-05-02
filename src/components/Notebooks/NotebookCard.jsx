@@ -5,15 +5,19 @@ import styles from './NotebookCard.module.css'
 import { useState, useRef, useEffect } from 'react'
 import ConfirmModal from '../Common/ConfirmModal'
 
-function NotebookCard({ notebook, deleteNotebook, onOpen, toggleFavoriteNotebook, updateNotebookColor }) {
+function NotebookCard({ notebook, noteCount, deleteNotebook, onOpen, toggleFavoriteNotebook, updateNotebookColor }) {
     const [menuOpen, setMenuOpen] = useState(false)
     const [menuPosition, setMenuPosition] = useState('below')
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const menuRef = useRef(null)
     const buttonRef = useRef(null)
 
-    const spineColor = notebook.color || '#4a9eff'
-    const noteCount = notebook.note_count || 0
+    const isDefaultColor = !notebook.color
+    const spineColor = isDefaultColor ? 'var(--text-faint)' : notebook.color
+    const spineGlow = isDefaultColor
+        ? 'color-mix(in srgb, var(--text-faint) 15%, transparent)'
+        : `${notebook.color}26`
+    const resolvedNoteCount = Number.isFinite(noteCount) ? noteCount : (notebook.note_count || 0)
 
     const tagsDisplay = notebook.tags
         ? notebook.tags.split(',').map(t => t.trim()).filter(Boolean).join(' · ')
@@ -87,7 +91,7 @@ function NotebookCard({ notebook, deleteNotebook, onOpen, toggleFavoriteNotebook
                     className={styles.card}
                     style={{
                         '--spine-color': spineColor,
-                        '--spine-glow': `${spineColor}26`,
+                        '--spine-glow': spineGlow,
                     }}
                 >
                     {/* Decorative spine with 4 dots */}
@@ -114,6 +118,7 @@ function NotebookCard({ notebook, deleteNotebook, onOpen, toggleFavoriteNotebook
                                         <div className={styles.colorPicker}>
                                             <span className={styles.colorLabel}>Spine Color:</span>
                                             <div className={styles.colorOptions}>
+                                                <button onClick={(e) => handleColorChange(e, null)} className={styles.colorBtn} style={{ backgroundColor: 'var(--bg-surface)' }} title="Default"></button>
                                                 <button onClick={(e) => handleColorChange(e, '#4a9eff')} className={styles.colorBtn} style={{ backgroundColor: '#4a9eff' }} title="Blue (Default)"></button>
                                                 <button onClick={(e) => handleColorChange(e, '#fbbf24')} className={styles.colorBtn} style={{ backgroundColor: '#fbbf24' }} title="Yellow"></button>
                                                 <button onClick={(e) => handleColorChange(e, '#10b981')} className={styles.colorBtn} style={{ backgroundColor: '#10b981' }} title="Green"></button>
@@ -135,7 +140,7 @@ function NotebookCard({ notebook, deleteNotebook, onOpen, toggleFavoriteNotebook
                         <div className={styles.footer}>
                             <div className={styles.noteCount}>
                                 <LuFileText size={14} />
-                                <span>{noteCount} {noteCount === 1 ? 'Note' : 'Notes'}</span>
+                                <span>{resolvedNoteCount} {resolvedNoteCount === 1 ? 'Note' : 'Notes'}</span>
                             </div>
                             <button onClick={handleDelete} className={styles.deleteBtn}>
                                 <HiOutlineTrash />

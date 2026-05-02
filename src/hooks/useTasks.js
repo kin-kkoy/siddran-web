@@ -2,13 +2,105 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "../utils/toast";
 import logger from "../utils/logger";
 
-// Custom hook for tasks and daily tasks
+
+// mini helper function for messages lol
+function whatMessage(action, subAction = null) {
+    const feedbackMessages = {
+        deleted: [
+            "Aaaand... it's history. 🦖",
+            "Poof! Into the digital abyss it goes.",
+            "Sent this one to a farm upstate. 🚜",
+            "Deleted. We don't know her anymore. 💅",
+            "Rest in pixels, old friend.",
+            "Yeeted into the recycle bin. ☄️"
+        ],
+        created: [
+            "It exists. Now what? 🤨",
+            "A fresh start. Don't mess this one up.",
+            "Brand new and already judging your progress.",
+            "Added to the pile. 📁",
+            "Witnessed. It's officially a thing now.",
+            "The canvas is no longer blank. Scared?",
+            "Birth certificate signed. ✍️"
+        ],
+        updated: [
+            "Changed it again, did we?",
+            "Applying the 'fix it' juice. 🧃",
+            "Consider it tweaked.",
+            "Polishing the edges. ✨",
+            "It's different now. Slightly.",
+            "Updated. The old version was mid anyway.",
+            "Wait, was that a typo? Fixed it."
+        ],
+        completed: [
+            "Finally. I was starting to worry. ☕",
+            "Yay it's done!!!!!!!!!!!!!!!!!!!!!",
+            "Off the to-do list and into the 'done' bin.",
+            "Manifested into reality. Yup.",
+            "You actually did the thing. Wow.",
+            "Checkmark acquired. Move along.",
+            "That's one less thing to ignore tomorrow."
+        ],
+        validation: {
+            noTitle: [
+                "A title would be nice, don't you think?",
+                "Untitled? Bold choice. Too bold.",
+                "Even 'Untitled' is a title. Try harder. 😤",
+                "The title field is feeling neglected.",
+            ],
+            noTasks: [
+                "You need at least one item. It's literally the point. 💨",
+                "Empty list detected. What are we even doing here?",
+                "No items? That's not a plan, that's a wish. 🌠",
+                "Add something first. Anything. We believe in you.",
+            ],
+        },
+        failed: {
+            create: [
+                "Birth certificate denied. 🚫",
+                "The universe says 'maybe later'.",
+                "It refused to be born. Re-evaluating life choices.",
+                "Error: Commitment issues detected."
+            ],
+            update: [
+                "The update didn't take. It likes its old self.",
+                "Refused to change. Stubborn, isn't it?",
+                "Nip/tuck failed. We're staying mid for now.",
+                "Changes discarded like last year's trends."
+            ],
+            delete: [
+                "It's fighting back. It won't leave. 🧟",
+                "Immortal item detected. Try again.",
+                "Deletion failed. It's too attached to you.",
+                "The abyss spit it back out. Awkward."
+            ],
+            complete: [
+                "Not so fast. Something's still broken.",
+                "Completion denied. Did you actually finish it though?",
+                "It's not over 'til the server sings. (It didn't).",
+                "The finish line just moved. Sorry."
+            ]
+        }
+    };
+
+    // Logic to handle nested "failed" messages or standard messages
+    const list = subAction
+        ? feedbackMessages[action][subAction]
+        : feedbackMessages[action];
+
+    return list[Math.floor(Math.random() * list.length)];
+}
+
+
+// Custom hook for tasks, daily tasks, and bundles
 export const useTasks = (authFetch, API, isAuthed) => {
 
     const [tasks, setTasks] = useState([])
     const [dailyTasks, setDailyTasks] = useState([])
+    const [bundles, setBundles] = useState([])
     const [tasksPagination, setTasksPagination] = useState(null)
     const [dailyTasksPagination, setDailyTasksPagination] = useState(null)
+    const [bundlesPagination, setBundlesPagination] = useState(null)
     const [loadingMore, setLoadingMore] = useState(false)
     const [loading, setLoading] = useState(true)
 
@@ -19,9 +111,10 @@ export const useTasks = (authFetch, API, isAuthed) => {
 
         const fetchAllTasks = async () => {
             try {
-                const [res1, res2] = await Promise.all([
+                const [res1, res2, res3] = await Promise.all([
                     authFetch(`${API}/tasks`),
-                    authFetch(`${API}/daily-tasks`)
+                    authFetch(`${API}/daily-tasks`),
+                    authFetch(`${API}/projects`)
                 ])
 
                 if(res1.ok) {
@@ -33,6 +126,11 @@ export const useTasks = (authFetch, API, isAuthed) => {
                     const data2 = await res2.json()
                     setDailyTasks(data2.dailyTasks)
                     setDailyTasksPagination(data2.pagination)
+                }
+                if(res3.ok) {
+                    const data3 = await res3.json()
+                    setBundles(data3.projects)
+                    setBundlesPagination(data3.pagination)
                 }
 
             } catch (error) {
@@ -88,13 +186,34 @@ export const useTasks = (authFetch, API, isAuthed) => {
         }
     }, [authFetch, API, dailyTasksPagination, loadingMore])
 
+    const loadMoreBundles = useCallback(async () => {
+        if(!bundlesPagination?.hasNextPage || loadingMore) return
+
+        setLoadingMore(true)
+        try {
+            const response = await authFetch(
+                `${API}/projects?cursor=${bundlesPagination.nextCursor}&limit=${bundlesPagination.limit}`
+            )
+            if(response.ok){
+                const data = await response.json()
+                setBundles(prev => [...prev, ...data.projects])
+                setBundlesPagination(data.pagination)
+            }
+        } catch (error) {
+            logger.error('Error loading more bundles:', error);
+        }finally {
+            setLoadingMore(false)
+        }
+
+    }, [authFetch, API, bundlesPagination, loadingMore])
+
 
     // ----------- Task Operations ===========================
     const addTask = useCallback(async (title, description, priority, dueDate, taskType) => {
         // if daily tasks
         if (taskType === 'daily') {
             if (!Array.isArray(title) || title.length === 0) {
-                toast.warning("No tasks to create")
+                toast.warning(whatMessage("validation", "noTasks"))
                 return
             }
 
@@ -111,7 +230,7 @@ export const useTasks = (authFetch, API, isAuthed) => {
 
             } catch (error) {
                 logger.error("Error adding daily tasks:", error)
-                toast.error("Failed to create daily tasks")
+                toast.error(whatMessage("failed", "create"))
             }
 
             return
@@ -119,7 +238,7 @@ export const useTasks = (authFetch, API, isAuthed) => {
 
         // if normal tasks
         if (!title.trim()) {
-            toast.warning("Task title cannot be empty")
+            toast.warning(whatMessage("validation", "noTitle"))
             return
         }
 
@@ -139,7 +258,32 @@ export const useTasks = (authFetch, API, isAuthed) => {
 
         } catch (error) {
             logger.error("Error adding task:", error)
-            toast.error("Failed to add task")
+            toast.error(whatMessage("failed", "create"))
+        }
+    }, [authFetch, API])
+
+    const updateTask = useCallback(async (id, {title, description, is_completed, priority, due_date}) => {
+        try {
+
+            // get the passed values first
+            const params = {title, description, is_completed, priority, due_date};
+
+            //remove undefined fields (the params that weren't passed)
+            const cleanParams = Object.fromEntries(
+                Object.entries(params).filter(([_dirname, v]) => v !== undefined)
+            );
+
+            const res = await authFetch(`${API}/tasks/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(cleanParams)
+            })
+
+            if(res.ok){
+                setTasks(prev => prev.map(task => task.id === id ? {...task, ...cleanParams} : task))
+            }
+
+        } catch (error) {
+            logger.error("Error updating task:", error)
         }
     }, [authFetch, API])
 
@@ -178,6 +322,57 @@ export const useTasks = (authFetch, API, isAuthed) => {
 
 
     // ----------- Daily Task Operations ===========================
+    const addDailyTask = useCallback(async (title, priority) => {
+
+        if (!title?.trim()) {
+            toast.warning(whatMessage("validation", "noTitle"))
+            return
+        }
+
+        try {
+            const res = await authFetch(`${API}/daily-tasks`, {
+                method: 'POST',
+                body: JSON.stringify({ tasks: [{title: title.trim(), priority}] })
+            })
+
+            if(res.ok) {
+                const newTasks = await res.json()
+                setDailyTasks(prev => [...newTasks, ...prev])
+            }
+
+        } catch (error) {
+            logger.error("Error adding daily task:", error)
+            toast.error(whatMessage("failed", "create"))
+        }
+
+        return
+    }, [authFetch, API])
+
+    const updateDailyTask = useCallback(async (id, {title, priority, is_completed}) => {
+        try {
+
+            // get the passed values first
+            const params = {title, priority, is_completed};
+
+            //remove undefined fields (the params that weren't passed)
+            const cleanParams = Object.fromEntries(
+                Object.entries(params).filter(([_dirname, v]) => v !== undefined)
+            );
+
+            const res = await authFetch(`${API}/daily-tasks/${id}`, {
+                method: "PUT",
+                body: JSON.stringify(cleanParams)
+            });
+
+            if(res.ok){
+                setDailyTasks(prev => prev.map(dailyTask => dailyTask.id === id ? {...dailyTask, ...cleanParams} : dailyTask))
+            }
+
+        } catch (error) {
+            logger.error("Error updating daily task:", error)
+        }
+    }, [authFetch, API])
+
     const deleteDailyTask = useCallback(async (id) => {
         try {
             const res = await authFetch(`${API}/daily-tasks/${id}`, { method: "DELETE" })
@@ -210,20 +405,268 @@ export const useTasks = (authFetch, API, isAuthed) => {
         }
     }, [authFetch, API])
 
+    // Batch toggle completion for daily tasks
+    const batchToggleDailyTasks = useCallback(async (updates) => {
+        // updates: [{ id, is_completed }, ...]
+        if (!updates.length) return
+
+        try {
+            const res = await authFetch(`${API}/daily-tasks/batch-complete`, {
+                method: 'PATCH',
+                body: JSON.stringify({ tasks: updates })
+            })
+
+            if (!res.ok) throw new Error(`Batch toggle failed: ${res.status}`)
+
+            const updatedTasks = await res.json()
+            setDailyTasks(prev => prev.map(task => {
+                const updated = updatedTasks.find(u => u.id === task.id)
+                return updated ? { ...task, ...updated } : task
+            }))
+        } catch (error) {
+            logger.error("Error batch toggling daily tasks:", error)
+            throw error
+        }
+    }, [authFetch, API])
+
+    // Batch delete daily tasks
+    const batchDeleteDailyTasks = useCallback(async (ids) => {
+        // ids: [id1, id2, ...]
+        if (!ids.length) return
+
+        try {
+            const res = await authFetch(`${API}/daily-tasks/batch-delete`, {
+                method: 'DELETE',
+                body: JSON.stringify({ tasks: ids.map(id => ({ id })) })
+            })
+
+            if (!res.ok) throw new Error(`Batch delete failed: ${res.status}`)
+
+            setDailyTasks(prev => prev.filter(task => !ids.includes(task.id)))
+        } catch (error) {
+            logger.error("Error batch deleting daily tasks:", error)
+            throw error
+        }
+    }, [authFetch, API])
+
+
+    // ----------- Bundle CRUD ===========================
+
+    // POST create a bundle with tasks
+    const addBundle = useCallback(async (title, tasks, color) => {
+
+        // Validate - title
+        if(!title.trim()){
+            toast.warning(whatMessage("validation", "noTitle"))
+            return
+        }
+        // Validate - tasks
+        if (!Array.isArray(tasks) || tasks.length === 0) {
+            toast.warning(whatMessage("validation", "noTasks"))
+            return
+        }
+
+        try {
+
+            const res = await authFetch(`${API}/projects`, {
+                method: 'POST',
+                body: JSON.stringify({ title, tasks, color })   // although color is optional, in the modal it'll have a color by default
+            });
+
+            if (res.ok){
+                const newBundle = await res.json();
+                setBundles(prev => [newBundle, ...prev])
+                toast.success(whatMessage("created"))
+            }
+
+        } catch (error) {
+            logger.error("Error adding bundle:", error)
+            toast.error(whatMessage("failed", "create"))
+        }
+
+
+    }, [authFetch, API])
+
+    // PUT update bundle metadata (title, color, is_completed)
+    const updateBundle = useCallback(async (id, { title, color, is_completed }) => {
+        try {
+
+            // -- (dynamically take the params that are only defined) ---
+            // get params first
+            const params = {title, color, is_completed};
+            // then clean the params
+            const cleanParams = Object.fromEntries(
+                Object.entries(params).filter(([_dirname, v]) => v !== undefined)
+            );
+
+            const res = await authFetch(`${API}/projects/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(cleanParams)
+            })
+
+            if(res.ok){
+                setBundles(prev => prev.map(p => p.id === id ? { ...p, ...cleanParams } : p))
+            }
+
+        } catch (error) {
+            logger.error("Error updating bundle:", error)
+            toast.error(whatMessage("failed", "update"))
+        }
+
+
+
+    }, [authFetch, API])
+
+    // DELETE delete bundle (cascades to its tasks)
+    const deleteBundle = useCallback(async (id) => {
+        try {
+            const res = await authFetch(`${API}/projects/${id}`, { method: 'DELETE' })
+            if(res.ok){
+                toast.success(whatMessage("deleted"))
+                setBundles(prev => prev.filter(p => p.id !== id))
+            }
+        } catch (error) {
+            logger.error("Error deleting bundle:", error)
+            toast.error(whatMessage("failed", "delete"))
+        }
+    }, [authFetch, API])
+
+
+    // ----------- Bundle Task Operations ===========================
+
+    // POST batch add tasks to a bundle
+    const addBundleTasks = useCallback(async (bundleId, tasks) => {
+        try {
+
+            // Validate - tasks
+            if (!Array.isArray(tasks) || tasks.length === 0) {
+                toast.warning(whatMessage("validation", "noTasks"))
+                return
+            }
+
+            const res = await authFetch(`${API}/projects/${bundleId}/tasks`, {
+                method: 'POST',
+                body: JSON.stringify({ tasks })
+            })
+
+            if(res.ok){
+                const updatedBundle = await res.json()
+                toast.success(whatMessage("created"));
+                setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: updatedBundle.tasks } : p ));
+            }
+
+        } catch (error) {
+            logger.error("Error creating tasks in the bundle:", error)
+            toast.error(whatMessage("failed", "create"))
+        }
+    }, [authFetch, API])
+
+    // PUT batch update bundle tasks
+    const batchUpdateBundleTasks = useCallback(async (bundleId, tasks) => {
+
+        try {
+
+            // Validate - tasks
+            if (!Array.isArray(tasks) || tasks.length === 0) {
+                toast.warning(whatMessage("validation", "noTasks"))
+                return
+            }
+
+            const res = await authFetch(`${API}/projects/${bundleId}/tasks`, {
+                method: 'PUT',
+                body: JSON.stringify({ tasks })
+            });
+
+            if(res.ok){
+                const data = await res.json()
+                toast.success(whatMessage("updated"));
+                setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: data.allTasks } : p ))
+            }
+
+        } catch (error) {
+            logger.error("Error updating tasks in the bundle:", error)
+            toast.error(whatMessage("failed", "update"))
+        }
+    }, [authFetch, API])
+
+    // PUT toggle single task completion
+    const toggleBundleTaskCompletion = useCallback(async (bundleId, taskId, isCompleted) => {
+
+        // Find the bundle, find the task inside it, flip is_completed
+        // On error, revert
+
+        try {
+            // optimistic update like toggleDailyTaskCompletion
+            setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: p.tasks.map( task => task.id === taskId ? {...task, is_completed: isCompleted} : task) } : p ))
+
+            await authFetch(`${API}/projects/${bundleId}/tasks/${taskId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ is_completed: isCompleted })
+            })
+
+        } catch (error) {
+            // if failed then revert back (have to add this since we're going omptimistic update)
+            setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: p.tasks.map( task => task.id === taskId ? {...task, is_completed: !isCompleted} : task) } : p ))
+            logger.error("Error completing task in the bundle:", error)
+            toast.error(whatMessage("failed", "complete"))
+        }
+    }, [authFetch, API])
+
+    // DELETE batch delete bundle tasks
+    const batchDeleteBundleTasks = useCallback(async (bundleId, taskIds) => {
+        try {
+
+            // Validate - task IDs
+            if (!Array.isArray(taskIds) || taskIds.length === 0) {
+                toast.warning(whatMessage("validation", "noTasks"))
+                return
+            }
+
+            const res = await authFetch(`${API}/projects/${bundleId}/tasks`, {
+                method: 'DELETE',
+                body: JSON.stringify({ tasks: taskIds.map(id => ({ id })) })
+            })
+
+            if(res.ok){
+                toast.success(whatMessage("deleted"))
+                setBundles(bundle => bundle.map( p => p.id === bundleId ? {...p, tasks: p.tasks.filter(task => !taskIds.includes(task.id))} : p ))
+            }
+
+        } catch (error) {
+            logger.error("Error deleting tasks in the bundle:", error)
+            toast.error(whatMessage("failed", "delete"))
+        }
+    }, [authFetch, API])
+
 
     return {
         tasks,
         dailyTasks,
+        bundles,
         tasksPagination,
         dailyTasksPagination,
+        bundlesPagination,
         loadMoreTasks,
         loadMoreDailyTasks,
+        loadMoreBundles,
         loadingMore,
         loading,
         addTask,
+        updateTask,
         deleteTask,
         toggleTaskCompletion,
+        addDailyTask,
+        updateDailyTask,
         deleteDailyTask,
-        toggleDailyTaskCompletion
+        toggleDailyTaskCompletion,
+        batchToggleDailyTasks,
+        batchDeleteDailyTasks,
+        addBundle,
+        updateBundle,
+        deleteBundle,
+        addBundleTasks,
+        batchUpdateBundleTasks,
+        toggleBundleTaskCompletion,
+        batchDeleteBundleTasks,
     }
 }

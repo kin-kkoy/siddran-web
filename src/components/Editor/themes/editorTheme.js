@@ -75,6 +75,19 @@ const editorTheme = {
 
   // Paragraph
   paragraph: 'editor-paragraph',
+
+  // Table (GFM round-trips via remark-gfm).
+  // Cell alignment is handled by Lexical's native ParagraphNode.setFormat,
+  // which writes inline `text-align` style — no theme class is needed for
+  // alignment to render. The selected/selection classes below are applied
+  // by @lexical/table during multi-cell drag-selection so the right-click
+  // menu's "selection" affordance is visible.
+  table: 'editor-table',
+  tableRow: 'editor-table-row',
+  tableCell: 'editor-table-cell',
+  tableCellHeader: 'editor-table-cell-header',
+  tableCellSelected: 'editor-table-cell-selected',
+  tableSelected: 'editor-table-selected',
 };
 
 export default editorTheme;
