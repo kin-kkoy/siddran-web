@@ -1,7 +1,7 @@
 /* Obsidian-style centered editor */
 .container {
     /* max-width: min(900px, 90vw);  */
-    max-width: clamp(700px, 60vw, 1200px);
+    max-width: var(--note-editor-width, 1200px);
     margin: 0 auto;
     padding: 60px 20px;
     min-height: 100vh;

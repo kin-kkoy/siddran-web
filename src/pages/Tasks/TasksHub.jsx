@@ -10,6 +10,7 @@ import { HiOutlineTrash, HiOutlineViewGrid, HiOutlineViewList, HiOutlineTemplate
 import BundleCard from "../../components/Tasks/BundleCard"
 import BundleDetailModal from "../../components/Common/BundleDetailModal"
 import { useRowMasonry } from '../../hooks/useRowMasonry'
+import Skeleton from "../../components/Common/Skeleton"
 
 function TasksHub({
   tasks,
@@ -264,6 +265,40 @@ function TasksHub({
     setShowDeleteModal(false)
   }
 
+
+  if (loading && tasks.length === 0 && dailyTasks.length === 0 && bundles.length === 0) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <Skeleton width="200px" height="36px" />
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+            <Skeleton width="140px" height="32px" radius={6} />
+            <Skeleton width="120px" height="32px" radius={6} />
+            <Skeleton width="120px" height="32px" radius={6} />
+            <Skeleton width="36px" height="32px" radius={6} />
+            <Skeleton width="36px" height="32px" radius={6} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            {Array.from({ length: 2 }).map((_, i) => (
+              <Skeleton key={`d${i}`} width="100%" height="180px" radius={10} />
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={`b${i}`} width="100%" height="160px" radius={10} />
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={`t${i}`} width="100%" height="120px" radius={10} />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={styles.container}>

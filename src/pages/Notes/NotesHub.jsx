@@ -14,9 +14,10 @@ import { HiOutlineTrash, HiOutlineViewGrid, HiOutlineViewList, HiOutlineUpload }
 import { LuNotebookPen } from 'react-icons/lu'
 import { toast } from '../../utils/toast'
 import { compareByFavorite } from '../../utils/noteSorting'
+import Skeleton from '../../components/Common/Skeleton'
 
 // obtains the notes and
-function NotesHub({ notes, notebooks, notebookNotesById, notesPagination, notebooksPagination, loadMoreNotes, loadMoreNotebooks, loadingMore, addNote, deleteNote, toggleFavorite, updateColor, createNotebook, deleteNotebook, toggleFavoriteNotebook, updateNotebookColor, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook, importMarkdownFiles, authFetch, API }) {
+function NotesHub({ notes, notebooks, notesLoading, notebookNotesById, notesPagination, notebooksPagination, loadMoreNotes, loadMoreNotebooks, loadingMore, addNote, deleteNote, toggleFavorite, updateColor, createNotebook, deleteNotebook, toggleFavoriteNotebook, updateNotebookColor, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook, importMarkdownFiles, authFetch, API }) {
 
   // Persist view mode in localStorage
   const [viewMode, setViewMode] = useState(() => {
@@ -224,6 +225,34 @@ function NotesHub({ notes, notebooks, notebookNotesById, notesPagination, notebo
     })
     .sort(compareByFavorite)
 
+
+  if (notesLoading && notes.length === 0 && notebooks.length === 0) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <Skeleton width="180px" height="36px" />
+          <Skeleton width="220px" height="14px" style={{ marginTop: 4 }} />
+          <Skeleton width="100%" height="40px" radius={8} style={{ marginTop: 12 }} />
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: 12 }}>
+            <Skeleton width="36px" height="36px" radius={6} />
+            <Skeleton width="160px" height="36px" radius={6} />
+            <Skeleton width="36px" height="36px" radius={6} />
+            <Skeleton width="36px" height="36px" radius={6} />
+          </div>
+        </div>
+        <div className={viewMode === "grid" ? styles.gridView : styles.listView}>
+          {Array.from({ length: viewMode === "grid" ? 6 : 5 }).map((_, i) => (
+            <Skeleton
+              key={i}
+              width="100%"
+              height={viewMode === "grid" ? "200px" : "80px"}
+              radius={10}
+            />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={styles.container}>

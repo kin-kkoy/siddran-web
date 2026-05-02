@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSettings, THEMES } from '../../contexts/SettingsContext'
 import { DIRECTION_ANGLES } from '../Layout/StarCanvas/StarCanvas'
+import { LuRotateCcw } from 'react-icons/lu'
 import styles from './SettingsPopup.module.css'
 
 function SettingsPopup() {
@@ -117,6 +118,45 @@ function InterfaceTab({ settings, updateSetting }) {
           checked={settings.autoHideToolbar}
           onChange={(v) => updateSetting('autoHideToolbar', v)}
         />
+      </SettingRow>
+
+      {/* Note editor width */}
+      <SettingRow
+        label="Note Editor Width"
+        description="Maximum width of the writing surface on note pages."
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="range"
+            className={styles.starSlider}
+            min={700}
+            max={1600}
+            step={20}
+            value={settings.noteEditorWidth ?? 1200}
+            onChange={e => updateSetting('noteEditorWidth', parseInt(e.target.value, 10))}
+          />
+          <span style={{ minWidth: 56, textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)', fontSize: 13 }}>
+            {settings.noteEditorWidth ?? 1200}px
+          </span>
+          <button
+            type="button"
+            onClick={() => updateSetting('noteEditorWidth', 1200)}
+            title="Reset to default (1200px)"
+            aria-label="Reset note editor width"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: 4,
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <LuRotateCcw size={14} />
+          </button>
+        </div>
       </SettingRow>
 
       {/* Star canvas toggle */}

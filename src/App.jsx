@@ -21,14 +21,14 @@ import ToastContainer from "./components/Common/ToastContainer.jsx"
 import logger from "./utils/logger.js"
 
 // Wrapper component to get the ID from route parameters
-function NotePageWrapper({ notes, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, onNoteChange}){
+function NotePageWrapper({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, onNoteChange}){
   const { id } = useParams()
 
   useEffect(() => {
     onNoteChange(id)
   }, [id, onNoteChange])
 
-  return <NotePage notes={notes} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} exportNote={exportNote} />
+  return <NotePage notes={notes} notesLoading={notesLoading} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} exportNote={exportNote} />
 }
 
 function App() {
@@ -173,7 +173,7 @@ function App() {
 
   // ------------- DATA LOGIC (Adding, deleting, etc. of Notes and Notebooks) ===================================
   const {
-    notes, notebooks, notebookNotesById, notesPagination, notebooksPagination, loadMoreNotes, loadMoreNotebooks, loadingMore, addNote, deleteNote, editTitle, editBody, toggleFavorite, updateColor, updateTags, createNotebook, deleteNotebook, toggleFavoriteNotebook, updateNotebookColor, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook, importMarkdownFiles, exportNote
+    notes, notebooks, loading: notesLoading, notebookNotesById, notesPagination, notebooksPagination, loadMoreNotes, loadMoreNotebooks, loadingMore, addNote, deleteNote, editTitle, editBody, toggleFavorite, updateColor, updateTags, createNotebook, deleteNotebook, toggleFavoriteNotebook, updateNotebookColor, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook, importMarkdownFiles, exportNote
   } = useNotes(authFetch, API, isAuthed)
 
   // ------------- TASKS DATA LOGIC ===================================
@@ -186,6 +186,7 @@ function App() {
   const notesHubElement = (
     <NotesHub notes={notes}
     notebooks={notebooks}
+    notesLoading={notesLoading}
     notebookNotesById={notebookNotesById}
     notesPagination={notesPagination}
     notebooksPagination={notebooksPagination}
@@ -324,6 +325,7 @@ function App() {
                   <Route path="/notes" element={notesHubElement} />
                   <Route path="/notes/:id" element={
                     <NotePageWrapper notes={notes}
+                      notesLoading={notesLoading}
                       editTitle={editTitle}
                       editBody={editBody}
                       updateTags={updateTags}

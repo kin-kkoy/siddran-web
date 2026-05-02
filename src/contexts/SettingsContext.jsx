@@ -28,6 +28,7 @@ const DEFAULTS = {
   starTwinkleDepth: 1.65,
   starCount: 135,
   starDirection: '↙',
+  noteEditorWidth: 1200,
 }
 
 // ── Color utilities ────────────────────────────────────────────────
@@ -255,6 +256,14 @@ export function SettingsProvider({ children, authFetch, API, isAuthed }) {
       : darkDefaults('low')
     applyPalette(palette)
   }, [settings.theme, settings.matchMode, settings.contrast, isAuthed])
+
+  // Note editor width — exposed as CSS variable for NotePage's container.
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      '--note-editor-width',
+      `${settings.noteEditorWidth || DEFAULTS.noteEditorWidth}px`
+    )
+  }, [settings.noteEditorWidth])
 
   // Fetch from backend on auth (backend is source of truth)
   useEffect(() => {

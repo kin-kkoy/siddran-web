@@ -19,6 +19,7 @@ export const useNotes = (authFetch, API, isAuthed) => {
     const [notesPagination, setNotesPagination] = useState(null)
     const [notebooksPagination, setNotebooksPagination] = useState(null)
     const [loadingMore, setLoadingMore] = useState(false)
+    const [loading, setLoading] = useState(true)
     // Map of notebookId -> notes[], hydrated by parallel prefetch so opening a
     // notebook is instant. Swap the prefetch effect for `?include=notes` once
     // the batch endpoint exists on the backend.
@@ -28,9 +29,13 @@ export const useNotes = (authFetch, API, isAuthed) => {
 
     // ----------- Fetch data ================================================================
     useEffect(() => {
-        if(!isAuthed) return
+        if(!isAuthed) {
+            setLoading(false)
+            return
+        }
 
         const fetchData = async () => {
+            setLoading(true)
             try {
                 const notesResponse = await authFetch(`${API}/notes`)
                 if(notesResponse.ok) {
@@ -48,6 +53,8 @@ export const useNotes = (authFetch, API, isAuthed) => {
 
             } catch (error) {
                 logger.error(`Error fetching for data:`, error)
+            } finally {
+                setLoading(false)
             }
         }
 
@@ -161,7 +168,7 @@ export const useNotes = (authFetch, API, isAuthed) => {
 
 
     // ----------- Notes Operations like: Creating, deleting, etc. ===========================
-    const addNote = useCallback(async (title = 'Untitled') => {
+    const addNote = useCallback(async (title = 'Untitled', onCreated) => {
         try {
             const res = await authFetch(`${API}/notes`, {
                 method: "POST",
@@ -170,6 +177,9 @@ export const useNotes = (authFetch, API, isAuthed) => {
             if(!res.ok) throw new Error(`Failed to add note`)
 
             const newNote = await res.json()
+            // Run caller's hook before committing to state so a navigate()
+            // can swap routes before the hub re-renders with the new card.
+            if (onCreated) onCreated(newNote)
             setNotes(currentNotes => [...currentNotes, newNote])
             return newNote
 
@@ -573,6 +583,7 @@ export const useNotes = (authFetch, API, isAuthed) => {
     return {
         notes,
         notebooks,
+        loading,
         notebookNotesById,
         notesPagination,
         notebooksPagination,

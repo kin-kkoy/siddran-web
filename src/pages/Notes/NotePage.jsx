@@ -8,8 +8,9 @@ import { HiPencilSquare } from "react-icons/hi2";
 import { HiOutlineDownload } from "react-icons/hi";
 import LexicalEditor from '../../components/Editor/LexicalEditor'
 import { toast } from '../../utils/toast'
+import Skeleton from '../../components/Common/Skeleton'
 
-function NotePage({ notes, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote }) {
+function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote }) {
 
   const { id } = useParams() //what note
   const navigate = useNavigate()
@@ -114,7 +115,34 @@ function NotePage({ notes, editTitle, editBody, updateTags, toggleFavorite, upda
   }, [note])
 
   // Early return AFTER all hooks
-  if(!note) return <div>Loading note...</div>
+  if (!note) {
+    if (notesLoading) {
+      return (
+        <div className={styles.container}>
+          <div className={styles.headerRow}>
+            <Skeleton width="140px" height="36px" radius={4} />
+            <Skeleton width="100%" height="40px" radius={6} style={{ flex: 1 }} />
+            <Skeleton width="36px" height="36px" radius={4} />
+            <Skeleton width="36px" height="36px" radius={4} />
+          </div>
+          <div className={styles.editorSurface}>
+            <Skeleton width="60%" height="42px" radius={4} style={{ marginBottom: 24 }} />
+            <Skeleton width="100%" height="18px" radius={4} style={{ marginBottom: 12 }} />
+            <Skeleton width="92%" height="18px" radius={4} style={{ marginBottom: 12 }} />
+            <Skeleton width="86%" height="18px" radius={4} style={{ marginBottom: 12 }} />
+            <Skeleton width="70%" height="18px" radius={4} style={{ marginBottom: 24 }} />
+            <Skeleton width="100%" height="18px" radius={4} style={{ marginBottom: 12 }} />
+            <Skeleton width="78%" height="18px" radius={4} />
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div className={styles.container}>
+        <p style={{ color: 'var(--text-muted)' }}>Note not found.</p>
+      </div>
+    )
+  }
 
   // the api calls to save title/body/tags
   const saveTitle = async () => {
