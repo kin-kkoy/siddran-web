@@ -4,7 +4,6 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import {
   $getSelection,
   $isRangeSelection,
-  $createTextNode,
   FORMAT_TEXT_COMMAND,
   SELECTION_CHANGE_COMMAND,
   COMMAND_PRIORITY_LOW,
@@ -12,7 +11,7 @@ import {
 import { TOGGLE_LINK_COMMAND, $isLinkNode } from '@lexical/link';
 import { mergeRegister } from '@lexical/utils';
 
-import { FaBold, FaItalic, FaStrikethrough, FaLink, FaCode, FaEyeSlash } from 'react-icons/fa';
+import { FaBold, FaItalic, FaUnderline, FaStrikethrough, FaLink, FaCode, FaEyeSlash } from 'react-icons/fa';
 
 import styles from './FloatingToolbarPlugin.module.css';
 import LinkPopover from './LinkPopover';
@@ -24,6 +23,7 @@ function FloatingToolbar({ editor, isReadMode }) {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
+  const [isUnderline, setIsUnderline] = useState(false);
   const [isStrikethrough, setIsStrikethrough] = useState(false);
   const [isCode, setIsCode] = useState(false);
   const [isLink, setIsLink] = useState(false);
@@ -60,6 +60,7 @@ function FloatingToolbar({ editor, isReadMode }) {
 
     setIsBold(selection.hasFormat('bold'));
     setIsItalic(selection.hasFormat('italic'));
+    setIsUnderline(selection.hasFormat('underline'));
     setIsStrikethrough(selection.hasFormat('strikethrough'));
     setIsCode(selection.hasFormat('code'));
 
@@ -188,6 +189,11 @@ function FloatingToolbar({ editor, isReadMode }) {
     editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic');
   };
 
+  const formatUnderline = (e) => {
+    e.preventDefault();
+    editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline');
+  };
+
   const formatStrikethrough = (e) => {
     e.preventDefault();
     editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough');
@@ -211,18 +217,54 @@ function FloatingToolbar({ editor, isReadMode }) {
           ? anchorNode.getParent()
           : null;
 
+      // Toggle off — unwrap by promoting children to the spoiler's parent
       if (existingSpoiler) {
-        const text = existingSpoiler.getTextContent();
-        if (text) existingSpoiler.replace($createTextNode(text));
-        else existingSpoiler.remove();
+        const children = existingSpoiler.getChildren();
+        if (children.length === 0) {
+          existingSpoiler.remove();
+          return;
+        }
+        let anchor = existingSpoiler;
+        for (const child of children) {
+          anchor.insertAfter(child);
+          anchor = child;
+        }
+        existingSpoiler.remove();
         return;
       }
 
-      const text = selection.getTextContent();
-      if (!text) return;
+      // Toggle on — wrap the selected nodes (with formats intact) inside a
+      // new SpoilerNode. selection.extract() splits any partially-selected
+      // TextNodes at boundaries so format flags are preserved on the parts.
+      // Partial-link selections lose the URL on the spoilered portion (a
+      // partial link can't carry its href if it's split); fully-selected
+      // links are detected below and wrapped whole.
+      if (selection.isCollapsed()) return;
+      const extracted = selection.extract();
+      if (extracted.length === 0) return;
+
       const spoilerNode = $createSpoilerNode();
-      spoilerNode.append($createTextNode(text));
-      selection.insertNodes([spoilerNode]);
+
+      // Special case: selection exactly covers a LinkNode's children — wrap
+      // the LinkNode itself so the URL survives.
+      const firstParent = extracted[0].getParent && extracted[0].getParent();
+      if (
+        firstParent && $isLinkNode(firstParent) &&
+        extracted.every(n => n.getParent && n.getParent().is(firstParent)) &&
+        firstParent.getChildrenSize() === extracted.length
+      ) {
+        firstParent.insertBefore(spoilerNode);
+        spoilerNode.append(firstParent);
+        return;
+      }
+
+      // General case: insert spoiler at the position of the first extracted
+      // node, then move each extracted node into it. append() detaches from
+      // the old parent before re-attaching, so this is a safe move.
+      extracted[0].insertBefore(spoilerNode);
+      for (const n of extracted) {
+        spoilerNode.append(n);
+      }
     });
   };
 
@@ -310,6 +352,13 @@ function FloatingToolbar({ editor, isReadMode }) {
             title="Italic"
           >
             <FaItalic />
+          </button>
+          <button
+            onMouseDown={formatUnderline}
+            className={`${styles.btn} ${isUnderline ? styles.active : ''}`}
+            title="Underline"
+          >
+            <FaUnderline />
           </button>
           <button
             onMouseDown={formatStrikethrough}

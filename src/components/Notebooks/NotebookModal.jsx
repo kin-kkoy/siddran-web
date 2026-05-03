@@ -9,6 +9,7 @@ function NotebookModal({ notebook, onClose, updateNotebookTags, renameNotebook, 
     const [name, setName] = useState(notebook?.name || '')
     const [showPicker, setShowPicker] = useState(false)
     const [selectedNoteIds, setSelectedNoteIds] = useState([])
+    const [isAdding, setIsAdding] = useState(false)
     const navigate = useNavigate()
 
     const availableNotes = allNotes.filter(n => !n.notebook_id)
@@ -34,6 +35,7 @@ function NotebookModal({ notebook, onClose, updateNotebookTags, renameNotebook, 
     }
 
     const handleBacking = (e) => {
+        if (isAdding) return
         if(e.target === e.currentTarget) onClose()
     }
 
@@ -69,13 +71,19 @@ function NotebookModal({ notebook, onClose, updateNotebookTags, renameNotebook, 
     }
 
     const handleAddNotes = async () => {
-        if (selectedNoteIds.length === 0) return
-        await addNotesToNotebook(notebook.id, selectedNoteIds)
-        setSelectedNoteIds([])
-        setShowPicker(false)
+        if (selectedNoteIds.length === 0 || isAdding) return
+        setIsAdding(true)
+        try {
+            await addNotesToNotebook(notebook.id, selectedNoteIds)
+            setSelectedNoteIds([])
+            setShowPicker(false)
+        } finally {
+            setIsAdding(false)
+        }
     }
 
     const cancelPicker = () => {
+        if (isAdding) return
         setSelectedNoteIds([])
         setShowPicker(false)
     }
@@ -160,15 +168,25 @@ function NotebookModal({ notebook, onClose, updateNotebookTags, renameNotebook, 
                                             Select notes to add {selectedNoteIds.length > 0 && `(${selectedNoteIds.length})`}
                                         </span>
                                         <div className={styles.pickerActions}>
-                                            <button onClick={cancelPicker} className={`${styles.pickerBtn} ${styles.cancelBtn}`}>
+                                            <button
+                                                onClick={cancelPicker}
+                                                className={`${styles.pickerBtn} ${styles.cancelBtn}`}
+                                                disabled={isAdding}
+                                            >
                                                 Cancel
                                             </button>
                                             <button
                                                 onClick={handleAddNotes}
                                                 className={`${styles.pickerBtn} ${styles.confirmBtn}`}
-                                                disabled={selectedNoteIds.length === 0}
+                                                disabled={selectedNoteIds.length === 0 || isAdding}
+                                                aria-busy={isAdding}
                                             >
-                                                Add
+                                                {isAdding ? (
+                                                    <>
+                                                        <span className={styles.btnSpinner} aria-hidden="true" />
+                                                        Adding…
+                                                    </>
+                                                ) : 'Add'}
                                             </button>
                                         </div>
                                     </div>

@@ -223,11 +223,16 @@ function appendInline(parent, node, formats) {
     }
 
     case 'spoiler': {
-      // SpoilerNode contract: flat text child, no carried formats. Concatenate
-      // any nested text values into a single text node inside the spoiler.
+      // SpoilerNode now carries arbitrary inline children. Walk inner mdast
+      // inlines through appendInlines so nested formatting, links, breaks,
+      // etc. are reconstructed via the same logic used for paragraphs/links.
+      // Carry outer formats through in case a spoiler is itself wrapped in
+      // bold/italic on the markdown side.
       const sp = $createSpoilerNode();
-      const inner = (node.children || []).map(c => c.value || '').join('');
-      sp.append($createTextNode(inner));
+      appendInlines(sp, node.children || [], formats);
+      // Defensive: drop empty spoilers rather than leaving a wrapper that
+      // would re-serialize as <spoiler></spoiler>.
+      if (sp.getChildrenSize() === 0) return;
       parent.append(sp);
       return;
     }

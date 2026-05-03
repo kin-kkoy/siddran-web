@@ -38,6 +38,7 @@ import { INSERT_TABLE_COMMAND } from '@lexical/table';
 import {
   FaBold,
   FaItalic,
+  FaUnderline,
   FaStrikethrough,
   FaListUl,
   FaListOl,
@@ -64,6 +65,7 @@ function ToolbarPlugin({ isReadMode }) {
   const [canRedo, setCanRedo] = useState(false);
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
+  const [isUnderline, setIsUnderline] = useState(false);
   const [isStrikethrough, setIsStrikethrough] = useState(false);
   const [isCode, setIsCode] = useState(false);
   const [isLink, setIsLink] = useState(false);
@@ -255,6 +257,7 @@ function ToolbarPlugin({ isReadMode }) {
     if ($isRangeSelection(selection)) {
       setIsBold(selection.hasFormat('bold'));
       setIsItalic(selection.hasFormat('italic'));
+      setIsUnderline(selection.hasFormat('underline'));
       setIsStrikethrough(selection.hasFormat('strikethrough'));
       setIsCode(selection.hasFormat('code'));
 
@@ -324,6 +327,7 @@ function ToolbarPlugin({ isReadMode }) {
   // Format handlers
   const formatBold = () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold');
   const formatItalic = () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic');
+  const formatUnderline = () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline');
   const formatStrikethrough = () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough');
 
   const formatHeading = (headingTag) => {
@@ -553,6 +557,14 @@ function ToolbarPlugin({ isReadMode }) {
             tabIndex={shouldShowDock ? 0 : -1}
           >
             <FaItalic />
+          </button>
+          <button
+            onClick={formatUnderline}
+            className={`${styles.toolbarBtn} ${isUnderline ? styles.active : ''}`}
+            title="Underline (Ctrl+U)"
+            tabIndex={shouldShowDock ? 0 : -1}
+          >
+            <FaUnderline />
           </button>
           <button
             onClick={formatStrikethrough}

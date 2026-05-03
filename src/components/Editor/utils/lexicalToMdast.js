@@ -300,12 +300,16 @@ function convertInline(node) {
   }
 
   if ($isSpoilerNode(node)) {
-    // SpoilerNode contract: flat text only. Concatenate any text descendants
-    // (defensive — typically there's a single text child) into one text node.
-    const text = node.getTextContent();
+    // SpoilerNode now carries arbitrary inline children (text with formats,
+    // links, breaks, etc). Walk children through the same convertInlines
+    // pipeline used for paragraphs/links so all formatting and link URLs
+    // round-trip. Empty spoilers are dropped to prevent <spoiler></spoiler>
+    // (or legacy ||||) from leaking onto disk.
+    const children = convertInlines(node.getChildren());
+    if (children.length === 0) return null;
     return {
       type: 'spoiler',
-      children: [{ type: 'text', value: text }],
+      children,
     };
   }
 

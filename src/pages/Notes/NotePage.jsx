@@ -9,12 +9,17 @@ import { HiOutlineDownload } from "react-icons/hi";
 import LexicalEditor from '../../components/Editor/LexicalEditor'
 import { toast } from '../../utils/toast'
 import Skeleton from '../../components/Common/Skeleton'
+import { NOTE_COLORS } from '../../components/Notes/noteColors'
 
 function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote }) {
 
   const { id } = useParams() //what note
   const navigate = useNavigate()
-  const note = notes && notes.length ? notes.find(n => n.id === Number(id)) : null
+  // Match by string for optimistic temp ids and by number for synced server ids
+  const note = notes && notes.length
+    ? notes.find(n => n.id === id || n.id === Number(id))
+    : null
+  const isOptimistic = note?._optimistic === true
 
   // All hooks must be called before any early return (Rules of Hooks)
   const [newTitle, setNewTitle] = useState(note?.title || "")
@@ -105,7 +110,9 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
         const noteUpdated = new Date(note.updated_at).getTime()
         if (savedAt > noteUpdated) {
           localStorage.removeItem(draftKey) // consume — don't re-trigger on re-render
-          toast.warning('Recovered unsaved changes from local backup')
+          // Defer: getInitialContent runs during render, so calling toast
+          // synchronously here would setState in ToastContainer mid-render
+          queueMicrotask(() => toast.warning('Recovered unsaved changes from local backup'))
           return content
         }
         localStorage.removeItem(draftKey) // stale draft, clean up
@@ -114,35 +121,41 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
     return note.body || ''
   }, [note])
 
+  // Skeleton shown while loading notes from server, or while a freshly-created
+  // optimistic note is still syncing with the backend
+  const skeletonView = (
+    <div className={styles.container}>
+      <div className={styles.headerRow}>
+        <Skeleton width="140px" height="36px" radius={4} />
+        <Skeleton width="100%" height="40px" radius={6} style={{ flex: 1 }} />
+        <Skeleton width="36px" height="36px" radius={4} />
+        <Skeleton width="36px" height="36px" radius={4} />
+      </div>
+      <div className={styles.editorSurface}>
+        <Skeleton width="60%" height="42px" radius={4} style={{ marginBottom: 24 }} />
+        <Skeleton width="100%" height="18px" radius={4} style={{ marginBottom: 12 }} />
+        <Skeleton width="92%" height="18px" radius={4} style={{ marginBottom: 12 }} />
+        <Skeleton width="86%" height="18px" radius={4} style={{ marginBottom: 12 }} />
+        <Skeleton width="70%" height="18px" radius={4} style={{ marginBottom: 24 }} />
+        <Skeleton width="100%" height="18px" radius={4} style={{ marginBottom: 12 }} />
+        <Skeleton width="78%" height="18px" radius={4} />
+      </div>
+    </div>
+  )
+
   // Early return AFTER all hooks
   if (!note) {
-    if (notesLoading) {
-      return (
-        <div className={styles.container}>
-          <div className={styles.headerRow}>
-            <Skeleton width="140px" height="36px" radius={4} />
-            <Skeleton width="100%" height="40px" radius={6} style={{ flex: 1 }} />
-            <Skeleton width="36px" height="36px" radius={4} />
-            <Skeleton width="36px" height="36px" radius={4} />
-          </div>
-          <div className={styles.editorSurface}>
-            <Skeleton width="60%" height="42px" radius={4} style={{ marginBottom: 24 }} />
-            <Skeleton width="100%" height="18px" radius={4} style={{ marginBottom: 12 }} />
-            <Skeleton width="92%" height="18px" radius={4} style={{ marginBottom: 12 }} />
-            <Skeleton width="86%" height="18px" radius={4} style={{ marginBottom: 12 }} />
-            <Skeleton width="70%" height="18px" radius={4} style={{ marginBottom: 24 }} />
-            <Skeleton width="100%" height="18px" radius={4} style={{ marginBottom: 12 }} />
-            <Skeleton width="78%" height="18px" radius={4} />
-          </div>
-        </div>
-      )
-    }
+    if (notesLoading) return skeletonView
     return (
       <div className={styles.container}>
         <p style={{ color: 'var(--text-muted)' }}>Note not found.</p>
       </div>
     )
   }
+
+  // Optimistic note that hasn't synced yet — show skeleton instead of mounting
+  // the editor so we don't fire PUT /notes/temp-... requests that will 404
+  if (isOptimistic) return skeletonView
 
   // the api calls to save title/body/tags
   const saveTitle = async () => {
@@ -272,11 +285,20 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
               <div className={styles.colorPicker}>
                 <span className={styles.colorLabel}>Color:</span>
                 <div className={styles.colorOptions}>
-                  <button onClick={(e) => handleColorChange(e, null)} className={styles.colorBtn} style={{ backgroundColor: '#1e1e1e' }} title="Default"></button>
-                  <button onClick={(e) => handleColorChange(e, '#2a2a1a')} className={styles.colorBtn} style={{ backgroundColor: '#2a2a1a' }} title="Brown"></button>
-                  <button onClick={(e) => handleColorChange(e, '#1a2a2a')} className={styles.colorBtn} style={{ backgroundColor: '#1a2a2a' }} title="Teal"></button>
-                  <button onClick={(e) => handleColorChange(e, '#2a1a2a')} className={styles.colorBtn} style={{ backgroundColor: '#2a1a2a' }} title="Purple"></button>
-                  <button onClick={(e) => handleColorChange(e, '#2a1a1a')} className={styles.colorBtn} style={{ backgroundColor: '#2a1a1a' }} title="Red"></button>
+                  {NOTE_COLORS.map(c => {
+                    const isSelected = (note.color ?? null) === c.key
+                    return (
+                      <button
+                        key={c.name ?? 'default'}
+                        onClick={(e) => handleColorChange(e, c.key)}
+                        className={`${styles.colorBtn} ${isSelected ? styles.selected : ''}`}
+                        style={{ backgroundColor: c.key ?? '#1e1e1e' }}
+                        title={c.name}
+                        aria-label={`Set color: ${c.name}`}
+                        aria-pressed={isSelected}
+                      />
+                    )
+                  })}
                 </div>
               </div>
             </div>

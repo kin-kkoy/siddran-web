@@ -33,6 +33,7 @@ import CodeCopyPlugin from './plugins/CodeCopyPlugin';
 import ScrollIntoViewPlugin from './plugins/ScrollIntoViewPlugin';
 import CollapsiblePlugin from './plugins/CollapsiblePlugin';
 import SpoilerClipboardPlugin from './plugins/SpoilerClipboardPlugin';
+import SpoilerNormalizationPlugin from './plugins/SpoilerNormalizationPlugin';
 import TableHoverActionsPlugin from './plugins/TableHoverActionsPlugin';
 import TableContextMenuPlugin from './plugins/TableContextMenuPlugin';
 import TableCellResizerPlugin from './plugins/TableCellResizerPlugin';
@@ -140,6 +141,7 @@ function LexicalEditor({ initialContent, onSave, noteId, onDirtyChange, placehol
           <ScrollIntoViewPlugin />
           <CollapsiblePlugin noteId={noteId} />
           <SpoilerClipboardPlugin />
+          <SpoilerNormalizationPlugin />
           <TablePlugin hasCellMerge={false} hasCellBackgroundColor={false} />
           <TableHoverActionsPlugin />
           <TableContextMenuPlugin />

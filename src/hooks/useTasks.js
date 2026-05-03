@@ -242,6 +242,20 @@ export const useTasks = (authFetch, API, isAuthed) => {
             return
         }
 
+        const tempId = `temp-${(crypto.randomUUID && crypto.randomUUID()) || `${Date.now()}-${Math.random()}`}`
+        const optimisticTask = {
+            id: tempId,
+            title,
+            description: description ?? '',
+            priority: priority ?? 'medium',
+            due_date: dueDate ? new Date(dueDate).toISOString() : null,
+            is_completed: false,
+            created_at: new Date().toISOString(),
+            _optimistic: true,
+        }
+
+        setTasks(prev => [optimisticTask, ...prev])
+
         try {
             const res = await authFetch(`${API}/tasks`, {
                 method: 'POST',
@@ -251,13 +265,14 @@ export const useTasks = (authFetch, API, isAuthed) => {
                 })
             })
 
-            if(res.ok) {
-                const newTask = await res.json()
-                setTasks(prev => [newTask, ...prev])
-            }
+            if(!res.ok) throw new Error('Failed to create task')
+
+            const newTask = await res.json()
+            setTasks(prev => prev.map(t => t.id === tempId ? newTask : t))
 
         } catch (error) {
             logger.error("Error adding task:", error)
+            setTasks(prev => prev.filter(t => t.id !== tempId))
             toast.error(whatMessage("failed", "create"))
         }
     }, [authFetch, API])
@@ -288,14 +303,22 @@ export const useTasks = (authFetch, API, isAuthed) => {
     }, [authFetch, API])
 
     const deleteTask = useCallback(async (id) => {
+        let removed = null
+        setTasks(prev => {
+            removed = prev.find(t => t.id === id) ?? null
+            return prev.filter(task => task.id !== id)
+        })
+
+        if (typeof id === 'string' && id.startsWith('temp-')) return
+
         try {
             const res = await authFetch(`${API}/tasks/${id}`, { method: 'DELETE' })
-            if(res.ok) {
-                setTasks(prev => prev.filter(task => task.id !== id))
-            }
+            if(!res.ok) throw new Error('Failed to delete task')
 
         } catch (error) {
             logger.error("Error deleting task:", error)
+            if (removed) setTasks(prev => [removed, ...prev])
+            toast.error('Failed to delete task. Restored.')
         }
     }, [authFetch, API])
 

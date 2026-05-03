@@ -168,7 +168,27 @@ export const useNotes = (authFetch, API, isAuthed) => {
 
 
     // ----------- Notes Operations like: Creating, deleting, etc. ===========================
-    const addNote = useCallback(async (title = 'Untitled', onCreated) => {
+    const addNote = useCallback(async (title = 'Untitled', onCreated, onSynced) => {
+        const tempId = `temp-${(crypto.randomUUID && crypto.randomUUID()) || `${Date.now()}-${Math.random()}`}`
+        const now = new Date().toISOString()
+        const optimisticNote = {
+            id: tempId,
+            title,
+            body: '',
+            is_favorite: false,
+            color: null,
+            tags: '',
+            created_at: now,
+            updated_at: now,
+            _optimistic: true,
+        }
+
+        // Commit optimistic state immediately so the UI responds with no delay
+        setNotes(currentNotes => [...currentNotes, optimisticNote])
+
+        // Let caller act on the optimistic note (e.g. navigate to /notes/temp-...)
+        if (onCreated) onCreated(optimisticNote)
+
         try {
             const res = await authFetch(`${API}/notes`, {
                 method: "POST",
@@ -177,29 +197,59 @@ export const useNotes = (authFetch, API, isAuthed) => {
             if(!res.ok) throw new Error(`Failed to add note`)
 
             const newNote = await res.json()
-            // Run caller's hook before committing to state so a navigate()
-            // can swap routes before the hub re-renders with the new card.
-            if (onCreated) onCreated(newNote)
-            setNotes(currentNotes => [...currentNotes, newNote])
+            // Swap temp note for the real one
+            setNotes(currentNotes => currentNotes.map(n => n.id === tempId ? newNote : n))
+            if (onSynced) onSynced(newNote, tempId)
             return newNote
 
         } catch (error) {
             logger.error(error)
+            // Rollback: remove the optimistic note
+            setNotes(currentNotes => currentNotes.filter(n => n.id !== tempId))
+            toast.error('Failed to create note')
             return null
         }
     }, [authFetch, API])
 
     const deleteNote = useCallback(async (id) => {
+        let removedNote = null
+        const cacheSnapshot = {}
+
+        setNotes(allNotes => {
+            removedNote = allNotes.find(n => n.id === id) ?? null
+            return allNotes.filter(note => note.id !== id)
+        })
+
+        setNotebookNotesById(prev => {
+            const next = {}
+            for (const [nbId, list] of Object.entries(prev)) {
+                const filtered = list.filter(n => n.id !== id)
+                if (filtered.length !== list.length) {
+                    cacheSnapshot[nbId] = list
+                }
+                next[nbId] = filtered
+            }
+            return next
+        })
+
+        // Skip the network for an unsynced optimistic note
+        if (typeof id === 'string' && id.startsWith('temp-')) return
+
         try {
             const res = await authFetch(`${API}/notes/${id}`, { method: "DELETE" })
             if(!res.ok) throw new Error(`Failed to delete note`)
-            setNotes(allNotes => allNotes.filter( note => note.id !== id))
-            updateNoteInNotebookCache(id, () => null)
 
         } catch (error) {
             logger.error(error)
+            if (removedNote) {
+                setNotes(allNotes => [...allNotes, removedNote])
+            }
+            if (Object.keys(cacheSnapshot).length > 0) {
+                setNotebookNotesById(prev => ({ ...prev, ...cacheSnapshot }))
+            }
+            toast.error('Failed to delete note. Restored.')
         }
-    }, [authFetch, API, updateNoteInNotebookCache])
+    }, [authFetch, API])
 
     const editTitle = useCallback(async (id, newTitle) => {
         // For this, we'll go the optimistic way: The notes will always be updated so just set the frontend side to already have the updated title. In the background we'll do the api call to actually update
@@ -232,8 +282,20 @@ export const useNotes = (authFetch, API, isAuthed) => {
                 })
                 if(!res.ok) throw new Error("Failed to update body/description/contents");
                 const data = await res.json()
-                setNotes(allNotes => allNotes.map( note => note.id === id ? data : note))
-                updateNoteInNotebookCache(id, () => data)
+                // Shallow-merge: preserve notebook_id when the server omits it
+                // (PUT /notes/:id doesn't echo it), otherwise the sidebar's
+                // notebook grouping drifts on every autosave. ?? lets a
+                // server-provided notebook_id still win.
+                setNotes(allNotes => allNotes.map(note =>
+                    note.id === id
+                        ? { ...note, ...data, notebook_id: data.notebook_id ?? note.notebook_id }
+                        : note
+                ))
+                updateNoteInNotebookCache(id, (prev) => ({
+                    ...prev,
+                    ...data,
+                    notebook_id: data.notebook_id ?? prev.notebook_id,
+                }))
                 return true
 
             } catch (error) {
