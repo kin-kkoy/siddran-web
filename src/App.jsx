@@ -21,14 +21,14 @@ import ToastContainer from "./components/Common/ToastContainer.jsx"
 import logger from "./utils/logger.js"
 
 // Wrapper component to get the ID from route parameters
-function NotePageWrapper({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, onNoteChange}){
+function NotePageWrapper({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, onNoteChange, setSidebarCollapsed, lessDistraction, setLessDistraction}){
   const { id } = useParams()
 
   useEffect(() => {
     onNoteChange(id)
   }, [id, onNoteChange])
 
-  return <NotePage notes={notes} notesLoading={notesLoading} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} exportNote={exportNote} />
+  return <NotePage notes={notes} notesLoading={notesLoading} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} exportNote={exportNote} setSidebarCollapsed={setSidebarCollapsed} lessDistraction={lessDistraction} setLessDistraction={setLessDistraction} />
 }
 
 function App() {
@@ -40,6 +40,10 @@ function App() {
   })
   const [currentNoteID, setCurrentNoteID] = useState(null)
   const [username, setUsername] = useState(null)
+  // Session-only "less distraction" mode. Set by NotePage; reset when NotePage
+  // unmounts. Lifted here so StarCanvas can react and force-disable stars
+  // while focus mode is active.
+  const [lessDistraction, setLessDistraction] = useState(false)
 
   // Auto-collapse sidebar on small viewports. One-way: shrink on small,
   // never auto-expand — once big again the user can toggle manually.
@@ -257,8 +261,6 @@ function App() {
     <ApiProvider authFetch={authFetch} API={API}>
     <div style={style}>
 
-      {/* Background effects */}
-      <StarCanvas />
       {isAuthed && (
         <div style={{
           position: 'fixed',
@@ -273,6 +275,8 @@ function App() {
       )}
 
       <BrowserRouter>
+        {/* Background effects — inside Router so StarCanvas can use useLocation() */}
+        <StarCanvas lessDistraction={lessDistraction} />
         <div style={{ display: "flex",
           flexDirection: "row",
           height: '100vh',
@@ -322,6 +326,7 @@ function App() {
               <Route path="/register" element={<RegisterPage setIsAuthed={setIsAuthed} setAppUsername={setUsername} />} />
               {isAuthed ? (
                 <>
+                  <Route path="/" element={notesHubElement} />
                   <Route path="/notes" element={notesHubElement} />
                   <Route path="/notes/:id" element={
                     <NotePageWrapper notes={notes}
@@ -333,6 +338,9 @@ function App() {
                       updateColor={updateColor}
                       exportNote={exportNote}
                       onNoteChange={setCurrentNoteID}
+                      setSidebarCollapsed={setIsCollapsed}
+                      lessDistraction={lessDistraction}
+                      setLessDistraction={setLessDistraction}
                       />
                     }
                   />

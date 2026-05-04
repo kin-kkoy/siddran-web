@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useSettings } from '../../../contexts/SettingsContext'
 import styles from './StarCanvas.module.css'
 
@@ -51,10 +52,16 @@ function makeStar(radiusRange, radiusBase) {
   }
 }
 
-function StarCanvas() {
+function StarCanvas({ lessDistraction = false }) {
   const canvasRef = useRef(null)
   const { settings } = useSettings()
-  const showStars   = settings.showStars   !== false
+  const location = useLocation()
+  // Note-page-specific gate: when on /notes/:id, also honor showStarsOnNotePage.
+  // Acts as a gate on top of global showStars (both must be true).
+  // Less-distraction mode (NotePage focus mode) forces stars off regardless.
+  const onNotePage = /^\/notes\/[^/]+/.test(location.pathname)
+  const notePageStarsAllowed = onNotePage ? settings.showStarsOnNotePage !== false : true
+  const showStars   = settings.showStars   !== false && notePageStarsAllowed && !lessDistraction
   const reduceStars = settings.reduceStars === true
 
   // Animation refs — no state needed; settings sync updates these directly

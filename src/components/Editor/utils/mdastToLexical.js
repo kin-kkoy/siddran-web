@@ -15,6 +15,7 @@ import {
 } from '@lexical/table';
 import { $createSpoilerNode } from '../nodes/SpoilerNode';
 import { $createImageNode } from '../nodes/ImageNode';
+import { $createHorizontalRuleNode } from '@lexical/react/LexicalHorizontalRuleNode';
 
 // Convert an mdast root tree into Lexical nodes appended to the given root.
 // Caller is responsible for being inside an editor.update() and for clearing
@@ -74,9 +75,11 @@ function convertBlock(node) {
     case 'table':
       return convertTable(node);
 
+    case 'thematicBreak':
+      return $createHorizontalRuleNode();
+
     // Unsupported block kinds — skip silently. Add cases here when introducing
     // image / html node types in Lexical.
-    case 'thematicBreak':
     case 'html':
     case 'definition':
     case 'yaml':

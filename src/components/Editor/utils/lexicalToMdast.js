@@ -15,6 +15,7 @@ import {
 import { $isSpoilerNode } from '../nodes/SpoilerNode';
 import { $isImageNode } from '../nodes/ImageNode';
 import { $isImagePlaceholderNode } from '../nodes/ImagePlaceholderNode';
+import { $isHorizontalRuleNode } from '@lexical/react/LexicalHorizontalRuleNode';
 
 // Convert a Lexical RootNode into an mdast root tree. Caller wraps in
 // editorState.read(() => lexicalToMdast($getRoot())). The returned tree is
@@ -82,6 +83,10 @@ function convertBlock(node) {
 
   if ($isTableNode(node)) {
     return convertTable(node);
+  }
+
+  if ($isHorizontalRuleNode(node)) {
+    return { type: 'thematicBreak' };
   }
 
   return null;

@@ -21,6 +21,7 @@ const DEFAULTS = {
   contrast: 'low',
   autoHideToolbar: true,
   showStars: true,
+  showStarsOnNotePage: true,
   reduceStars: false,
   starSize: 1.40,
   starDriftSpeed: 3.90,

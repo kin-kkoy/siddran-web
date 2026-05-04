@@ -5,13 +5,15 @@ import { IoMdArrowRoundBack } from "react-icons/io"
 import { FaStar, FaRegStar, FaEllipsisV } from 'react-icons/fa'
 import { MdChromeReaderMode } from "react-icons/md";
 import { HiPencilSquare } from "react-icons/hi2";
-import { HiOutlineDownload } from "react-icons/hi";
+import { HiOutlineDownload, HiOutlineCog } from "react-icons/hi";
+import { LuMaximize, LuMinimize } from "react-icons/lu";
 import LexicalEditor from '../../components/Editor/LexicalEditor'
 import { toast } from '../../utils/toast'
 import Skeleton from '../../components/Common/Skeleton'
 import { NOTE_COLORS } from '../../components/Notes/noteColors'
+import NoteSettingsPopup from '../../components/Settings/NoteSettingsPopup'
 
-function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote }) {
+function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction }) {
 
   const { id } = useParams() //what note
   const navigate = useNavigate()
@@ -34,6 +36,7 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   const isDirtyRef = useRef(false)
   const headerRowRef = useRef(null)
   const [headerVisible, setHeaderVisible] = useState(true)
+  const [noteSettingsOpen, setNoteSettingsOpen] = useState(false)
 
   // re-renders if note changes (parent changes)
   useEffect(() => {
@@ -88,6 +91,14 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
+
+  // Reset less-distraction when the user navigates away from this note —
+  // session-only state per the spec.
+  useEffect(() => {
+    return () => {
+      if (setLessDistraction) setLessDistraction(false)
+    }
+  }, [setLessDistraction])
 
   const handleDirtyChange = useCallback((dirty) => {
     isDirtyRef.current = dirty
@@ -227,6 +238,16 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
     updateColor(note.id, color)
   }
 
+  const toggleLessDistraction = () => {
+    setLessDistraction(prev => {
+      const next = !prev
+      // On enable, collapse the sidebar. On disable, leave it where the user
+      // put it — toggling off is just for getting the page styling back.
+      if (next && setSidebarCollapsed) setSidebarCollapsed(true)
+      return next
+    })
+  }
+
   return (
     <div className={styles.container}>
 
@@ -262,6 +283,16 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
           {viewMode ? <HiPencilSquare /> : <MdChromeReaderMode />}
         </button>
 
+        <button
+          onClick={toggleLessDistraction}
+          className={styles.backBtn}
+          aria-pressed={lessDistraction}
+          title={lessDistraction ? 'Exit less-distraction mode' : 'Less distraction mode'}
+          aria-label={lessDistraction ? 'Exit less-distraction mode' : 'Enter less-distraction mode'}
+        >
+          {lessDistraction ? <LuMinimize /> : <LuMaximize />}
+        </button>
+
         <div className={styles.menuContainer} ref={menuRef}>
           <button ref={buttonRef} onClick={toggleMenu} className={styles.menuBtn}>
             <FaEllipsisV />
@@ -280,6 +311,14 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
               >
                 <HiOutlineDownload />
                 <span>Export as markdown</span>
+              </button>
+
+              <button
+                onClick={() => { setNoteSettingsOpen(true); setMenuOpen(false) }}
+                className={styles.menuItem}
+              >
+                <HiOutlineCog />
+                <span>Note Settings</span>
               </button>
 
               <div className={styles.colorPicker}>
@@ -306,7 +345,7 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
         </div>
       </div>
 
-      <div className={styles.editorSurface}>
+      <div className={`${styles.editorSurface} ${lessDistraction ? styles.lessDistraction : ''}`}>
         <input
           ref={titleInputReference}
           className={styles.titleInput}
@@ -329,6 +368,10 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
         />
       </div>
 
+      <NoteSettingsPopup
+        isOpen={noteSettingsOpen}
+        onClose={() => setNoteSettingsOpen(false)}
+      />
     </div>
 
   )

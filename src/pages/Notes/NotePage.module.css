@@ -73,6 +73,15 @@
     will-change: transform;
 }
 
+/* Less-distraction mode — drop the paper look entirely. Background goes
+   transparent so the page bg shows through, removing the visible box.
+   Padding is preserved so the text doesn't shift position. */
+.editorSurface.lessDistraction {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
 /* Title input */
 .titleInput {
     width: 100%;

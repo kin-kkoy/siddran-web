@@ -10,8 +10,9 @@ import {
 } from 'lexical';
 import { TOGGLE_LINK_COMMAND, $isLinkNode } from '@lexical/link';
 import { mergeRegister } from '@lexical/utils';
+import { INSERT_HORIZONTAL_RULE_COMMAND } from '@lexical/react/LexicalHorizontalRuleNode';
 
-import { FaBold, FaItalic, FaUnderline, FaStrikethrough, FaLink, FaCode, FaEyeSlash } from 'react-icons/fa';
+import { FaBold, FaItalic, FaUnderline, FaStrikethrough, FaLink, FaCode, FaEyeSlash, FaMinus } from 'react-icons/fa';
 
 import styles from './FloatingToolbarPlugin.module.css';
 import LinkPopover from './LinkPopover';
@@ -268,6 +269,11 @@ function FloatingToolbar({ editor, isReadMode }) {
     });
   };
 
+  const insertHorizontalRule = (e) => {
+    e.preventDefault();
+    editor.dispatchCommand(INSERT_HORIZONTAL_RULE_COMMAND, undefined);
+  };
+
   const insertLink = useCallback(
     (e) => {
       e.preventDefault();
@@ -387,6 +393,13 @@ function FloatingToolbar({ editor, isReadMode }) {
             title={isSpoiler ? 'Unhide' : 'Hide (spoiler)'}
           >
             <FaEyeSlash />
+          </button>
+          <button
+            onMouseDown={insertHorizontalRule}
+            className={styles.btn}
+            title="Horizontal rule"
+          >
+            <FaMinus />
           </button>
         </div>
       )}

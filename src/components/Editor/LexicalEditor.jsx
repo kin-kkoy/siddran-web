@@ -9,6 +9,8 @@ import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin';
 import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
 import { TabIndentationPlugin } from '@lexical/react/LexicalTabIndentationPlugin';
 import { TablePlugin } from '@lexical/react/LexicalTablePlugin';
+import { HorizontalRulePlugin } from '@lexical/react/LexicalHorizontalRulePlugin';
+import { HorizontalRuleNode } from '@lexical/react/LexicalHorizontalRuleNode';
 
 // Nodes
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
@@ -98,6 +100,7 @@ function LexicalEditor({ initialContent, onSave, noteId, onDirtyChange, placehol
       SpoilerNode,
       ImageNode,
       ImagePlaceholderNode,
+      HorizontalRuleNode,
     ],
   };
 
@@ -130,6 +133,7 @@ function LexicalEditor({ initialContent, onSave, noteId, onDirtyChange, placehol
 
           {/* Markdown live transformation */}
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+          <HorizontalRulePlugin />
 
           {/* Custom plugins */}
           <FloatingToolbarPlugin isReadMode={interfaceMode}/>

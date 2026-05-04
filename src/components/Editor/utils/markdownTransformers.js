@@ -17,6 +17,32 @@ import {
 } from '@lexical/markdown';
 import { $createTextNode } from 'lexical';
 import { $createSpoilerNode, $isSpoilerNode, SpoilerNode } from '../nodes/SpoilerNode';
+import {
+  $createHorizontalRuleNode,
+  $isHorizontalRuleNode,
+  HorizontalRuleNode,
+} from '@lexical/react/LexicalHorizontalRuleNode';
+
+// Horizontal rule (line must contain only `---`, `***`, or `___`).
+// @lexical/markdown v0.39 stopped exporting HORIZONTAL_RULE, so we redefine
+// it locally with the same shape Lexical uses internally.
+const HORIZONTAL_RULE = {
+  dependencies: [HorizontalRuleNode],
+  export: (node) => ($isHorizontalRuleNode(node) ? '***' : null),
+  regExp: /^(---|\*\*\*|___)\s?$/,
+  replace: (parentNode, _children, _match, isImport) => {
+    const line = $createHorizontalRuleNode();
+    // If we're at the end of the document and not importing, insert before the
+    // current empty paragraph so the cursor lands on a clean new line below.
+    if (isImport || parentNode.getNextSibling() != null) {
+      parentNode.replace(line);
+    } else {
+      parentNode.insertBefore(line);
+    }
+    line.selectNext();
+  },
+  type: 'element',
+};
 
 // Discord-style spoiler: ||hidden text||
 const SPOILER_TRANSFORMER = {
@@ -60,4 +86,5 @@ export const TRANSFORMERS = [
   UNORDERED_LIST, // - or *
   ORDERED_LIST, // 1.
   CHECK_LIST, // - [ ] or - [x]
+  HORIZONTAL_RULE, // --- (line must contain only dashes)
 ];
