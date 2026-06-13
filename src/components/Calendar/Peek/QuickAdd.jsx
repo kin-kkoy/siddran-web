@@ -40,7 +40,7 @@ export default function QuickAdd({ day, onCreate }) {
                 onKeyDown={onKeyDown}
             />
             <div className={styles.quickFoot}>
-                <input className={styles.quickTime} type="time" value={time} onChange={e => setTime(e.target.value)} title="Leave empty for all-day" />
+                <input className={styles.quickTime} type="time" step={900} value={time} onChange={e => setTime(e.target.value)} title="Leave empty for all-day" />
                 <span className={styles.quickDate}>{dayFullLabel(day)}</span>
                 <button className={styles.quickCreate} onClick={submit}>Create</button>
             </div>

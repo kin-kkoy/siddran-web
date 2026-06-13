@@ -86,9 +86,9 @@ export default function EventModal({ mode, draft, onSave, onDelete, onClose }) {
                         <div className={styles.row}>
                             <label className={styles.label}>Time</label>
                             <div className={styles.timeGroup}>
-                                <input className={styles.field} type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                                <input className={styles.field} type="time" step={900} value={startTime} onChange={e => setStartTime(e.target.value)} />
                                 <span className={styles.dash}>→</span>
-                                <input className={styles.field} type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                                <input className={styles.field} type="time" step={900} value={endTime} onChange={e => setEndTime(e.target.value)} />
                             </div>
                         </div>
                     )}

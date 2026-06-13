@@ -1,37 +1,26 @@
-import { useRef, useState, useEffect } from 'react'
+import { Fragment, useRef, useState, useMemo } from 'react'
+import { LuEyeOff, LuEye } from 'react-icons/lu'
 import styles from './TimeGrid.module.css'
 import { isTodayISO, DAY_NAMES } from '../calendarDates'
-import { HOUR_H, fmtMin, slotFromPoint } from './timeGridGeom'
+import { slotFromPoint } from './timeGridGeom'
+import { useCalendarView } from '../../../contexts/CalendarViewContext'
 
-const SCROLL_TO_HOUR = 7      // initial vertical scroll
 const DRAG_THRESHOLD = 4
 
+const pad = (n) => String(n).padStart(2, '0')
 const hourLabel = (h) => h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`
+const itemHour = (it) => (it.time ? Number(it.time.split(':')[0]) : null)
 
-// Minutes-of-day for a timed item, or null if it belongs in the all-day row.
-function timedInfo(item) {
-    if (item.kind === 'task') {
-        if (!item.time) return null // midnight → all-day
-        const [h, m] = item.time.split(':').map(Number)
-        const startMin = h * 60 + (m || 0)
-        return { startMin, endMin: startMin + 60 }
+// Group an hour cell's items by exact time into ordered sub-rows (8:00 before 8:15 …). Same-time
+// items end up in one sub-row, laid side-by-side.
+function groupByTime(items) {
+    const map = new Map()
+    for (const it of items) {
+        const key = it.time || '00:00'
+        if (!map.has(key)) map.set(key, [])
+        map.get(key).push(it)
     }
-    if (item.kind === 'event') {
-        const e = item.source
-        if (e.all_day) return null
-        const s = new Date(e.start_at)
-        const startMin = s.getHours() * 60 + s.getMinutes()
-        let endMin = e.end_at ? (new Date(e.end_at).getHours() * 60 + new Date(e.end_at).getMinutes()) : startMin + 60
-        if (endMin <= startMin) endMin = startMin + 30
-        return { startMin, endMin }
-    }
-    if (item.kind === 'daily') {
-        if (!item.time) return null
-        const [h, m] = item.time.split(':').map(Number)
-        const startMin = h * 60 + (m || 0)
-        return { startMin, endMin: startMin + 60 }
-    }
-    return null
+    return [...map.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(e => e[1])
 }
 
 function srcClass(item) {
@@ -50,31 +39,38 @@ function srcClass(item) {
     return styles.srcEvent
 }
 
-const HOURS = Array.from({ length: 24 }, (_, h) => h)
-
-// Shared time grid for Week (many days) and Day (one day). Renders a sticky day header, an
-// all-day row, and a scrollable 24h body with absolutely-positioned timed items, a current-time
-// line, click-to-create, click-to-edit, and Pointer-Events drag-to-retime (day + time).
+// Hour-bucket grid for Week (many days) and Day (one day). Each hour is a CELL that auto-expands
+// to fit its blocks — no overlap, no absolute positioning. Day lays a cell's blocks side-by-side;
+// Week stacks them (narrow columns). All-day items sit in the all-day row. Clicking a cell creates
+// a block at that hour; dragging a block onto a cell moves it to that hour/day.
 export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onRetime }) {
-    const bodyRef = useRef(null)
+    const sideBySide = days.length === 1 // Day view → side-by-side; Week → stacked
+    const nowHour = new Date().getHours()
+
+    // Hidden hours live in CalendarViewContext so Day, Week and the half pane all share one source.
+    const { hiddenHours, hideHour, revealHours, showAllHours } = useCalendarView()
+
+    // Ordered render list: visible 'hour' rows + collapsed 'strip' runs of hidden hours.
+    const rows = useMemo(() => {
+        const out = []
+        let h = 0
+        while (h < 24) {
+            if (hiddenHours.has(h)) {
+                const start = h
+                while (h < 24 && hiddenHours.has(h)) h++
+                out.push({ type: 'strip', start, end: h - 1 })
+            } else {
+                out.push({ type: 'hour', h })
+                h++
+            }
+        }
+        return out
+    }, [hiddenHours])
+
     const drag = useRef(null)
     const ghostRef = useRef(null)
     const [dragTitle, setDragTitle] = useState(null)
-    const [dragOver, setDragOver] = useState(null) // { day, time } drop target while dragging
-    const [nowMin, setNowMin] = useState(() => { const n = new Date(); return n.getHours() * 60 + n.getMinutes() })
-
-    const timeToY = (t) => { const [h, m] = t.split(':').map(Number); return ((h * 60 + (m || 0)) / 60) * HOUR_H }
-
-    // Scroll the body to ~morning on mount.
-    useEffect(() => {
-        if (bodyRef.current) bodyRef.current.scrollTop = SCROLL_TO_HOUR * HOUR_H
-    }, [])
-
-    // Keep the current-time line fresh (once a minute).
-    useEffect(() => {
-        const id = setInterval(() => { const n = new Date(); setNowMin(n.getHours() * 60 + n.getMinutes()) }, 60000)
-        return () => clearInterval(id)
-    }, [])
+    const [dragOver, setDragOver] = useState(null) // { day, hour } | { day, hour: null }
 
     const positionGhost = (x, y) => {
         if (ghostRef.current) ghostRef.current.style.transform = `translate(${x + 12}px, ${y + 12}px)`
@@ -84,7 +80,7 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
         if (item.kind === 'daily') return // recurrence-bound
         e.stopPropagation()
         drag.current = { item, startX: e.clientX, startY: e.clientY, dragging: false }
-        try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* no-op */ }
+        try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* */ }
     }
     const onChipPointerMove = (e) => {
         const st = drag.current
@@ -96,40 +92,116 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
         }
         positionGhost(e.clientX, e.clientY)
         const slot = slotFromPoint(e.clientX, e.clientY)
-        setDragOver(prev => (prev?.day === slot?.day && prev?.time === slot?.time) ? prev : slot)
+        let next = null
+        if (slot) {
+            if (slot.time) {
+                const [hh, mm] = slot.time.split(':').map(Number)
+                next = { day: slot.day, hour: hh, quarter: mm / 15 }
+            } else {
+                next = { day: slot.day, hour: null, quarter: null }
+            }
+        }
+        setDragOver(prev => (prev?.day === next?.day && prev?.hour === next?.hour && prev?.quarter === next?.quarter) ? prev : next)
     }
     const onChipPointerUp = (e, item) => {
         const st = drag.current
         drag.current = null
-        try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* no-op */ }
+        try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* */ }
         setDragTitle(null)
         setDragOver(null)
         if (st?.dragging) {
-            // Always delegate to retime (it has its own no-op guards) so an all-day↔timed
-            // conversion fires even when the day doesn't change.
-            const slot = slotFromPoint(e.clientX, e.clientY)
+            const slot = slotFromPoint(e.clientX, e.clientY) // already snapped to the 15-min quarter
             if (slot) onRetime?.(item, slot.day, slot.time)
         } else {
             onEventClick(item)
         }
     }
 
-    // Click empty space in a day body column → create a block at the clicked HOUR (floor), so
-    // clicking anywhere in the "1 AM" band starts the block at 1:00. (Drag still snaps finer.)
-    const onColumnClick = (e, dayISO) => {
-        const rect = e.currentTarget.getBoundingClientRect()
-        const raw = ((e.clientY - rect.top) / HOUR_H) * 60
-        const min = Math.min(Math.max(Math.floor(raw / 60) * 60, 0), 23 * 60)
-        onSlotClick(dayISO, fmtMin(min))
+    // Click a cell → create at the clicked 15-min quarter (falls back to the hour top).
+    const onCellClick = (e, iso, h) => {
+        const slot = slotFromPoint(e.clientX, e.clientY)
+        onSlotClick(iso, slot ? slot.time : `${pad(h)}:00`)
     }
 
-    const gridStyle = { '--cols': days.length }
+    // showTime=false for non-leftmost chips in a sub-row (they share the row's time).
+    const renderChip = (it, showTime = true) => {
+        const draggable = it.kind !== 'daily'
+        return (
+            <div
+                key={it.key}
+                className={[styles.chip, srcClass(it), it.done ? styles.done : '', draggable ? styles.draggable : ''].filter(Boolean).join(' ')}
+                style={it.color ? { borderLeftColor: it.color } : undefined}
+                title={it.title}
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => onChipPointerDown(e, it)}
+                onPointerMove={draggable ? onChipPointerMove : undefined}
+                onPointerUp={draggable ? (e) => { e.stopPropagation(); onChipPointerUp(e, it) } : undefined}
+            >
+                {showTime && it.time && <span className={styles.chipTime}>{it.time}</span>}
+                <span className={styles.chipTitle}>{it.title}</span>
+            </div>
+        )
+    }
+
+    const renderHour = (h) => (
+        <Fragment key={`h${h}`}>
+            <div className={styles.timeLabel}>
+                <button className={styles.hideHourBtn} title="Hide this hour (shift-click for a range)" onClick={(e) => { e.stopPropagation(); hideHour(h, e.shiftKey) }}><LuEyeOff /></button>
+                <span>{hourLabel(h)}</span>
+            </div>
+            {days.map(iso => {
+                const cellItems = itemsAt(iso).filter(it => itemHour(it) === h)
+                const over = dragOver?.day === iso && dragOver.hour === h
+                const isNow = isTodayISO(iso) && h === nowHour
+                const cls = [styles.cell, over ? styles.cellDrop : '', isNow ? styles.cellNow : ''].filter(Boolean).join(' ')
+                return (
+                    <div key={iso} className={cls} data-day={iso} data-hour={h} onClick={(e) => onCellClick(e, iso, h)}>
+                        {over && (
+                            <div className={styles.dropGuide}>
+                                {[0, 1, 2, 3].map(q => (
+                                    <div key={q} className={`${styles.quarter} ${q === dragOver.quarter ? styles.quarterActive : ''}`}>
+                                        {q === dragOver.quarter && <span className={styles.quarterLabel}>{pad(h)}:{pad(q * 15)}</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {sideBySide
+                            ? groupByTime(cellItems).map((group, gi) => (
+                                <div key={(group[0].time || '') + gi} className={styles.subRow}>
+                                    {group.map((it, idx) => renderChip(it, idx === 0))}
+                                </div>
+                            ))
+                            : cellItems.map(it => renderChip(it, true))}
+                    </div>
+                )
+            })}
+        </Fragment>
+    )
+
+    const renderStrip = (row) => {
+        const count = row.end - row.start + 1
+        let blocks = 0
+        for (let h = row.start; h <= row.end; h++) {
+            for (const iso of days) blocks += itemsAt(iso).filter(it => itemHour(it) === h).length
+        }
+        return (
+            <button key={`s${row.start}`} className={styles.hiddenStrip} style={{ gridColumn: '1 / -1' }} onClick={() => revealHours(row.start, row.end)}>
+                {count} hour{count > 1 ? 's' : ''} hidden · {hourLabel(row.start)} – {hourLabel(row.end)}{blocks ? ` · ${blocks} block${blocks > 1 ? 's' : ''}` : ''} · show
+            </button>
+        )
+    }
+
+    const gridStyle = { gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }
 
     return (
         <div className={styles.wrap}>
             {/* Day header */}
             <div className={styles.headRow} style={gridStyle}>
-                <div className={styles.gutterCorner} />
+                <div className={styles.gutterCorner}>
+                    {hiddenHours.size > 0 && (
+                        <button className={styles.compactBtn} onClick={showAllHours} title="Show all hours"><LuEye /></button>
+                    )}
+                </div>
                 {days.map(iso => {
                     const d = new Date(iso + 'T00:00:00')
                     return (
@@ -145,86 +217,20 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
             <div className={styles.allDayRow} style={gridStyle}>
                 <div className={styles.gutterLabel}>all-day</div>
                 {days.map(iso => {
-                    const allDayItems = itemsAt(iso).filter(it => timedInfo(it) === null)
-                    const allDayOver = dragOver?.day === iso && !dragOver.time
+                    const allDayItems = itemsAt(iso).filter(it => !it.time)
+                    const over = dragOver?.day === iso && dragOver.hour == null
                     return (
-                        <div key={iso} className={`${styles.allDayCell} ${allDayOver ? styles.allDayOver : ''}`} data-day={iso} onClick={() => onSlotClick(iso, null)}>
-                            {allDayItems.map(it => {
-                                const draggable = it.kind !== 'daily'
-                                return (
-                                    <div
-                                        key={it.key}
-                                        className={[styles.chip, srcClass(it), it.done ? styles.done : '', draggable ? styles.draggable : ''].filter(Boolean).join(' ')}
-                                        style={it.color ? { borderLeftColor: it.color } : undefined}
-                                        title={it.title}
-                                        onClick={(e) => e.stopPropagation()}
-                                        onPointerDown={(e) => onChipPointerDown(e, it)}
-                                        onPointerMove={draggable ? onChipPointerMove : undefined}
-                                        onPointerUp={draggable ? (e) => { e.stopPropagation(); onChipPointerUp(e, it) } : undefined}
-                                    >{it.title}</div>
-                                )
-                            })}
+                        <div key={iso} className={`${styles.allDayCell} ${over ? styles.cellOver : ''}`} data-day={iso} onClick={() => onSlotClick(iso, null)}>
+                            {allDayItems.map(renderChip)}
                         </div>
                     )
                 })}
             </div>
 
-            {/* Scrollable body */}
-            <div className={styles.body} ref={bodyRef}>
-                <div className={styles.grid} style={{ ...gridStyle, height: 24 * HOUR_H }}>
-                    {/* hour gutter */}
-                    <div className={styles.hours}>
-                        {HOURS.map(h => (
-                            <div key={h} className={styles.hourLabel} style={{ height: HOUR_H }}>
-                                <span>{hourLabel(h)}</span>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* day columns */}
-                    {days.map(iso => {
-                        const timed = itemsAt(iso).map(it => ({ it, t: timedInfo(it) })).filter(x => x.t)
-                        const colOver = dragOver?.day === iso
-                        return (
-                            <div
-                                key={iso}
-                                className={`${styles.col} ${colOver ? styles.colOver : ''}`}
-                                data-day={iso}
-                                data-slot="time"
-                                onClick={(e) => onColumnClick(e, iso)}
-                            >
-                                {colOver && dragOver.time && (
-                                    <div className={styles.dropLine} style={{ top: timeToY(dragOver.time) }} />
-                                )}
-                                {timed.map(({ it, t }) => {
-                                    const draggable = it.kind !== 'daily'
-                                    return (
-                                        <div
-                                            key={it.key}
-                                            className={[styles.event, srcClass(it), it.done ? styles.done : '', draggable ? styles.draggable : ''].filter(Boolean).join(' ')}
-                                            style={{
-                                                top: (t.startMin / 60) * HOUR_H,
-                                                height: Math.max(((t.endMin - t.startMin) / 60) * HOUR_H, 16),
-                                                ...(it.color ? { borderLeftColor: it.color } : {}),
-                                            }}
-                                            title={it.title}
-                                            onClick={(e) => e.stopPropagation()}
-                                            onPointerDown={(e) => onChipPointerDown(e, it)}
-                                            onPointerMove={draggable ? onChipPointerMove : undefined}
-                                            onPointerUp={draggable ? (e) => { e.stopPropagation(); onChipPointerUp(e, it) } : undefined}
-                                        >
-                                            {it.time && <span className={styles.eventTime}>{it.time}</span>}
-                                            <span className={styles.eventTitle}>{it.title}</span>
-                                        </div>
-                                    )
-                                })}
-
-                                {isTodayISO(iso) && (
-                                    <div className={styles.nowLine} style={{ top: (nowMin / 60) * HOUR_H }} />
-                                )}
-                            </div>
-                        )
-                    })}
+            {/* Hour-bucket grid */}
+            <div className={styles.body}>
+                <div className={`${styles.grid} ${sideBySide ? styles.sideBySide : styles.stacked}`} style={gridStyle}>
+                    {rows.map(row => row.type === 'strip' ? renderStrip(row) : renderHour(row.h))}
                 </div>
             </div>
 

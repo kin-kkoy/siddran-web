@@ -1,23 +1,23 @@
-// Geometry helpers shared by TimeGrid and the unscheduled drawer. Kept out of TimeGrid.jsx so
-// that file only exports a component (react-refresh / fast-refresh requirement).
-
-export const HOUR_H = 52      // px per hour row — MUST match the 52px gradient in TimeGrid.module.css
-export const SNAP_MIN = 15    // snap granularity for click-create + drag
+// Geometry helper shared by TimeGrid and the unscheduled drawer. Kept out of TimeGrid.jsx so
+// that file only exports a component (fast-refresh requirement).
+//
+// The Day/Week grid is an HOUR-BUCKET grid (each hour is a cell, 'HH:00–HH:59'), not a
+// continuous timeline — so a drop resolves to whole-hour cells, never sub-hour minutes.
 
 const pad = (n) => String(n).padStart(2, '0')
-export const fmtMin = (min) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`
 
-// Resolve a viewport point to { day, time } via the grid column under the pointer. Body columns
-// carry data-slot="time" (→ compute time from y); all-day cells carry only data-day (→ time null).
+// Resolve a viewport point to { day, time } via the grid cell under the pointer. Hour cells carry
+// data-day + data-hour; within a cell the vertical position picks a 15-min quarter (top → :00 …
+// bottom → :45), so click/drag snaps to 15 min. The all-day cell carries only data-day (→ null).
 export function slotFromPoint(x, y) {
-    const col = document.elementFromPoint(x, y)?.closest('[data-day]')
-    if (!col) return null
-    const day = col.getAttribute('data-day')
-    if (col.getAttribute('data-slot') === 'time') {
-        const rect = col.getBoundingClientRect()
-        const raw = ((y - rect.top) / HOUR_H) * 60
-        const min = Math.min(Math.max(Math.round(raw / SNAP_MIN) * SNAP_MIN, 0), 24 * 60 - SNAP_MIN)
-        return { day, time: fmtMin(min) }
-    }
-    return { day, time: null }
+    const cell = document.elementFromPoint(x, y)?.closest('[data-day]')
+    if (!cell) return null
+    const day = cell.getAttribute('data-day')
+    const hourAttr = cell.getAttribute('data-hour')
+    if (hourAttr == null) return { day, time: null } // all-day cell
+    const hour = Number(hourAttr)
+    const rect = cell.getBoundingClientRect()
+    const frac = rect.height ? (y - rect.top) / rect.height : 0
+    const quarter = Math.min(3, Math.max(0, Math.floor(frac * 4)))
+    return { day, time: `${pad(hour)}:${pad(quarter * 15)}` }
 }
