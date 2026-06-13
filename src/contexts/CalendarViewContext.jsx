@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 
 // Mirrors SandboxViewContext (do NOT modify that file). Drives the Calendar peek drawer and its
 // escalation to a half-split. Pin persists across navigation (provider lives at the app root);
@@ -14,7 +14,6 @@ export const CAL_VIEW_MODES = {
 }
 
 const VIEW_KEY = 'cinder_cal_last_view'
-const HIDDEN_KEY = 'cinder_cal_hidden_hours'
 const VIEWS = ['day', 'week', 'month']
 
 function todayISO() {
@@ -43,36 +42,6 @@ export function CalendarViewProvider({ children }) {
         setPinned(false)
     }, [])
 
-    // Hidden hours (Day/Week grid) — shared across views so hiding in one applies everywhere.
-    const [hiddenHours, setHiddenHours] = useState(() => {
-        try { const a = JSON.parse(localStorage.getItem(HIDDEN_KEY)); return new Set(Array.isArray(a) ? a : []) } catch { return new Set() }
-    })
-    const hiddenAnchor = useRef(null)
-    const persistHidden = (set) => { try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...set])) } catch { /* */ } }
-    const hideHour = useCallback((h, shift) => {
-        setHiddenHours(prev => {
-            const next = new Set(prev)
-            if (shift && hiddenAnchor.current != null) {
-                const [a, b] = hiddenAnchor.current <= h ? [hiddenAnchor.current, h] : [h, hiddenAnchor.current]
-                for (let i = a; i <= b; i++) next.add(i)
-            } else {
-                next.add(h)
-            }
-            hiddenAnchor.current = h
-            persistHidden(next)
-            return next
-        })
-    }, [])
-    const revealHours = useCallback((start, end) => {
-        setHiddenHours(prev => {
-            const next = new Set(prev)
-            for (let h = start; h <= end; h++) next.delete(h)
-            persistHidden(next)
-            return next
-        })
-    }, [])
-    const showAllHours = useCallback(() => { setHiddenHours(new Set()); persistHidden(new Set()); hiddenAnchor.current = null }, [])
-
     const peek = useCallback(() => { setMode(CAL_VIEW_MODES.PEEK); setPinned(false) }, [])
     const pin = useCallback(() => { setMode(CAL_VIEW_MODES.HALF); setPinned(true) }, [])
     const unpin = useCallback(() => { setMode(CAL_VIEW_MODES.PEEK); setPinned(false) }, [])
@@ -90,15 +59,11 @@ export function CalendarViewProvider({ children }) {
         pin,
         unpin,
         close,
-        hiddenHours,
-        hideHour,
-        revealHours,
-        showAllHours,
         isHidden: mode === CAL_VIEW_MODES.HIDDEN,
         isPeek: mode === CAL_VIEW_MODES.PEEK,
         isHalf: mode === CAL_VIEW_MODES.HALF,
         isFull: mode === CAL_VIEW_MODES.FULL,
-    }), [mode, pinned, focusedDay, view, setView, toggle, peek, pin, unpin, close, hiddenHours, hideHour, revealHours, showAllHours])
+    }), [mode, pinned, focusedDay, view, setView, toggle, peek, pin, unpin, close])
 
     return (
         <CalendarViewContext.Provider value={value}>

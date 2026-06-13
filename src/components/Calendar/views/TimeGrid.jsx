@@ -3,7 +3,6 @@ import { LuEyeOff, LuEye } from 'react-icons/lu'
 import styles from './TimeGrid.module.css'
 import { isTodayISO, DAY_NAMES } from '../calendarDates'
 import { slotFromPoint } from './timeGridGeom'
-import { useCalendarView } from '../../../contexts/CalendarViewContext'
 
 const DRAG_THRESHOLD = 4
 
@@ -47,8 +46,36 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
     const sideBySide = days.length === 1 // Day view → side-by-side; Week → stacked
     const nowHour = new Date().getHours()
 
-    // Hidden hours live in CalendarViewContext so Day, Week and the half pane all share one source.
-    const { hiddenHours, hideHour, revealHours, showAllHours } = useCalendarView()
+    // Hidden hours are per-view: Day and Week keep independent sets, persisted under separate keys.
+    const hiddenKey = `cinder_cal_hidden_hours_${sideBySide ? 'day' : 'week'}`
+    const [hiddenHours, setHiddenHours] = useState(() => {
+        try { const a = JSON.parse(localStorage.getItem(hiddenKey)); return new Set(Array.isArray(a) ? a : []) } catch { return new Set() }
+    })
+    const anchorRef = useRef(null)
+    const persistHidden = (set) => { try { localStorage.setItem(hiddenKey, JSON.stringify([...set])) } catch { /* */ } }
+    const hideHour = (h, shift) => {
+        setHiddenHours(prev => {
+            const next = new Set(prev)
+            if (shift && anchorRef.current != null) {
+                const [a, b] = anchorRef.current <= h ? [anchorRef.current, h] : [h, anchorRef.current]
+                for (let i = a; i <= b; i++) next.add(i)
+            } else {
+                next.add(h)
+            }
+            anchorRef.current = h
+            persistHidden(next)
+            return next
+        })
+    }
+    const revealHours = (start, end) => {
+        setHiddenHours(prev => {
+            const next = new Set(prev)
+            for (let h = start; h <= end; h++) next.delete(h)
+            persistHidden(next)
+            return next
+        })
+    }
+    const showAllHours = () => { setHiddenHours(new Set()); persistHidden(new Set()); anchorRef.current = null }
 
     // Visible hours render contiguously (hidden hours are removed from the timeline entirely, not
     // left in place as a strip). Hidden runs are summarized in a bar under the all-day row.
