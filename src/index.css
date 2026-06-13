@@ -17,6 +17,12 @@
   --accent-warning-alpha: rgba(240, 184, 64, 0.07);
   --accent-success: #52c47a;
   --shadow-color: rgba(0, 0, 0, 0.5);
+  /* Calendar source colours — left-border accent per item kind (see Calendar feature). */
+  --src-note: var(--accent-blue);
+  --src-task: var(--accent-success);
+  --src-daily: var(--accent-warning);
+  --src-bundle: #c084fc;
+  --src-sandbox: var(--accent-danger);
   --font-display: 'Syne', sans-serif;
   --font-heading: 'Fraunces', serif;
   --font-body: 'Crimson Pro', serif;

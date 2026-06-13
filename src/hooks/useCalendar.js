@@ -1,0 +1,192 @@
+import { useMemo, useCallback } from "react";
+import {
+    isoDate, parseISODate, addDays, localDayOf, isWeekday, toISOFromParts, timeOf,
+} from "../components/Calendar/calendarDates";
+
+// Pure derivation layer for the Calendar. It NEVER owns state — it reads the source
+// collections (calendar_events blocks, tasks, recurring daily tasks) and projects them onto
+// the visible date range as a Map<ISO, Item[]>. `retime` dispatches a move back to the right
+// source mutation. This keeps the calendar a view over existing data, never a second copy.
+//
+// Normalized Item shape (what the views render):
+//   { key, kind: 'event'|'task'|'daily', id, title, day (ISO), done, color, time,
+//     all_day, ref_type, ref_id, source }   // source = the original row, for click-through
+//
+// Args:
+//   events           — calendar_events rows (from useCalendarEvents)
+//   tasks            — task rows (from useTasks); plotted by due_date
+//   dailyTasks       — daily_tasks rows; only recurring ones (recurrence != null) are expanded
+//   dailyCompletions — [{ daily_task_id, date }] (P5); absent for now → recurring dailies show undone
+//   range            — { from: Date, to: Date } inclusive window to project onto
+//   updateEvent, updateTask — source mutations used by retime
+
+// Parse a stored recurrence value ('every-day'|'weekdays'|'weekends' | '{"mask":[7 bools]}').
+function parseRecurrence(rec) {
+    if (rec == null) return null;
+    if (typeof rec === 'object') return rec.mask ? { mask: rec.mask } : null;
+    const s = String(rec).trim();
+    if (s === 'every-day' || s === 'weekdays' || s === 'weekends') return s;
+    if (s.startsWith('{')) {
+        try {
+            const p = JSON.parse(s);
+            if (Array.isArray(p?.mask) && p.mask.length === 7) return { mask: p.mask };
+        } catch { /* fall through */ }
+    }
+    return null;
+}
+
+// Does a recurrence rule fire on local date `d`?
+function recurrenceMatches(rule, d) {
+    if (!rule) return false;
+    if (rule === 'every-day') return true;
+    if (rule === 'weekdays') return isWeekday(d);
+    if (rule === 'weekends') return !isWeekday(d);
+    if (rule.mask) return !!rule.mask[d.getDay()];
+    return false;
+}
+
+export function useCalendar({
+    events = [],
+    tasks = [],
+    dailyTasks = [],
+    dailyCompletions = [],
+    range,
+    updateEvent,
+    updateTask,
+} = {}) {
+
+    // Set of "<daily_task_id>|<ISO>" that are completed, for O(1) lookup.
+    const completedSet = useMemo(() => {
+        const set = new Set();
+        for (const c of dailyCompletions) {
+            const day = typeof c.date === 'string' ? c.date.slice(0, 10) : localDayOf(c.date);
+            set.add(`${c.daily_task_id}|${day}`);
+        }
+        return set;
+    }, [dailyCompletions]);
+
+    const eventsByDate = useMemo(() => {
+        const map = new Map();
+        if (!range?.from || !range?.to) return map;
+
+        const fromISO = isoDate(range.from);
+        const toISO = isoDate(range.to);
+        const push = (dayISO, item) => {
+            if (dayISO < fromISO || dayISO > toISO) return;
+            if (!map.has(dayISO)) map.set(dayISO, []);
+            map.get(dayISO).push(item);
+        };
+
+        // 1) Calendar blocks — placed on every local day they span (start_at..end_at inclusive).
+        for (const e of events) {
+            if (!e.start_at) continue;
+            const startDay = parseISODate(localDayOf(e.start_at));
+            const endDay = e.end_at ? parseISODate(localDayOf(e.end_at)) : startDay;
+            for (let d = startDay; d <= endDay; d = addDays(d, 1)) {
+                push(isoDate(d), {
+                    key: `event-${e.id}-${isoDate(d)}`,
+                    kind: 'event',
+                    id: e.id,
+                    title: e.title,
+                    day: isoDate(d),
+                    done: false,
+                    color: e.color || null,
+                    time: e.all_day ? null : timeOf(e.start_at),
+                    all_day: e.all_day,
+                    ref_type: e.ref_type || null,
+                    ref_id: e.ref_id || null,
+                    source: e,
+                });
+            }
+        }
+
+        // 2) Tasks — plotted on their due_date's local day.
+        for (const t of tasks) {
+            if (!t.due_date) continue;
+            const day = localDayOf(t.due_date);
+            push(day, {
+                key: `task-${t.id}`,
+                kind: 'task',
+                id: t.id,
+                title: t.title,
+                day,
+                done: !!t.is_completed,
+                color: null,
+                time: null,
+                all_day: false,
+                source: t,
+            });
+        }
+
+        // 3) Recurring daily tasks — expanded into virtual per-day instances across the range.
+        const recurring = dailyTasks
+            .map(dt => ({ dt, rule: parseRecurrence(dt.recurrence) }))
+            .filter(x => x.rule);
+        if (recurring.length) {
+            for (let d = parseISODate(fromISO); isoDate(d) <= toISO; d = addDays(d, 1)) {
+                const dayISO = isoDate(d);
+                for (const { dt, rule } of recurring) {
+                    if (!recurrenceMatches(rule, d)) continue;
+                    push(dayISO, {
+                        key: `daily-${dt.id}-${dayISO}`,
+                        kind: 'daily',
+                        id: dt.id,
+                        title: dt.title,
+                        day: dayISO,
+                        done: completedSet.has(`${dt.id}|${dayISO}`),
+                        color: null,
+                        time: dt.time || null,
+                        all_day: !dt.time,
+                        source: dt,
+                    });
+                }
+            }
+        }
+
+        // Stable order within a day: all-day/daily first, then timed, then by title.
+        for (const list of map.values()) {
+            list.sort((a, b) => {
+                const at = a.time || '', bt = b.time || '';
+                if (at !== bt) return at < bt ? -1 : 1;
+                return a.title.localeCompare(b.title);
+            });
+        }
+
+        return map;
+    }, [events, tasks, dailyTasks, completedSet, range]);
+
+    const itemsAt = useCallback((dayISO) => eventsByDate.get(dayISO) || [], [eventsByDate]);
+
+    // Move an item to a new local day. Blocks rewrite start/end (duration + time preserved);
+    // tasks rewrite due_date (time preserved); daily/recurring can't retime (returns false).
+    const retime = useCallback((item, newDayISO) => {
+        if (!item || !newDayISO) return false;
+
+        if (item.kind === 'event') {
+            const e = item.source;
+            const oldStart = new Date(e.start_at);
+            const time = `${String(oldStart.getHours()).padStart(2, '0')}:${String(oldStart.getMinutes()).padStart(2, '0')}`;
+            const newStartISO = toISOFromParts(newDayISO, e.all_day ? null : time);
+            let newEndISO = null;
+            if (e.end_at) {
+                const durationMs = new Date(e.end_at).getTime() - oldStart.getTime();
+                newEndISO = new Date(new Date(newStartISO).getTime() + durationMs).toISOString();
+            }
+            updateEvent?.(e.id, { start_at: newStartISO, end_at: newEndISO });
+            return true;
+        }
+
+        if (item.kind === 'task') {
+            const t = item.source;
+            const old = t.due_date ? new Date(t.due_date) : new Date();
+            const time = `${String(old.getHours()).padStart(2, '0')}:${String(old.getMinutes()).padStart(2, '0')}`;
+            updateTask?.(t.id, { due_date: toISOFromParts(newDayISO, time) });
+            return true;
+        }
+
+        // daily / recurring — date is governed by the recurrence rule, not draggable.
+        return false;
+    }, [updateEvent, updateTask]);
+
+    return { eventsByDate, itemsAt, retime };
+}

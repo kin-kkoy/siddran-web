@@ -17,6 +17,7 @@ import ModsHub from "./pages/Mods/ModsHub.jsx"
 import NotFoundPage from "./pages/NotFoundPage.jsx"
 import { useNotes } from "./hooks/useNotes.js"
 import { useTasks } from "./hooks/useTasks.js"
+import { useCalendarEvents } from "./hooks/useCalendarEvents.js"
 import { SettingsProvider } from "./contexts/SettingsContext.jsx"
 import { ApiProvider } from "./contexts/ApiContext.jsx"
 import { SandboxViewProvider } from "./contexts/SandboxViewContext.jsx"
@@ -259,6 +260,11 @@ function App() {
     tasks, dailyTasks, bundles, tasksPagination, dailyTasksPagination, bundlesPagination, loadMoreTasks, loadMoreDailyTasks, loadMoreBundles, loadingMore: tasksLoadingMore, loading: tasksLoading, addTask, updateTask, deleteTask, toggleTaskCompletion, addDailyTask, updateDailyTask, deleteDailyTask, toggleDailyTaskCompletion, batchToggleDailyTasks, batchDeleteDailyTasks, addBundle, updateBundle, deleteBundle, addBundleTasks, batchUpdateBundleTasks, toggleBundleTaskCompletion, batchDeleteBundleTasks
   } = useTasks(authFetch, API, isAuthed)
 
+  // ------------- CALENDAR DATA LOGIC ===================================
+  const {
+    events: calendarEvents, loading: calendarEventsLoading, addEvent, updateEvent, deleteEvent
+  } = useCalendarEvents(authFetch, API, isAuthed)
+
 
   //  Elements area
   const notesHubElement = (
@@ -445,7 +451,18 @@ function App() {
                       <SandBoxPageWrapper notes={notes} tasks={tasks} toggleTaskCompletion={toggleTaskCompletion} />
                     </Suspense>
                   } />
-                  <Route path="/calendar" element={<Calendar />} />
+                  <Route path="/calendar" element={
+                    <Calendar
+                      events={calendarEvents}
+                      eventsLoading={calendarEventsLoading}
+                      addEvent={addEvent}
+                      updateEvent={updateEvent}
+                      deleteEvent={deleteEvent}
+                      dailyTasks={dailyTasks}
+                      authFetch={authFetch}
+                      API={API}
+                    />
+                  } />
                   <Route path="/mods" element={<ModsHub />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </>
