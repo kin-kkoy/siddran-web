@@ -51,7 +51,8 @@ import {
   FaTable,
   FaImage,
 } from 'react-icons/fa';
-import { LuHeading1, LuHeading2, LuHeading3, LuPilcrow } from 'react-icons/lu';
+import { LuHeading1, LuHeading2, LuHeading3, LuPilcrow, LuPenTool } from 'react-icons/lu';
+import { useSandboxView, SANDBOX_VIEW_MODES } from '../../../contexts/SandboxViewContext';
 
 import styles from './ToolbarPlugin.module.css';
 import LinkPopover from './LinkPopover';
@@ -61,6 +62,7 @@ import { insertImagesFromFiles } from './ImagePlugin';
 
 function ToolbarPlugin({ isReadMode }) {
   const [editor] = useLexicalComposerContext();
+  const sandboxView = useSandboxView();
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [isBold, setIsBold] = useState(false);
@@ -689,6 +691,25 @@ function ToolbarPlugin({ isReadMode }) {
             tabIndex={shouldShowDock ? 0 : -1}
           >
             <FaImage />
+          </button>
+
+          <div className={styles.divider} />
+
+          {/* Sandbox dock — opens PiP preview of the user's last sandbox.
+              Lives outside the editor formatting cluster on purpose: this is a
+              navigation affordance, not a content action. */}
+          <button
+            onClick={() => {
+              const lastId = (() => {
+                try { return localStorage.getItem('cinder_last_sandbox') } catch { return null }
+              })();
+              sandboxView.open(lastId, sandboxView.isHidden ? SANDBOX_VIEW_MODES.PIP : SANDBOX_VIEW_MODES.HIDDEN);
+            }}
+            className={`${styles.toolbarBtn} ${!sandboxView.isHidden ? styles.active : ''}`}
+            title="Sandbox dock"
+            tabIndex={shouldShowDock ? 0 : -1}
+          >
+            <LuPenTool />
           </button>
         </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react"
 import { BrowserRouter, Route, Routes, useParams } from 'react-router-dom'
 import Sidebar from "./components/Layout/Sidebar/Sidebar.jsx"
 import StarCanvas from "./components/Layout/StarCanvas/StarCanvas.jsx"
@@ -8,7 +8,10 @@ import NotesHub from "./pages/Notes/NotesHub.jsx"
 import LoginPage from "./pages/Auth/LoginPage.jsx"
 import RegisterPage from "./pages/Auth/RegisterPage.jsx"
 import TasksHub from "./pages/Tasks/TasksHub.jsx"
-import SandBoxes from "./pages/Sandbox/SandBoxes.jsx"
+// Sandbox routes are code-split — Konva + perfect-freehand stay out of the
+// main bundle until the user actually navigates to /sandboxes.
+const SandBoxes   = lazy(() => import("./pages/Sandbox/SandBoxes.jsx"))
+const SandBoxPage = lazy(() => import("./pages/Sandbox/SandBoxPage.jsx"))
 import Calendar from "./pages/Calendar/Calendar.jsx"
 import ModsHub from "./pages/Mods/ModsHub.jsx"
 import NotFoundPage from "./pages/NotFoundPage.jsx"
@@ -16,24 +19,51 @@ import { useNotes } from "./hooks/useNotes.js"
 import { useTasks } from "./hooks/useTasks.js"
 import { SettingsProvider } from "./contexts/SettingsContext.jsx"
 import { ApiProvider } from "./contexts/ApiContext.jsx"
+import { SandboxViewProvider } from "./contexts/SandboxViewContext.jsx"
 import SettingsPopup from "./components/Settings/SettingsPopup.jsx"
 import ToastContainer from "./components/Common/ToastContainer.jsx"
 import logger from "./utils/logger.js"
 
+// Lightweight loading state shown while the lazy Sandbox chunk is fetching.
+// Kept minimal so it does not flash garishly against the dark Cinder shell.
+function SandboxFallback() {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'var(--text-muted)',
+      fontFamily: 'var(--font-mono)',
+      fontSize: '0.8rem',
+      letterSpacing: '0.08em',
+    }}>opening sandbox…</div>
+  )
+}
+
+// Wrapper for the lazy SandBoxPage so route param + notes/tasks props are threaded in.
+function SandBoxPageWrapper({ notes, tasks, toggleTaskCompletion }) {
+  return <SandBoxPage notes={notes} tasks={tasks} toggleTaskCompletion={toggleTaskCompletion} mode="full" />
+}
+
 // Wrapper component to get the ID from route parameters
-function NotePageWrapper({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, onNoteChange, setSidebarCollapsed, lessDistraction, setLessDistraction}){
+function NotePageWrapper({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, onNoteChange, setSidebarCollapsed, lessDistraction, setLessDistraction, tasks, toggleTaskCompletion}){
   const { id } = useParams()
 
   useEffect(() => {
     onNoteChange(id)
   }, [id, onNoteChange])
 
-  return <NotePage notes={notes} notesLoading={notesLoading} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} exportNote={exportNote} setSidebarCollapsed={setSidebarCollapsed} lessDistraction={lessDistraction} setLessDistraction={setLessDistraction} />
+  return <NotePage notes={notes} notesLoading={notesLoading} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} exportNote={exportNote} setSidebarCollapsed={setSidebarCollapsed} lessDistraction={lessDistraction} setLessDistraction={setLessDistraction} tasks={tasks} toggleTaskCompletion={toggleTaskCompletion} />
 }
 
 function App() {
 
   const [isAuthed, setIsAuthed] = useState(false)
+  // Gates the first render until the startup token check resolves, so we never
+  // flash the login page (or fire protected requests) while a bootstrap refresh
+  // is in flight.
+  const [authReady, setAuthReady] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false
     return window.innerWidth < 1090 || window.innerHeight < 600
@@ -70,16 +100,16 @@ function App() {
     }
   }
 
-  // first and foremost check if user already has token
-  useEffect(() => {
-    const accessToken = localStorage.getItem('accessToken')
-    if(accessToken){
-      setIsAuthed(true)
-      // get username from the token
-      const getUsername = getUsernameToken(accessToken)
-      if(getUsername) setUsername(getUsername)
+  // Read the JWT `exp` (seconds since epoch) without verifying the signature —
+  // we only use this client-side to decide whether to refresh before firing
+  // protected requests. The server still verifies for real.
+  const getTokenExp = token => {
+    try {
+      return JSON.parse(atob(token.split('.')[1])).exp
+    } catch {
+      return null
     }
-  }, [])
+  }
 
   // get token and attach to `Authentication` header AS WELL AS the username
   const getAuthHeaders = useCallback(() => {
@@ -121,6 +151,50 @@ function App() {
 
     return refreshPromiseRef.current
   }, [API])
+
+  // Startup auth bootstrap. Runs once on mount. The access token persists in
+  // localStorage for days but expires in 15 min, so a stale token here used to
+  // make every on-auth request 401 at once (the 401 storm) before recovering.
+  // Instead: if the stored token is still valid we authenticate immediately
+  // (zero cost); if it's expired/near-expiry we refresh ONCE before flipping
+  // isAuthed, so the data hooks fire with a fresh token and never 401.
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) {
+      setAuthReady(true)
+      return
+    }
+
+    const exp = getTokenExp(token)
+    const stillValid = exp && exp * 1000 > Date.now() + 30_000 // 30s safety margin
+
+    if (stillValid) {
+      setIsAuthed(true)
+      const u = getUsernameToken(token)
+      if (u) setUsername(u)
+      setAuthReady(true)
+      return
+    }
+
+    // Expired/near-expiry: refresh before exposing the app so protected
+    // requests never go out with the dead token.
+    let cancelled = false
+    refreshAuthToken()
+      .then(newToken => {
+        if (cancelled) return
+        setIsAuthed(true)
+        const u = getUsernameToken(newToken)
+        if (u) setUsername(u)
+      })
+      .catch(() => {
+        // refreshAuthToken already cleared the token + setIsAuthed(false)
+      })
+      .finally(() => {
+        if (!cancelled) setAuthReady(true)
+      })
+
+    return () => { cancelled = true }
+  }, [refreshAuthToken])
 
   // Proactive token refresh - refreshes access token every 13 minutes
   // (before the 15-minute expiry) so the user never hits a 401 during normal use
@@ -246,19 +320,31 @@ function App() {
     />
   )
 
+  // --cinder-sidebar-w exposes the sidebar's current width so full-bleed pages
+  // (e.g. SandBoxPage) can absolutely-position themselves flush against it
+  // without re-implementing the collapse logic.
+  const sidebarW = isAuthed ? (isCollapsed ? '70px' : '220px') : '0px'
   const style = {
     backgroundColor: "var(--bg-primary)",
     color: "var(--text-primary)",
     minHeight: "100vh",
     margin: 0,
     padding: 0,
+    '--cinder-sidebar-w': sidebarW,
   };
+
+  // Hold the first paint until the startup token check resolves — prevents a
+  // login-page flash on reload while the bootstrap refresh is in flight.
+  if (!authReady) {
+    return <div style={{ ...style, minHeight: '100vh' }} />
+  }
 
 
   return (
 
     <SettingsProvider authFetch={authFetch} API={API} isAuthed={isAuthed}>
     <ApiProvider authFetch={authFetch} API={API}>
+    <SandboxViewProvider>
     <div style={style}>
 
       {isAuthed && (
@@ -341,13 +427,24 @@ function App() {
                       setSidebarCollapsed={setIsCollapsed}
                       lessDistraction={lessDistraction}
                       setLessDistraction={setLessDistraction}
+                      tasks={tasks}
+                      toggleTaskCompletion={toggleTaskCompletion}
                       />
                     }
                   />
                   {/* <Route path="/notebooks/:id" element={Notebook} */}
 
                   <Route path="/tasks" element={tasksHubElement} />
-                  <Route path="/sandboxes" element={<SandBoxes />} />
+                  <Route path="/sandboxes" element={
+                    <Suspense fallback={<SandboxFallback />}>
+                      <SandBoxes />
+                    </Suspense>
+                  } />
+                  <Route path="/sandboxes/:id" element={
+                    <Suspense fallback={<SandboxFallback />}>
+                      <SandBoxPageWrapper notes={notes} tasks={tasks} toggleTaskCompletion={toggleTaskCompletion} />
+                    </Suspense>
+                  } />
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/mods" element={<ModsHub />} />
                   <Route path="*" element={<NotFoundPage />} />
@@ -369,6 +466,7 @@ function App() {
 
       </BrowserRouter>
     </div>
+    </SandboxViewProvider>
     </ApiProvider>
     </SettingsProvider>
 

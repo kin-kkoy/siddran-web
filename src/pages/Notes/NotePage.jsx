@@ -12,8 +12,21 @@ import { toast } from '../../utils/toast'
 import Skeleton from '../../components/Common/Skeleton'
 import { NOTE_COLORS } from '../../components/Notes/noteColors'
 import NoteSettingsPopup from '../../components/Settings/NoteSettingsPopup'
+import SandboxDock from '../../components/Sandbox/Dock/SandboxDock'
+import { useSandboxView } from '../../contexts/SandboxViewContext'
 
-function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction }) {
+function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction, tasks, toggleTaskCompletion }) {
+
+  const sandboxView = useSandboxView()
+
+  // Auto-collapse the sidebar when the sandbox dock expands to half mode so the
+  // editor + sandbox columns have room to breathe.
+  useEffect(() => {
+    if (sandboxView.isHalf && setSidebarCollapsed) setSidebarCollapsed(true)
+  }, [sandboxView.isHalf, setSidebarCollapsed])
+
+  // Clean up the dock when navigating away from NotePage entirely.
+  useEffect(() => () => { sandboxView.close() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { id } = useParams() //what note
   const navigate = useNavigate()
@@ -248,7 +261,7 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
     })
   }
 
-  return (
+  const noteContent = (
     <div className={styles.container}>
 
       {!headerVisible && (
@@ -373,7 +386,24 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
         onClose={() => setNoteSettingsOpen(false)}
       />
     </div>
+  )
 
+  // Half-mode wraps the note column + a sandbox column in a CSS grid. Hidden
+  // and PiP modes leave the note column at full width and overlay the dock.
+  return (
+    <div
+      style={sandboxView.isHalf ? {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        height: '100vh',
+        overflow: 'hidden',
+      } : { width: '100%' }}
+    >
+      <div style={sandboxView.isHalf ? { overflow: 'auto', height: '100%' } : undefined}>
+        {noteContent}
+      </div>
+      {!sandboxView.isHidden && <SandboxDock notes={notes} tasks={tasks} toggleTaskCompletion={toggleTaskCompletion} />}
+    </div>
   )
 }
 

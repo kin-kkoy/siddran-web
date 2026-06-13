@@ -61,7 +61,10 @@ function StarCanvas({ lessDistraction = false }) {
   // Less-distraction mode (NotePage focus mode) forces stars off regardless.
   const onNotePage = /^\/notes\/[^/]+/.test(location.pathname)
   const notePageStarsAllowed = onNotePage ? settings.showStarsOnNotePage !== false : true
-  const showStars   = settings.showStars   !== false && notePageStarsAllowed && !lessDistraction
+  // Sandbox editor occupies the whole viewport (and stars would be hidden
+  // behind its dark surface anyway) — skip the rAF loop entirely on this route.
+  const onSandboxEditor = /^\/sandboxes\/[^/]+/.test(location.pathname)
+  const showStars   = settings.showStars !== false && notePageStarsAllowed && !lessDistraction && !onSandboxEditor
   const reduceStars = settings.reduceStars === true
 
   // Animation refs — no state needed; settings sync updates these directly
