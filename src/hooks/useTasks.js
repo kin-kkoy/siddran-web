@@ -302,6 +302,13 @@ export const useTasks = (authFetch, API, isAuthed) => {
         }
     }, [authFetch, API])
 
+    // Patch a task in this app-level cache WITHOUT a network call. Used by the Calendar (which
+    // owns its own range-fetched task cache + the actual PUT) to keep TasksHub in sync after a
+    // drag-reschedule, so it reflects the new due date without a page refresh.
+    const patchTaskInCache = useCallback((id, patch) => {
+        setTasks(prev => prev.map(task => task.id === id ? { ...task, ...patch } : task))
+    }, [])
+
     const deleteTask = useCallback(async (id) => {
         let removed = null
         setTasks(prev => {
@@ -676,6 +683,7 @@ export const useTasks = (authFetch, API, isAuthed) => {
         loading,
         addTask,
         updateTask,
+        patchTaskInCache,
         deleteTask,
         toggleTaskCompletion,
         addDailyTask,

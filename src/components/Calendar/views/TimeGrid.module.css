@@ -1,0 +1,206 @@
+/* NOTE: the 52px hour-line gradient below must match HOUR_H in timeGridGeom.js. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.headRow,
+.allDayRow,
+.grid {
+  display: grid;
+  grid-template-columns: 56px repeat(var(--cols), 1fr);
+}
+
+/* ── Day header ── */
+.headRow {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+}
+.gutterCorner { border-right: 1px solid var(--border-default); }
+.dayHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border-left: 1px solid var(--border-default);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.dayDate { font-family: var(--font-heading); font-size: 15px; color: var(--text-secondary); }
+.todayHead .dayName, .todayHead .dayDate { color: var(--accent-warning); }
+
+/* ── All-day row ── */
+.allDayRow {
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  min-height: 34px;
+}
+.gutterLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 8px 6px;
+  text-align: right;
+  border-right: 1px solid var(--border-default);
+}
+.allDayCell {
+  border-left: 1px solid var(--border-default);
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+.allDayCell:hover { background: var(--bg-surface); }
+
+/* ── Scrollable body ── */
+.body { overflow-y: auto; max-height: calc(100vh - 240px); }
+.grid { position: relative; }
+.hours { position: relative; border-right: 1px solid var(--border-default); }
+.hourLabel { position: relative; }
+/* Label is vertically centred ON its hour gridline (matches the column lines), so a block at
+   1:00 lines up exactly with the "1 AM" label — clearer now that drops can carry a time. */
+.hourLabel span {
+  position: absolute;
+  top: -6px;
+  right: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  padding: 0 2px;
+}
+.col {
+  position: relative;
+  border-left: 1px solid var(--border-default);
+  cursor: pointer;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--border-default) 0, var(--border-default) 1px,
+    transparent 1px, transparent 52px
+  );
+}
+
+/* ── Timed event blocks ── */
+.event {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  background: var(--bg-elevated);
+  border-left: 3px solid var(--accent-warning);
+  border-radius: 4px;
+  padding: 3px 7px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--text-primary);
+  z-index: 2;
+}
+.eventTime { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); letter-spacing: 0.04em; flex-shrink: 0; }
+.eventTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── All-day chips ── */
+.chip {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-primary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  border-left: 2px solid var(--accent-warning);
+  background: var(--bg-elevated);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.chip:hover { background: var(--bg-hover); }
+
+.srcNote    { border-left-color: var(--src-note); }
+.srcTask    { border-left-color: var(--src-task); }
+.srcDaily   { border-left-color: var(--src-daily); }
+.srcBundle  { border-left-color: var(--src-bundle); }
+.srcSandbox { border-left-color: var(--src-sandbox); }
+.srcEvent   { border-left-color: var(--accent-warning); }
+
+.done { color: var(--text-muted); text-decoration: line-through; }
+.draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.draggable:active { cursor: grabbing; }
+
+/* ── Drag drop target feedback ── */
+.colOver { background-color: rgba(240, 184, 64, 0.05); }
+.allDayOver { background: var(--bg-hover) !important; box-shadow: inset 0 0 0 1px var(--accent-warning); }
+.dropLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 2px dashed var(--accent-warning);
+  z-index: 4;
+  pointer-events: none;
+}
+.dropLine::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: -4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-warning);
+}
+
+/* ── Current-time line ── */
+.nowLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 2px solid var(--accent-danger);
+  z-index: 3;
+  pointer-events: none;
+}
+.nowLine::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: -4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-danger);
+}
+
+/* ── Drag ghost ── */
+.ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1001;
+  pointer-events: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-warning);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-primary);
+  max-width: 220px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-shadow: 0 6px 18px var(--shadow-color);
+}

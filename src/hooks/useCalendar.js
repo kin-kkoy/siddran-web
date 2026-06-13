@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from "react";
 import {
-    isoDate, parseISODate, addDays, localDayOf, isWeekday, toISOFromParts, timeOf,
+    isoDate, parseISODate, addDays, localDayOf, isWeekday, toISOFromParts, timeOf, taskDueStamp,
 } from "../components/Calendar/calendarDates";
 
 // Pure derivation layer for the Calendar. It NEVER owns state — it reads the source
@@ -100,10 +100,13 @@ export function useCalendar({
             }
         }
 
-        // 2) Tasks — plotted on their due_date's local day.
+        // 2) Tasks — plotted on their due_date's local day. A non-midnight time renders the task
+        // on the time grid; midnight = all-day (date-level deadline).
         for (const t of tasks) {
             if (!t.due_date) continue;
             const day = localDayOf(t.due_date);
+            const due = new Date(t.due_date);
+            const mins = due.getHours() * 60 + due.getMinutes();
             push(day, {
                 key: `task-${t.id}`,
                 kind: 'task',
@@ -112,8 +115,8 @@ export function useCalendar({
                 day,
                 done: !!t.is_completed,
                 color: null,
-                time: null,
-                all_day: false,
+                time: mins === 0 ? null : timeOf(t.due_date),
+                all_day: mins === 0,
                 source: t,
             });
         }
@@ -157,30 +160,50 @@ export function useCalendar({
 
     const itemsAt = useCallback((dayISO) => eventsByDate.get(dayISO) || [], [eventsByDate]);
 
-    // Move an item to a new local day. Blocks rewrite start/end (duration + time preserved);
-    // tasks rewrite due_date (time preserved); daily/recurring can't retime (returns false).
-    const retime = useCallback((item, newDayISO) => {
+    // Move an item to a new local day, optionally to a new time-of-day (`newTime` 'HH:MM',
+    // supplied by time-grid drags). Blocks rewrite start/end (duration preserved); tasks
+    // rewrite due_date; daily/recurring can't retime (returns false).
+    const retime = useCallback((item, newDayISO, newTime = null) => {
         if (!item || !newDayISO) return false;
 
+        // The drop target decides all-day vs timed:
+        //   newTime === null      → dropped on the all-day strip → make all-day
+        //   newTime === undefined → month drop → keep current all-day/time
+        //   newTime === 'HH:MM'   → dropped on a time slot → make timed at that time
         if (item.kind === 'event') {
             const e = item.source;
             const oldStart = new Date(e.start_at);
-            const time = `${String(oldStart.getHours()).padStart(2, '0')}:${String(oldStart.getMinutes()).padStart(2, '0')}`;
-            const newStartISO = toISOFromParts(newDayISO, e.all_day ? null : time);
+            let targetAllDay, time;
+            if (newTime === null) { targetAllDay = true; time = null; }
+            else if (newTime === undefined) { targetAllDay = e.all_day; time = e.all_day ? null : timeOf(e.start_at); }
+            else { targetAllDay = false; time = newTime; }
+
+            const newStartISO = toISOFromParts(newDayISO, time);
+            if (!newStartISO) return false;
+            // No-op guard: same start AND same all-day-ness → don't hit the backend.
+            if (new Date(newStartISO).getTime() === oldStart.getTime() && targetAllDay === e.all_day) return false;
+
             let newEndISO = null;
-            if (e.end_at) {
+            if (!targetAllDay && e.end_at) {
                 const durationMs = new Date(e.end_at).getTime() - oldStart.getTime();
                 newEndISO = new Date(new Date(newStartISO).getTime() + durationMs).toISOString();
             }
-            updateEvent?.(e.id, { start_at: newStartISO, end_at: newEndISO });
+            updateEvent?.(e.id, { start_at: newStartISO, end_at: newEndISO, all_day: targetAllDay });
             return true;
         }
 
         if (item.kind === 'task') {
-            const t = item.source;
-            const old = t.due_date ? new Date(t.due_date) : new Date();
-            const time = `${String(old.getHours()).padStart(2, '0')}:${String(old.getMinutes()).padStart(2, '0')}`;
-            updateTask?.(t.id, { due_date: toISOFromParts(newDayISO, time) });
+            const due = item.source.due_date ? new Date(item.source.due_date) : null;
+            const existingMins = due ? due.getHours() * 60 + due.getMinutes() : 0;
+            let time;
+            if (newTime === null) time = null;
+            else if (newTime === undefined) time = existingMins ? timeOf(item.source.due_date) : null;
+            else time = newTime;
+            // No-op guard: same day AND same time-of-day → skip.
+            const newMins = time ? (() => { const [h, m] = time.split(':').map(Number); return h * 60 + (m || 0); })() : 0;
+            const oldDay = due ? localDayOf(item.source.due_date) : null;
+            if (oldDay === newDayISO && existingMins === newMins) return false;
+            updateTask?.(item.source.id, { due_date: taskDueStamp(newDayISO, time) });
             return true;
         }
 

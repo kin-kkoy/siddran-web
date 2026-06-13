@@ -67,6 +67,19 @@ export function isWeekday(d) {
     return g >= 1 && g <= 5;
 }
 
+// Monday (local midnight) of the week containing `d`.
+export function mondayOf(d) {
+    const r = startOfDay(d);
+    const offset = (r.getDay() + 6) % 7;
+    return addDays(r, -offset);
+}
+
+// The 7 dates of the Monday-start week containing `d`.
+export function weekDays(d) {
+    const start = mondayOf(d);
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
 // Combine a 'YYYY-MM-DD' day + optional 'HH:MM' into a UTC ISO string (local → UTC).
 // Returns null for a missing/invalid day rather than throwing on toISOString.
 export function toISOFromParts(dayISO, time) {
@@ -78,6 +91,14 @@ export function toISOFromParts(dayISO, time) {
     }
     const dt = new Date(y, m - 1, d, hh, mm, 0, 0);
     return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+}
+
+// due_date for a task as a NAIVE LOCAL timestamp 'YYYY-MM-DD HH:MM:SS' (no 'time' → midnight).
+// tasks.due_date is `TIMESTAMP` (no time zone): writing a UTC ISO 'Z' string makes node-pg read
+// it back shifted by the local offset. A naive local string round-trips to the correct local
+// day AND time. Midnight (no time) renders as all-day; any other time renders on the grid.
+export function taskDueStamp(dayISO, time) {
+    return time ? `${dayISO} ${time}:00` : `${dayISO} 00:00:00`;
 }
 
 // 'HH:MM' (local) for a timestamp, for prefilling time inputs.

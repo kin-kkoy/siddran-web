@@ -73,7 +73,7 @@
   cursor: pointer;
 }
 .chip:hover { background: var(--bg-hover); }
-.draggable { cursor: grab; touch-action: none; }
+.draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .draggable:active { cursor: grabbing; }
 
 /* Floating label that follows the pointer during a drag. */
