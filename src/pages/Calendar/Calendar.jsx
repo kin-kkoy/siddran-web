@@ -37,7 +37,7 @@ function Calendar({ events, addEvent, updateEvent, deleteEvent, dailyTasks, auth
     // Range-scoped task overlay (all dated tasks in view, not just useTasks' first page).
     const { tasks, retimeTask } = useCalendarTasks(authFetch, API, true, range)
 
-    const { itemsAt } = useCalendar({ events, tasks, dailyTasks, range, updateEvent, updateTask: retimeTask })
+    const { itemsAt, retime } = useCalendar({ events, tasks, dailyTasks, range, updateEvent, updateTask: retimeTask })
 
     const goPrev = () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))
     const goNext = () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))
@@ -118,6 +118,7 @@ function Calendar({ events, addEvent, updateEvent, deleteEvent, dailyTasks, auth
                     itemsAt={itemsAt}
                     onDayClick={handleDayClick}
                     onEventClick={handleEventClick}
+                    onRetime={retime}
                 />
             ) : (
                 <div className={styles.placeholder}>
