@@ -15,8 +15,16 @@ const relativeTime = (iso) => {
     return new Date(iso).toLocaleDateString()
 }
 
-function SandboxCard({ sandbox, onDelete, itemCount }) {
+// Fixed mosaic grid (8 cols × 4 rows). The first `count` cells are coloured by
+// their item's bucket; the rest stay dim — so a near-empty board reads sparse
+// and a busy one reads full. Boards with more than MOSAIC_CELLS items just fill
+// the grid (it caps at "full" rather than growing).
+const MOSAIC_CELLS = 32
+
+function SandboxCard({ sandbox, onDelete, summary }) {
     const navigate = useNavigate()
+    const count = summary?.count ?? 0
+    const buckets = summary?.buckets ?? []
 
     return (
         <div
@@ -36,9 +44,21 @@ function SandboxCard({ sandbox, onDelete, itemCount }) {
             </button>
 
             <div className={styles.preview}>
-                <div className={styles.previewItems}>
-                    {itemCount > 0 ? `${itemCount} ITEMS` : 'EMPTY BOARD'}
-                </div>
+                {count > 0 ? (
+                    <div className={styles.mosaic}>
+                        {Array.from({ length: MOSAIC_CELLS }, (_, i) => {
+                            const bucket = buckets[i]
+                            return (
+                                <span
+                                    key={i}
+                                    className={`${styles.tile} ${bucket ? styles[`tile_${bucket}`] : ''}`}
+                                />
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className={styles.previewEmpty}>empty board</div>
+                )}
             </div>
 
             <div className={styles.meta}>

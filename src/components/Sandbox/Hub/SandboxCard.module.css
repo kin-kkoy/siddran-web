@@ -32,17 +32,38 @@
     overflow: hidden;
 }
 
-.previewItems {
+/* Density mosaic — one tile per item, coloured by type bucket. */
+.mosaic {
+    position: absolute;
+    inset: 10px;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 4px;
+}
+
+.tile {
+    border-radius: 3px;
+    background: var(--bg-surface-alt);
+}
+
+.tile_draw { background: rgba(240, 184, 64, 0.55); }
+.tile_note { background: rgba(90, 156, 240, 0.50); }
+.tile_task { background: rgba(82, 196, 122, 0.50); }
+.tile_text { background: rgba(99, 95, 128, 0.60); }
+
+.previewEmpty {
     position: absolute;
     inset: 0;
-    color: var(--accent-warning);
-    opacity: 0.6;
-    font-family: var(--font-mono);
-    font-size: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: var(--text-muted);
+    opacity: 0.55;
+    font-family: var(--font-mono);
+    font-size: 10px;
     letter-spacing: 0.18em;
+    text-transform: uppercase;
 }
 
 .meta {

@@ -95,3 +95,24 @@ export function useSandbox(sandboxId) {
 }
 
 export const newSandboxItemId = newItemId
+
+// Collapse the canvas item types into the four colour buckets the hub mosaic
+// uses. Anything unrecognised (incl. connectors) falls back to 'text'.
+const TYPE_BUCKET = {
+    stroke: 'draw', shape: 'draw', image: 'draw',
+    note: 'note',
+    task: 'task',
+    text: 'text', connector: 'text',
+}
+
+// Lightweight per-sandbox summary read straight from localStorage, so the hub
+// cards can render a density mosaic without mounting the full useSandbox hook.
+// `buckets` is one entry per item, in stored order.
+export const getSandboxSummary = (sandboxId) => {
+    if (!sandboxId) return { count: 0, buckets: [] }
+    const items = readSandbox(sandboxId).items
+    return {
+        count: items.length,
+        buckets: items.map(it => TYPE_BUCKET[it?.type] || 'text'),
+    }
+}

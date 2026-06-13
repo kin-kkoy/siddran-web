@@ -3,6 +3,7 @@ import { HiOutlineViewGrid, HiOutlineViewList } from 'react-icons/hi'
 import { useNavigate } from 'react-router-dom'
 import styles from './SandBoxes.module.css'
 import { useSandboxes } from '../../hooks/useSandboxes'
+import { getSandboxSummary } from '../../hooks/useSandbox'
 import SandboxCard from '../../components/Sandbox/Hub/SandboxCard'
 import SandboxRow from '../../components/Sandbox/Hub/SandboxRow'
 import AddSandboxCard from '../../components/Sandbox/Hub/AddSandboxCard'
@@ -23,6 +24,15 @@ function SandBoxes() {
         if (!q) return sandboxes
         return sandboxes.filter(s => s.title.toLowerCase().includes(q))
     }, [sandboxes, search])
+
+    // Per-sandbox summary (count + item-type buckets for the mosaic), read from
+    // localStorage. Recomputed when the list changes (create/delete) and on
+    // mount — which covers navigating back from a board after editing it.
+    const summaries = useMemo(() => {
+        const map = {}
+        for (const s of sandboxes) map[s.id] = getSandboxSummary(s.id)
+        return map
+    }, [sandboxes])
 
     const toggleView = () => {
         const next = viewMode === 'grid' ? 'list' : 'grid'
@@ -100,7 +110,7 @@ function SandBoxes() {
                     )}
 
                     {filtered.map(sb => viewMode === 'grid'
-                        ? <SandboxCard key={sb.id} sandbox={sb} onDelete={handleDelete} />
+                        ? <SandboxCard key={sb.id} sandbox={sb} onDelete={handleDelete} summary={summaries[sb.id]} />
                         : <SandboxRow  key={sb.id} sandbox={sb} onDelete={handleDelete} />
                     )}
                 </div>
