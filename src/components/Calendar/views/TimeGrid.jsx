@@ -50,19 +50,19 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
     // Hidden hours live in CalendarViewContext so Day, Week and the half pane all share one source.
     const { hiddenHours, hideHour, revealHours, showAllHours } = useCalendarView()
 
-    // Ordered render list: visible 'hour' rows + collapsed 'strip' runs of hidden hours.
-    const rows = useMemo(() => {
+    // Visible hours render contiguously (hidden hours are removed from the timeline entirely, not
+    // left in place as a strip). Hidden runs are summarized in a bar under the all-day row.
+    const visibleHours = useMemo(() => {
+        const out = []
+        for (let h = 0; h < 24; h++) if (!hiddenHours.has(h)) out.push(h)
+        return out
+    }, [hiddenHours])
+    const hiddenRuns = useMemo(() => {
         const out = []
         let h = 0
         while (h < 24) {
-            if (hiddenHours.has(h)) {
-                const start = h
-                while (h < 24 && hiddenHours.has(h)) h++
-                out.push({ type: 'strip', start, end: h - 1 })
-            } else {
-                out.push({ type: 'hour', h })
-                h++
-            }
+            if (hiddenHours.has(h)) { const start = h; while (h < 24 && hiddenHours.has(h)) h++; out.push({ start, end: h - 1 }) }
+            else h++
         }
         return out
     }, [hiddenHours])
@@ -178,17 +178,12 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
         </Fragment>
     )
 
-    const renderStrip = (row) => {
-        const count = row.end - row.start + 1
+    const runBlockCount = (run) => {
         let blocks = 0
-        for (let h = row.start; h <= row.end; h++) {
+        for (let h = run.start; h <= run.end; h++) {
             for (const iso of days) blocks += itemsAt(iso).filter(it => itemHour(it) === h).length
         }
-        return (
-            <button key={`s${row.start}`} className={styles.hiddenStrip} style={{ gridColumn: '1 / -1' }} onClick={() => revealHours(row.start, row.end)}>
-                {count} hour{count > 1 ? 's' : ''} hidden · {hourLabel(row.start)} – {hourLabel(row.end)}{blocks ? ` · ${blocks} block${blocks > 1 ? 's' : ''}` : ''} · show
-            </button>
-        )
+        return blocks
     }
 
     const gridStyle = { gridTemplateColumns: `56px repeat(${days.length}, 1fr)` }
@@ -227,10 +222,27 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
                 })}
             </div>
 
-            {/* Hour-bucket grid */}
+            {/* Hidden-hours bar (under the sticky all-day row) — hidden hours leave the timeline and
+                show here as pills; click one to reveal that run. */}
+            {hiddenRuns.length > 0 && (
+                <div className={styles.hiddenBar}>
+                    <span className={styles.hiddenBarLabel}>Hidden</span>
+                    {hiddenRuns.map(run => {
+                        const blocks = runBlockCount(run)
+                        return (
+                            <button key={run.start} className={styles.hiddenPill} onClick={() => revealHours(run.start, run.end)} title="Show these hours">
+                                {hourLabel(run.start)}{run.end > run.start ? ` – ${hourLabel(run.end)}` : ''}{blocks ? ` · ${blocks}` : ''}
+                                <LuEye />
+                            </button>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* Hour-bucket grid (visible hours only) */}
             <div className={styles.body}>
                 <div className={`${styles.grid} ${sideBySide ? styles.sideBySide : styles.stacked}`} style={gridStyle}>
-                    {rows.map(row => row.type === 'strip' ? renderStrip(row) : renderHour(row.h))}
+                    {visibleHours.map(h => renderHour(h))}
                 </div>
             </div>
 

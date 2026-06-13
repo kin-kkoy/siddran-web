@@ -264,15 +264,20 @@ function App() {
   } = useTasks(authFetch, API, isAuthed)
 
   // ------------- CALENDAR DATA LOGIC ===================================
+  const calView = useCalendarView()
+  // Lazy-load: only fetch calendar data once the calendar is actually used (peek opened/pinned, or
+  // the /calendar route mounts) — so Notes/Tasks/etc. don't fire events + task requests on every load.
+  const [calendarActive, setCalendarActive] = useState(false)
+  const activateCalendar = useCallback(() => setCalendarActive(true), [])
+  useEffect(() => { if (!calView.isHidden) setCalendarActive(true) }, [calView.isHidden])
+
   // Lifted to App level so the root-mounted peek and the /calendar route share one source.
   const {
     events: calendarEvents, addEvent, updateEvent, deleteEvent
-  } = useCalendarEvents(authFetch, API, isAuthed)
+  } = useCalendarEvents(authFetch, API, isAuthed && calendarActive)
   const {
     tasks: calendarTasks, undated: calendarUndated, retimeTask, scheduleTask
-  } = useCalendarTasks(authFetch, API, isAuthed)
-
-  const calView = useCalendarView()
+  } = useCalendarTasks(authFetch, API, isAuthed && calendarActive)
 
   // Calendar owns the PUT; patchTaskInCache also syncs the app-level useTasks cache so TasksHub
   // reflects new dates live (no extra request).
@@ -316,6 +321,7 @@ function App() {
     tasks: calendarTasks,
     undated: calendarUndated,
     onTaskRetime, onTaskSchedule,
+    onActivate: activateCalendar,
   }
 
   // Resizable half-split: halfPct = the calendar pane's width %. Drag the divider to adjust.

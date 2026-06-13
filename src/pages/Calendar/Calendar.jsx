@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { FiChevronLeft, FiChevronRight, FiMinimize2 } from 'react-icons/fi'
 import styles from './Calendar.module.css'
 import MonthView from '../../components/Calendar/views/MonthView.jsx'
@@ -17,9 +17,12 @@ const VIEWS = ['day', 'week', 'month']
 // Full-route Calendar (also rendered in the half-split pane via mode="half"). View + focused day
 // live in CalendarViewContext so the peek, the route, and the half pane all stay in sync. Calendar
 // data + task mutations are passed in from App (shared with the peek — single fetch).
-function Calendar({ events, addEvent, updateEvent, deleteEvent, dailyTasks, tasks, undated, onTaskRetime, onTaskSchedule, mode = 'full' }) {
+function Calendar({ events, addEvent, updateEvent, deleteEvent, dailyTasks, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
     const { view, setView, focusedDay, setFocusedDay, unpin } = useCalendarView()
     const [modal, setModal] = useState(null) // { mode, draft } | null
+
+    // Tell App to start fetching calendar data (lazy-load) when this route/pane mounts.
+    useEffect(() => { onActivate?.() }, [onActivate])
 
     const anchor = useMemo(() => parseISODate(focusedDay), [focusedDay])
     const monthDate = useMemo(() => new Date(anchor.getFullYear(), anchor.getMonth(), 1), [anchor])

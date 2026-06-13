@@ -139,21 +139,38 @@
 .quarterActive { background: rgba(240, 184, 64, 0.16); box-shadow: inset 0 0 0 1px var(--accent-warning); }
 .quarterLabel { position: absolute; right: 5px; top: 1px; font-family: var(--font-mono); font-size: 9px; color: var(--accent-warning); }
 
-/* Collapsed empty-hour run (compact mode) — thin clickable strip spanning all columns. */
-.hiddenStrip {
-  border-top: 1px dashed var(--border-strong);
+/* Hidden-hours bar — sits under the all-day row; hidden runs become pills (click to reveal). */
+.hiddenBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
   background: var(--bg-surface);
-  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-default);
+}
+.hiddenBarLabel {
   font-family: var(--font-mono);
   font-size: 9px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  padding: 5px 0;
-  text-align: center;
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  color: var(--text-faint);
 }
-.hiddenStrip:hover { color: var(--accent-warning); background: var(--bg-hover); }
+.hiddenPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  transition: color 0.15s, border-color 0.15s;
+}
+.hiddenPill svg { font-size: 11px; }
+.hiddenPill:hover { color: var(--accent-warning); border-color: var(--accent-warning); }
 
 /* ── Block chips ── */
 .chip {
