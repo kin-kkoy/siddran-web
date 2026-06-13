@@ -31,9 +31,9 @@ const sortByUpdated = (arr) => [...arr].sort((a, b) => {
     return 0
 })
 
-const setList = (next) => {
+const setList = (next, { persist = true } = {}) => {
     list = next
-    writeList(list)
+    if (persist) writeList(list)
     listeners.forEach(cb => cb())
 }
 
@@ -238,5 +238,11 @@ if (typeof window !== 'undefined') {
         for (const s of list) {
             if (pendingCreates.has(s.id)) pushCreate(s)
         }
+    })
+
+    // Cross-tab: when another tab changes the board list (create/rename/delete), pick up
+    // its write. persist:false avoids a storage-event ping-pong between tabs.
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'cinder_sandboxes') setList(readList(), { persist: false })
     })
 }
