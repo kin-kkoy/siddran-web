@@ -7,10 +7,12 @@ import ConfirmModal from "../../components/Common/ConfirmModal"
 import TaskDetailsModal from "../../components/Common/TaskDetailsModal"
 import DailyTaskModal from "../../components/Common/DailyTaskModal"
 import { HiOutlineTrash, HiOutlineViewGrid, HiOutlineViewList, HiOutlineTemplate, HiOutlineViewBoards } from 'react-icons/hi'
+import { LuCalendarDays } from 'react-icons/lu'
 import BundleCard from "../../components/Tasks/BundleCard"
 import BundleDetailModal from "../../components/Common/BundleDetailModal"
 import { useRowMasonry } from '../../hooks/useRowMasonry'
 import Skeleton from "../../components/Common/Skeleton"
+import { useCalendarView } from '../../contexts/CalendarViewContext'
 
 function TasksHub({
   tasks,
@@ -42,6 +44,8 @@ function TasksHub({
   toggleBundleTaskCompletion,
   batchDeleteBundleTasks,
 }) {
+
+  const calendarView = useCalendarView()
 
   // Persist view mode in localStorage
   const [viewMode, setViewMode] = useState(() => {
@@ -355,6 +359,15 @@ function TasksHub({
               title={isSelectionMode ? "Delete selected tasks" : "Select tasks to delete"}
             >
               <HiOutlineTrash size={18} />
+            </button>
+
+            {/* Calendar peek */}
+            <button
+              onClick={() => calendarView.toggle()}
+              className={styles.toggleBtn}
+              title="Calendar peek (⌘;)"
+            >
+              <LuCalendarDays size={18} />
             </button>
 
             {/* Cancel button - only in selection mode */}

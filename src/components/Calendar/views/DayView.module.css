@@ -1,11 +1,13 @@
 .shell {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  /* Shelf scales with the (resizable) pane instead of staying a fixed 300px, so it visibly
+     participates when the half-split is dragged. */
+  grid-template-columns: minmax(0, 1fr) clamp(200px, 30%, 320px);
   gap: 18px;
   align-items: start;
 }
 .grid { min-width: 0; }
 
-@media (max-width: 900px) {
+@media (max-width: 760px) {
   .shell { grid-template-columns: 1fr; }
 }

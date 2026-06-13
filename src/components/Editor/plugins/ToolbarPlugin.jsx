@@ -51,8 +51,9 @@ import {
   FaTable,
   FaImage,
 } from 'react-icons/fa';
-import { LuHeading1, LuHeading2, LuHeading3, LuPilcrow, LuPenTool } from 'react-icons/lu';
+import { LuHeading1, LuHeading2, LuHeading3, LuPilcrow, LuPenTool, LuCalendarDays } from 'react-icons/lu';
 import { useSandboxView, SANDBOX_VIEW_MODES } from '../../../contexts/SandboxViewContext';
+import { useCalendarView } from '../../../contexts/CalendarViewContext';
 
 import styles from './ToolbarPlugin.module.css';
 import LinkPopover from './LinkPopover';
@@ -63,6 +64,7 @@ import { insertImagesFromFiles } from './ImagePlugin';
 function ToolbarPlugin({ isReadMode }) {
   const [editor] = useLexicalComposerContext();
   const sandboxView = useSandboxView();
+  const calendarView = useCalendarView();
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [isBold, setIsBold] = useState(false);
@@ -710,6 +712,16 @@ function ToolbarPlugin({ isReadMode }) {
             tabIndex={shouldShowDock ? 0 : -1}
           >
             <LuPenTool />
+          </button>
+
+          {/* Calendar peek — toggle the planning drawer (⌘/Ctrl+;). */}
+          <button
+            onClick={() => calendarView.toggle()}
+            className={`${styles.toolbarBtn} ${!calendarView.isHidden ? styles.active : ''}`}
+            title="Calendar peek (⌘;)"
+            tabIndex={shouldShowDock ? 0 : -1}
+          >
+            <LuCalendarDays />
           </button>
         </div>
 

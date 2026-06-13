@@ -101,6 +101,12 @@ export function taskDueStamp(dayISO, time) {
     return time ? `${dayISO} ${time}:00` : `${dayISO} 00:00:00`;
 }
 
+// 'Fri Jun 13' style label for a 'YYYY-MM-DD' day.
+export function dayFullLabel(dayISO) {
+    const d = parseISODate(dayISO);
+    return `${DAY_NAMES[d.getDay()]} ${MONTH_NAMES_SHORT[d.getMonth()]} ${d.getDate()}`;
+}
+
 // 'HH:MM' (local) for a timestamp, for prefilling time inputs.
 export function timeOf(ts) {
     const d = new Date(ts);

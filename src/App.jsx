@@ -18,6 +18,9 @@ import NotFoundPage from "./pages/NotFoundPage.jsx"
 import { useNotes } from "./hooks/useNotes.js"
 import { useTasks } from "./hooks/useTasks.js"
 import { useCalendarEvents } from "./hooks/useCalendarEvents.js"
+import { useCalendarTasks } from "./hooks/useCalendarTasks.js"
+import { useCalendarView } from "./contexts/CalendarViewContext.jsx"
+import CalendarPeek from "./components/Calendar/Peek/CalendarPeek.jsx"
 import { SettingsProvider } from "./contexts/SettingsContext.jsx"
 import { ApiProvider } from "./contexts/ApiContext.jsx"
 import { SandboxViewProvider } from "./contexts/SandboxViewContext.jsx"
@@ -261,9 +264,86 @@ function App() {
   } = useTasks(authFetch, API, isAuthed)
 
   // ------------- CALENDAR DATA LOGIC ===================================
+  // Lifted to App level so the root-mounted peek and the /calendar route share one source.
   const {
-    events: calendarEvents, loading: calendarEventsLoading, addEvent, updateEvent, deleteEvent
+    events: calendarEvents, addEvent, updateEvent, deleteEvent
   } = useCalendarEvents(authFetch, API, isAuthed)
+  const {
+    tasks: calendarTasks, undated: calendarUndated, retimeTask, scheduleTask
+  } = useCalendarTasks(authFetch, API, isAuthed)
+
+  const calView = useCalendarView()
+
+  // Calendar owns the PUT; patchTaskInCache also syncs the app-level useTasks cache so TasksHub
+  // reflects new dates live (no extra request).
+  const onTaskRetime = useCallback((id, patch) => {
+    retimeTask(id, patch)
+    patchTaskInCache(id, patch)
+  }, [retimeTask, patchTaskInCache])
+  const onTaskSchedule = useCallback((taskId, due) => {
+    scheduleTask(taskId, due)
+    patchTaskInCache(taskId, { due_date: due })
+  }, [scheduleTask, patchTaskInCache])
+
+  // Global Cmd/Ctrl+; toggles the peek; Esc closes it (when not typing in a field).
+  useEffect(() => {
+    if (!isAuthed) return
+    const onKey = (e) => {
+      const el = document.activeElement
+      const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+      if ((e.metaKey || e.ctrlKey) && e.key === ';') {
+        if (typing) return
+        e.preventDefault()
+        calView.toggle()
+      } else if (e.key === 'Escape' && !calView.isHidden && !typing) {
+        calView.close()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isAuthed, calView])
+
+  // Auto-collapse the sidebar while the calendar is pinned to the half-split.
+  useEffect(() => {
+    if (calView.isHalf) setIsCollapsed(true)
+  }, [calView.isHalf])
+
+  // Props shared by the /calendar route and the half-split pane.
+  const calendarProps = {
+    events: calendarEvents,
+    addEvent, updateEvent, deleteEvent,
+    dailyTasks,
+    tasks: calendarTasks,
+    undated: calendarUndated,
+    onTaskRetime, onTaskSchedule,
+  }
+
+  // Resizable half-split: halfPct = the calendar pane's width %. Drag the divider to adjust.
+  const [halfPct, setHalfPct] = useState(() => {
+    const v = Number(localStorage.getItem('cinder_cal_half_pct'))
+    return v >= 25 && v <= 75 ? v : 50
+  })
+  const contentRowRef = useRef(null)
+  const leftPaneRef = useRef(null)
+  const splitDragRef = useRef(false)
+  const latestPctRef = useRef(halfPct)
+  const onSplitDown = (e) => { splitDragRef.current = true; try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* */ } }
+  // Resize imperatively during the drag (no React re-render → the calendar pane doesn't repaint
+  // every frame), then commit to state + localStorage on release.
+  const onSplitMove = (e) => {
+    if (!splitDragRef.current) return
+    const r = contentRowRef.current?.getBoundingClientRect()
+    if (!r) return
+    const pct = Math.min(75, Math.max(25, ((r.right - e.clientX) / r.width) * 100))
+    latestPctRef.current = pct
+    if (leftPaneRef.current) leftPaneRef.current.style.flex = `0 0 ${100 - pct}%`
+  }
+  const onSplitUp = (e) => {
+    splitDragRef.current = false
+    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* */ }
+    setHalfPct(latestPctRef.current)
+    try { localStorage.setItem('cinder_cal_half_pct', String(Math.round(latestPctRef.current))) } catch { /* */ }
+  }
 
 
   //  Elements area
@@ -402,16 +482,22 @@ function App() {
           )}
 
 
-          {/* The main page/s (the contents on the right, not sidebar) */}
-          <div style={{ flex: 1,
-            padding: isAuthed ? '0 40px' : '0',
-            overflowY: 'auto',
+          {/* The main page/s (the contents on the right, not sidebar). When the calendar is
+              pinned, this becomes a 1fr/1fr split: routed content left, calendar pane right. */}
+          <div ref={contentRowRef} style={{ flex: 1,
+            display: 'flex',
+            flexDirection: 'row',
             backgroundColor: 'transparent',
             minWidth: 0,  /* Allows flex item to shrink below content size */
             position: 'relative',
             zIndex: 5,
           }}>
-
+            <div ref={leftPaneRef} style={{
+              flex: (isAuthed && calView.isHalf) ? `0 0 ${100 - halfPct}%` : 1,
+              padding: isAuthed ? '0 40px' : '0',
+              overflowY: 'auto',
+              minWidth: 0,
+            }}>
 
             <Routes>
               <Route path="/login" element={<LoginPage setIsAuthed={setIsAuthed} setAppUsername={setUsername} />} />
@@ -451,19 +537,7 @@ function App() {
                       <SandBoxPageWrapper notes={notes} tasks={tasks} toggleTaskCompletion={toggleTaskCompletion} />
                     </Suspense>
                   } />
-                  <Route path="/calendar" element={
-                    <Calendar
-                      events={calendarEvents}
-                      eventsLoading={calendarEventsLoading}
-                      addEvent={addEvent}
-                      updateEvent={updateEvent}
-                      deleteEvent={deleteEvent}
-                      dailyTasks={dailyTasks}
-                      patchTaskInCache={patchTaskInCache}
-                      authFetch={authFetch}
-                      API={API}
-                    />
-                  } />
+                  <Route path="/calendar" element={<Calendar {...calendarProps} mode="full" />} />
                   <Route path="/mods" element={<ModsHub />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </>
@@ -472,9 +546,40 @@ function App() {
               )}
               {/* <Route path="add" element={}/> */}
             </Routes>
+            </div>
 
+            {/* Calendar half-split pane (peek pinned) — draggable divider to resize. */}
+            {isAuthed && calView.isHalf && (
+              <>
+                <div
+                  onPointerDown={onSplitDown}
+                  onPointerMove={onSplitMove}
+                  onPointerUp={onSplitUp}
+                  title="Drag to resize"
+                  style={{ flex: '0 0 6px', cursor: 'col-resize', backgroundColor: 'var(--border-default)', touchAction: 'none', zIndex: 6 }}
+                />
+                <div style={{
+                  flex: '1 1 0',
+                  minWidth: 0,
+                  overflowY: 'auto',
+                  backgroundColor: 'var(--bg-surface)',
+                }}>
+                  <Calendar {...calendarProps} mode="half" />
+                </div>
+              </>
+            )}
           </div>
         </div>
+
+        {/* Calendar peek drawer (root-mounted so it persists across routes) */}
+        {isAuthed && (
+          <CalendarPeek
+            events={calendarEvents}
+            tasks={calendarTasks}
+            dailyTasks={dailyTasks}
+            addEvent={addEvent}
+          />
+        )}
 
         {/* Settings popup (rendered at app level, controlled by context) */}
         {isAuthed && <SettingsPopup />}
