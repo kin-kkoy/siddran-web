@@ -9,7 +9,9 @@ import { applyServerCount } from './sandboxStore'
 // the source of truth.
 
 const CACHE_DEBOUNCE = 300   // ms — durable local write
-const NET_DEBOUNCE = 1000    // ms — coalesce a drawing burst into one request
+const NET_DEBOUNCE = 6000    // ms — flush ~6s after the user pauses (coalesce a drawing burst)
+const MAX_WAIT = 25000       // ms — but never hold pending edits longer than this, even during
+                            //      continuous drawing (bounds data-at-risk between flushes)
 const BACKOFF = [1000, 2000, 4000]
 const BATCH_CHUNK = 200      // server caps a batch at 500
 const MAX_CHUNK_BYTES = 800 * 1024 // keep each request well under the server's 5mb body limit
@@ -32,6 +34,7 @@ export const ensure = (id) => {
             deleted: new Set(),
             cacheTimer: null,
             netTimer: null,
+            pendingSince: null, // when the oldest un-flushed edit was made (for MAX_WAIT cap)
             inFlight: false,
             failures: 0,
             listeners: new Set(),
@@ -152,8 +155,13 @@ export const getItemById = (id, itemId) => {
 const scheduleFlush = (id) => {
     const rec = boards.get(id)
     if (!rec) return
+    if (rec.pendingSince == null) rec.pendingSince = Date.now()
+    // Debounce by NET_DEBOUNCE, but cap total wait at MAX_WAIT so continuous drawing
+    // (which keeps resetting the debounce) still saves periodically.
+    const remaining = MAX_WAIT - (Date.now() - rec.pendingSince)
+    const delay = Math.max(0, Math.min(NET_DEBOUNCE, remaining))
     if (rec.netTimer) clearTimeout(rec.netTimer)
-    rec.netTimer = setTimeout(() => { rec.netTimer = null; flush(id) }, NET_DEBOUNCE)
+    rec.netTimer = setTimeout(() => { rec.netTimer = null; flush(id) }, delay)
 }
 
 // Only ship image items backed by a real R2 URL. Blob previews, failed uploads, and
@@ -215,11 +223,13 @@ async function flush(id) {
     if (rec.dirty.size === 0 && rec.deleted.size === 0) return
     if (!api.isAuthed) return
 
-    // Snapshot then clear: edits arriving during the request accumulate in fresh sets.
+    // Snapshot then clear: edits arriving during the request accumulate in fresh sets,
+    // re-arming pendingSince via scheduleFlush.
     const dirtyIds = new Set(rec.dirty)
     const deleteIds = new Set(rec.deleted)
     rec.dirty = new Set()
     rec.deleted = new Set()
+    rec.pendingSince = null
 
     const upserts = [...dirtyIds]
         .map(i => rec.items.find(it => it.id === i))
