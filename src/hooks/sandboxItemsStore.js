@@ -12,6 +12,7 @@ const CACHE_DEBOUNCE = 300   // ms — durable local write
 const NET_DEBOUNCE = 1000    // ms — coalesce a drawing burst into one request
 const BACKOFF = [1000, 2000, 4000]
 const BATCH_CHUNK = 200      // server caps a batch at 500
+const MAX_CHUNK_BYTES = 800 * 1024 // keep each request well under the server's 5mb body limit
 const EMPTY = []
 
 let api = { authFetch: null, API: '', isAuthed: false }
@@ -85,6 +86,14 @@ export const loadFromServer = async (id) => {
         if (!res.ok) throw new Error(`GET /sandboxes/${id} ${res.status}`)
         const data = await res.json()
         const serverItems = data.items || []
+        // Server has nothing but we hold local items (e.g. a board whose items never
+        // finished syncing) — push the local copy up instead of wiping it.
+        if (serverItems.length === 0 && rec.items.length > 0) {
+            for (const it of rec.items) rec.dirty.add(it.id)
+            rec.loaded = true
+            scheduleFlush(id)
+            return
+        }
         if (rec.dirty.size === 0 && rec.deleted.size === 0) {
             rec.items = serverItems
         } else {
@@ -147,12 +156,13 @@ const scheduleFlush = (id) => {
     rec.netTimer = setTimeout(() => { rec.netTimer = null; flush(id) }, NET_DEBOUNCE)
 }
 
-// Don't ship image items that are still a local blob preview or whose upload failed —
-// the server must only ever store the R2 path.
-const shippable = (it) => !(it.type === 'image' && (
-    it.payload?._uploading || it.payload?._uploadFailed ||
-    (typeof it.payload?.url === 'string' && it.payload.url.startsWith('blob:'))
-))
+// Only ship image items backed by a real R2 URL. Blob previews, failed uploads, and
+// legacy base64 (`payload.src`, no `url`) are never sent — the DB stores R2 URLs only.
+const shippable = (it) => {
+    if (it.type !== 'image') return true
+    const url = it.payload?.url
+    return typeof url === 'string' && !url.startsWith('blob:') && !url.startsWith('data:')
+}
 
 const sanitizeItem = (it) => ({
     id: it.id,
@@ -169,9 +179,21 @@ const sanitizeItem = (it) => ({
 async function postBatchChunked(id, upserts, deletes) {
     let last = null
     const bodies = []
-    for (let i = 0; i < upserts.length; i += BATCH_CHUNK) {
-        bodies.push({ upserts: upserts.slice(i, i + BATCH_CHUNK), deletes: [] })
+    // Chunk upserts by BOTH count and approximate byte size so one request never
+    // exceeds the server body limit (e.g. a board full of dense strokes).
+    let chunk = []
+    let bytes = 0
+    for (const it of upserts) {
+        const size = JSON.stringify(it).length
+        if (chunk.length >= BATCH_CHUNK || (chunk.length > 0 && bytes + size > MAX_CHUNK_BYTES)) {
+            bodies.push({ upserts: chunk, deletes: [] })
+            chunk = []
+            bytes = 0
+        }
+        chunk.push(it)
+        bytes += size
     }
+    if (chunk.length) bodies.push({ upserts: chunk, deletes: [] })
     for (let i = 0; i < deletes.length; i += BATCH_CHUNK) {
         bodies.push({ upserts: [], deletes: deletes.slice(i, i + BATCH_CHUNK) })
     }
