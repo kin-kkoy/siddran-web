@@ -1,0 +1,254 @@
+import logger from '../utils/logger'
+import { toast } from '../utils/toast'
+import { readItems, writeItems, newItemId } from './sandboxCache'
+import { applyServerCount } from './sandboxStore'
+
+// Module-level singleton for per-board ITEMS (mirrors cinder_sandbox_<id>). Tracks
+// dirty + deleted ids since the last flush and sends them as ONE debounced batch —
+// never one request per stroke. localStorage is the offline cache; the backend is
+// the source of truth.
+
+const CACHE_DEBOUNCE = 300   // ms — durable local write
+const NET_DEBOUNCE = 1000    // ms — coalesce a drawing burst into one request
+const BACKOFF = [1000, 2000, 4000]
+const BATCH_CHUNK = 200      // server caps a batch at 500
+const EMPTY = []
+
+let api = { authFetch: null, API: '', isAuthed: false }
+const boards = new Map() // id -> record
+
+export const connect = (next) => {
+    api = { authFetch: next.authFetch, API: next.API, isAuthed: !!next.isAuthed }
+}
+
+export const ensure = (id) => {
+    if (!id) return null
+    let rec = boards.get(id)
+    if (!rec) {
+        rec = {
+            items: readItems(id),
+            dirty: new Set(),
+            deleted: new Set(),
+            cacheTimer: null,
+            netTimer: null,
+            inFlight: false,
+            failures: 0,
+            listeners: new Set(),
+            loaded: false,
+        }
+        boards.set(id, rec)
+    }
+    return rec
+}
+
+export const subscribe = (id, cb) => {
+    const rec = ensure(id)
+    if (!rec) return () => {}
+    rec.listeners.add(cb)
+    return () => rec.listeners.delete(cb)
+}
+
+export const getSnapshot = (id) => {
+    if (!id) return EMPTY
+    const rec = ensure(id)
+    return rec ? rec.items : EMPTY
+}
+
+const notify = (rec) => rec.listeners.forEach(cb => cb())
+
+const scheduleCacheWrite = (id) => {
+    const rec = boards.get(id)
+    if (!rec) return
+    if (rec.cacheTimer) clearTimeout(rec.cacheTimer)
+    rec.cacheTimer = setTimeout(() => { writeItems(id, rec.items); rec.cacheTimer = null }, CACHE_DEBOUNCE)
+}
+
+const emit = (id) => {
+    const rec = boards.get(id)
+    if (!rec) return
+    notify(rec)
+    scheduleCacheWrite(id)
+}
+
+async function request(path, options) {
+    if (!api.authFetch) throw new Error('sandbox API not connected')
+    return api.authFetch(`${api.API}${path}`, options)
+}
+
+// ---- server load ----
+export const loadFromServer = async (id) => {
+    const rec = ensure(id)
+    if (!rec || !api.isAuthed) return
+    try {
+        const res = await request(`/sandboxes/${id}`, { method: 'GET' })
+        if (res.status === 404) return // not on server yet (local-only / pending create)
+        if (!res.ok) throw new Error(`GET /sandboxes/${id} ${res.status}`)
+        const data = await res.json()
+        const serverItems = data.items || []
+        if (rec.dirty.size === 0 && rec.deleted.size === 0) {
+            rec.items = serverItems
+        } else {
+            // Merge: server base, drop local deletes, re-apply local dirty so an
+            // offline edit isn't clobbered by a stale GET.
+            const byId = new Map(serverItems.map(it => [it.id, it]))
+            for (const did of rec.deleted) byId.delete(did)
+            for (const it of rec.items) if (rec.dirty.has(it.id)) byId.set(it.id, it)
+            rec.items = [...byId.values()]
+        }
+        rec.loaded = true
+        emit(id)
+    } catch (err) {
+        logger.error('sandboxItemsStore — load failed', err)
+    }
+}
+
+// ---- mutations (optimistic, synchronous) ----
+export const addItem = (id, item) => {
+    const rec = ensure(id)
+    if (!rec) return item
+    const withId = { ...item, id: item.id ?? newItemId() }
+    rec.items = [...rec.items, withId]
+    rec.dirty.add(withId.id)
+    rec.deleted.delete(withId.id)
+    emit(id)
+    scheduleFlush(id)
+    return withId
+}
+
+export const updateItem = (id, itemId, patch) => {
+    const rec = ensure(id)
+    if (!rec) return
+    rec.items = rec.items.map(it => it.id === itemId ? { ...it, ...patch } : it)
+    rec.dirty.add(itemId)
+    emit(id)
+    scheduleFlush(id)
+}
+
+export const removeItem = (id, itemId) => {
+    const rec = ensure(id)
+    if (!rec) return
+    rec.items = rec.items.filter(it => it.id !== itemId)
+    rec.dirty.delete(itemId)
+    rec.deleted.add(itemId)
+    emit(id)
+    scheduleFlush(id)
+}
+
+export const getItemById = (id, itemId) => {
+    const rec = boards.get(id)
+    return rec ? rec.items.find(it => it.id === itemId) : undefined
+}
+
+// ---- batch delta-sync ----
+const scheduleFlush = (id) => {
+    const rec = boards.get(id)
+    if (!rec) return
+    if (rec.netTimer) clearTimeout(rec.netTimer)
+    rec.netTimer = setTimeout(() => { rec.netTimer = null; flush(id) }, NET_DEBOUNCE)
+}
+
+// Don't ship image items that are still a local blob preview or whose upload failed —
+// the server must only ever store the R2 path.
+const shippable = (it) => !(it.type === 'image' && (
+    it.payload?._uploading || it.payload?._uploadFailed ||
+    (typeof it.payload?.url === 'string' && it.payload.url.startsWith('blob:'))
+))
+
+const sanitizeItem = (it) => ({
+    id: it.id,
+    type: it.type,
+    x: it.x,
+    y: it.y,
+    w: it.w,
+    h: it.h,
+    rotation: it.rotation ?? 0,
+    z_index: it.z_index ?? 0,
+    payload: it.payload ?? {},
+})
+
+async function postBatchChunked(id, upserts, deletes) {
+    let last = null
+    const bodies = []
+    for (let i = 0; i < upserts.length; i += BATCH_CHUNK) {
+        bodies.push({ upserts: upserts.slice(i, i + BATCH_CHUNK), deletes: [] })
+    }
+    for (let i = 0; i < deletes.length; i += BATCH_CHUNK) {
+        bodies.push({ upserts: [], deletes: deletes.slice(i, i + BATCH_CHUNK) })
+    }
+    for (const body of bodies) {
+        const res = await request(`/sandboxes/${id}/items/batch`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+        })
+        if (!res.ok) throw new Error(`batch ${res.status}`)
+        last = await res.json()
+    }
+    return last
+}
+
+async function flush(id) {
+    const rec = boards.get(id)
+    if (!rec) return
+    if (rec.inFlight) return
+    if (rec.dirty.size === 0 && rec.deleted.size === 0) return
+    if (!api.isAuthed) return
+
+    // Snapshot then clear: edits arriving during the request accumulate in fresh sets.
+    const dirtyIds = new Set(rec.dirty)
+    const deleteIds = new Set(rec.deleted)
+    rec.dirty = new Set()
+    rec.deleted = new Set()
+
+    const upserts = [...dirtyIds]
+        .map(i => rec.items.find(it => it.id === i))
+        .filter(Boolean)
+        .filter(shippable)
+        .map(sanitizeItem)
+    const deletes = [...deleteIds]
+
+    if (upserts.length === 0 && deletes.length === 0) return
+
+    rec.inFlight = true
+    try {
+        const last = await postBatchChunked(id, upserts, deletes)
+        if (last) applyServerCount(id, last.item_count, last.updated_at)
+        rec.failures = 0
+        rec.inFlight = false
+        if (rec.dirty.size || rec.deleted.size) scheduleFlush(id)
+    } catch (err) {
+        logger.error('sandboxItemsStore — flush failed', err)
+        // Re-queue the snapshot WITHOUT clobbering ids changed during the flight.
+        for (const i of dirtyIds) if (!rec.deleted.has(i)) rec.dirty.add(i)
+        for (const i of deleteIds) if (!rec.dirty.has(i)) rec.deleted.add(i)
+        if (rec.failures === 0) toast.error('Sandbox changes saved locally — will retry.')
+        rec.failures += 1
+        rec.inFlight = false
+        const delay = BACKOFF[Math.min(rec.failures - 1, BACKOFF.length - 1)]
+        if (rec.netTimer) clearTimeout(rec.netTimer)
+        rec.netTimer = setTimeout(() => { rec.netTimer = null; flush(id) }, delay)
+    }
+}
+
+// Flush on route change / unmount: persist the cache synchronously, then fire the
+// network flush (it lives on this singleton, so it survives the component unmount).
+export const flushNow = (id) => {
+    const rec = boards.get(id)
+    if (!rec) return
+    if (rec.cacheTimer) { clearTimeout(rec.cacheTimer); rec.cacheTimer = null }
+    writeItems(id, rec.items)
+    if (rec.netTimer) { clearTimeout(rec.netTimer); rec.netTimer = null }
+    flush(id)
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('online', () => {
+        for (const [id, rec] of boards) {
+            if (rec.dirty.size || rec.deleted.size) flush(id)
+        }
+    })
+    const persistAll = () => { for (const id of boards.keys()) flushNow(id) }
+    window.addEventListener('pagehide', persistAll)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') persistAll()
+    })
+}

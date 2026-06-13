@@ -343,7 +343,7 @@ function App() {
   return (
 
     <SettingsProvider authFetch={authFetch} API={API} isAuthed={isAuthed}>
-    <ApiProvider authFetch={authFetch} API={API}>
+    <ApiProvider authFetch={authFetch} API={API} isAuthed={isAuthed}>
     <SandboxViewProvider>
     <div style={style}>
 

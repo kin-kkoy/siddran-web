@@ -2,8 +2,8 @@ import { createContext, useContext, useMemo } from 'react'
 
 const ApiContext = createContext(null)
 
-export function ApiProvider({ authFetch, API, children }) {
-    const value = useMemo(() => ({ authFetch, API }), [authFetch, API])
+export function ApiProvider({ authFetch, API, isAuthed, children }) {
+    const value = useMemo(() => ({ authFetch, API, isAuthed }), [authFetch, API, isAuthed])
     return <ApiContext.Provider value={value}>{children}</ApiContext.Provider>
 }
 

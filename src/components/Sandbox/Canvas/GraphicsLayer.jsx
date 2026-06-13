@@ -2,6 +2,7 @@ import { Layer, Group, Shape, Rect, Ellipse, Line, Arrow, Text, Image as KonvaIm
 import { memo, useCallback } from 'react'
 import { drawStrokePath } from './strokeOutline'
 import { useKonvaImage } from '../../../hooks/useKonvaImage'
+import { resolveImageUrl } from '../../../utils/imageUpload'
 import { renderShape, isLineKind } from '../shapes/registry'
 
 /**
@@ -164,7 +165,9 @@ const CommittedShape = memo(function CommittedShape({ item, hideText = false }) 
 
 const CommittedImage = memo(function CommittedImage({ item }) {
     const p = item.payload || {}
-    const img = useKonvaImage(p.src)
+    // payload.url is the R2 path; p.src is the legacy base64 fallback for items not
+    // yet migrated. resolveImageUrl passes data:/blob:/http through untouched.
+    const img = useKonvaImage(resolveImageUrl(p.url ?? p.src))
     const { x, y, rotation, w, h } = centerProps(item)
     if (!img) return null
     return (

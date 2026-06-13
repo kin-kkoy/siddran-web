@@ -22,6 +22,8 @@ import { unionAABB } from '../../components/Sandbox/selection/snapping'
 import { exportStagePNG } from '../../components/Sandbox/Canvas/exportImage'
 import ShortcutsModal from '../../components/Sandbox/Toolbar/ShortcutsModal'
 import { useSandboxView } from '../../contexts/SandboxViewContext'
+import { useApi } from '../../contexts/ApiContext'
+import { uploadImageFile } from '../../utils/imageUpload'
 import { toast } from '../../utils/toast'
 
 const CARD_TYPES = new Set(['note', 'task', 'text'])
@@ -36,7 +38,7 @@ const isEditable = (el) => {
 // chosen with the mouse/pen instead.
 const TOOL_KEYS = { v: 'pointer', g: 'lasso', p: 'pen', e: 'eraser', t: 'text', h: 'hand' }
 
-// Load + (if large) downscale an image File into a storable dataURL.
+// Load an image File into an <img> so we can read its natural size.
 function loadImageFile(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader()
@@ -50,19 +52,21 @@ function loadImageFile(file) {
         reader.readAsDataURL(file)
     })
 }
-async function prepareImage(file, maxStore = 1280) {
-    const { img, dataURL } = await loadImageFile(file)
+// Read natural dims and produce a Blob to upload to R2. Large images are downscaled
+// to a JPEG blob (keeps R2 objects small); small ones upload as-is.
+async function prepareImageBlob(file, maxStore = 1280) {
+    const { img } = await loadImageFile(file)
     const nW = img.naturalWidth, nH = img.naturalHeight
-    let src = dataURL
-    if (Math.max(nW, nH) > maxStore) {
-        const scale = maxStore / Math.max(nW, nH)
-        const cw = Math.round(nW * scale), ch = Math.round(nH * scale)
-        const c = document.createElement('canvas')
-        c.width = cw; c.height = ch
-        c.getContext('2d').drawImage(img, 0, 0, cw, ch)
-        src = c.toDataURL('image/jpeg', 0.85)
+    if (Math.max(nW, nH) <= maxStore) {
+        return { blob: file, naturalW: nW, naturalH: nH }
     }
-    return { src, naturalW: nW, naturalH: nH }
+    const scale = maxStore / Math.max(nW, nH)
+    const cw = Math.round(nW * scale), ch = Math.round(nH * scale)
+    const c = document.createElement('canvas')
+    c.width = cw; c.height = ch
+    c.getContext('2d').drawImage(img, 0, 0, cw, ch)
+    const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.85))
+    return { blob: blob || file, naturalW: nW, naturalH: nH }
 }
 
 function SandBoxPage({ notes, tasks = [], toggleTaskCompletion, mode = 'full', sandboxIdOverride }) {
@@ -70,6 +74,7 @@ function SandBoxPage({ notes, tasks = [], toggleTaskCompletion, mode = 'full', s
     const sandboxId = sandboxIdOverride ?? paramId
     const navigate = useNavigate()
     const view = useSandboxView()
+    const { authFetch, API } = useApi()
 
     const { sandboxes, rename, touch } = useSandboxes()
     const sandbox = sandboxes.find(s => s.id === sandboxId)
@@ -231,18 +236,35 @@ function SandBoxPage({ notes, tasks = [], toggleTaskCompletion, mode = 'full', s
     }, [act, nextZ, canvas, bump])
 
     const placeImageFile = useCallback(async (file, world) => {
+        let created
+        let localUrl
         try {
-            const { src, naturalW, naturalH } = await prepareImage(file)
+            const { blob, naturalW, naturalH } = await prepareImageBlob(file)
             let w = naturalW, h = naturalH
             const maxDisp = 480
             if (Math.max(w, h) > maxDisp) { const s = maxDisp / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s) }
             const at = world || centerWorld()
-            act.addItem({ type: 'image', x: at.x - w / 2, y: at.y - h / 2, w, h, rotation: 0, z_index: nextZ(), payload: { src, naturalW, naturalH } })
+            // Insert optimistically with a local blob preview so it shows + undoes
+            // instantly; the real R2 upload happens in the background.
+            localUrl = URL.createObjectURL(blob)
+            created = act.addItem({ type: 'image', x: at.x - w / 2, y: at.y - h / 2, w, h, rotation: 0, z_index: nextZ(), payload: { url: localUrl, naturalW, naturalH, _uploading: true } })
             bump()
+
+            try {
+                const { path } = await uploadImageFile(authFetch, API, blob)
+                // Raw mutator (base.updateItem) so the URL swap doesn't create an undo
+                // step; it re-marks the item dirty so the R2 path syncs.
+                base.updateItem(created.id, { payload: { url: path, naturalW, naturalH } })
+                URL.revokeObjectURL(localUrl)
+            } catch (err) {
+                base.updateItem(created.id, { payload: { url: localUrl, naturalW, naturalH, _uploadFailed: true } })
+                toast.error(err?.message || 'Image upload failed — re-add it to save.')
+            }
         } catch {
+            if (localUrl) URL.revokeObjectURL(localUrl)
             toast.error('Could not load that image.')
         }
-    }, [act, nextZ, centerWorld, bump])
+    }, [act, base, nextZ, centerWorld, bump, authFetch, API])
 
     const onImageDrop = useCallback((file, world) => { placeImageFile(file, world) }, [placeImageFile])
 

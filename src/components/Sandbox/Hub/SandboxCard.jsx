@@ -23,7 +23,9 @@ const MOSAIC_CELLS = 32
 
 function SandboxCard({ sandbox, onDelete, summary }) {
     const navigate = useNavigate()
-    const count = summary?.count ?? 0
+    // Prefer the server's denormalized count (shows for boards synced from another
+    // device before their items are cached locally); fall back to the cache summary.
+    const count = sandbox?.item_count ?? summary?.count ?? 0
     const buckets = summary?.buckets ?? []
 
     return (
