@@ -2,7 +2,7 @@ import TimeGrid from './TimeGrid.jsx'
 import { weekDays, isoDate } from '../calendarDates'
 
 // Week view = the shared TimeGrid over the Monday-start week containing `anchor` (a Date).
-export default function WeekView({ anchor, itemsAt, onSlotClick, onEventClick, onRetime }) {
+export default function WeekView({ anchor, itemsAt, onSlotClick, onEventClick, onRetime, onToggleDaily }) {
     const days = weekDays(anchor).map(isoDate)
     return (
         <TimeGrid
@@ -11,6 +11,7 @@ export default function WeekView({ anchor, itemsAt, onSlotClick, onEventClick, o
             onSlotClick={onSlotClick}
             onEventClick={onEventClick}
             onRetime={onRetime}
+            onToggleDaily={onToggleDaily}
         />
     )
 }

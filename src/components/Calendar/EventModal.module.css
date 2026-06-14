@@ -177,6 +177,22 @@
   font-weight: 600;
 }
 .saveBtn:hover { filter: brightness(1.08); }
+
+/* Deep-link banner shown for blocks linked to a note/task/daily/project/sandbox. */
+.openLink {
+  width: 100%;
+  text-align: left;
+  background: var(--accent-warning-alpha);
+  border: 1px solid var(--border-default);
+  border-left: 2px solid var(--accent-warning);
+  border-radius: 6px;
+  padding: 9px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  cursor: pointer;
+}
+.openLink:hover { border-color: var(--accent-warning); background: var(--bg-hover); }
 .deleteBtn {
   display: inline-flex;
   align-items: center;

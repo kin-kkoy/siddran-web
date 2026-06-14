@@ -109,6 +109,28 @@
   text-decoration: line-through;
 }
 
+/* Per-day check-off for recurring daily chips. */
+.dailyCheck {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  margin-right: 5px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--accent-warning);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+.dailyCheck:hover { border-color: var(--accent-warning); }
+.dailyCheckOn { background: var(--accent-warning-alpha); border-color: var(--accent-warning); }
+
 .more {
   font-family: var(--font-mono);
   font-size: 9px;

@@ -29,7 +29,7 @@ function srcClass(item) {
 // cell calls onDayClick (quick-add + focus); clicking a chip calls onEventClick. Dragging a
 // chip onto another day calls onRetime(item, newDayISO) — daily chips are recurrence-bound and
 // not draggable.
-export default function MonthView({ monthDate, focusedDay, itemsAt, onDayClick, onEventClick, onRetime }) {
+export default function MonthView({ monthDate, focusedDay, itemsAt, onDayClick, onEventClick, onRetime, onToggleDaily }) {
     const days = monthGridDays(monthDate)
 
     // Drag bookkeeping kept in a ref so pointer-move doesn't re-render the whole grid; only the
@@ -126,6 +126,14 @@ export default function MonthView({ monthDate, focusedDay, itemsAt, onDayClick, 
                                     onPointerMove={draggable ? onChipPointerMove : undefined}
                                     onPointerUp={draggable ? (e) => { e.stopPropagation(); onChipPointerUp(e, it) } : undefined}
                                 >
+                                    {it.kind === 'daily' && onToggleDaily && (
+                                        <button
+                                            className={`${styles.dailyCheck} ${it.done ? styles.dailyCheckOn : ''}`}
+                                            aria-label={it.done ? 'Mark not done' : 'Mark done'}
+                                            onPointerDown={(e) => e.stopPropagation()}
+                                            onClick={(e) => { e.stopPropagation(); onToggleDaily(it.id, it.day, !it.done) }}
+                                        >{it.done ? '✓' : ''}</button>
+                                    )}
                                     {it.title}
                                 </div>
                             )

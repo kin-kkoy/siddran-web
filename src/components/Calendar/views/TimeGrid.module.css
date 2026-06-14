@@ -203,6 +203,23 @@
 .draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .draggable:active { cursor: grabbing; }
 
+/* Per-day check-off for recurring daily chips. */
+.dailyCheck {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 13px; height: 13px;
+  padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--accent-warning);
+  font-size: 10px; line-height: 1;
+  cursor: pointer;
+}
+.dailyCheck:hover { border-color: var(--accent-warning); }
+.dailyCheckOn { background: var(--accent-warning-alpha); border-color: var(--accent-warning); }
+
 /* ── Drag ghost ── */
 .ghost {
   position: fixed;

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { FiChevronLeft, FiChevronRight, FiMinimize2 } from 'react-icons/fi'
 import styles from './Calendar.module.css'
 import MonthView from '../../components/Calendar/views/MonthView.jsx'
@@ -17,9 +18,25 @@ const VIEWS = ['day', 'week', 'month']
 // Full-route Calendar (also rendered in the half-split pane via mode="half"). View + focused day
 // live in CalendarViewContext so the peek, the route, and the half pane all stay in sync. Calendar
 // data + task mutations are passed in from App (shared with the peek — single fetch).
-function Calendar({ events, addEvent, updateEvent, deleteEvent, dailyTasks, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
+function Calendar({ events, addEvent, updateEvent, deleteEvent, dailyTasks, dailyCompletions, onToggleDaily, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
     const { view, setView, focusedDay, setFocusedDay, unpin } = useCalendarView()
+    const navigate = useNavigate()
     const [modal, setModal] = useState(null) // { mode, draft } | null
+
+    // Deep-link a linked block to its target. note/sandbox have real detail routes; task/daily/
+    // project open their detail modal in TasksHub via a query param the TasksHub bridge consumes.
+    const handleOpenLink = useCallback((refType, refId) => {
+        if (!refType || !refId) return
+        switch (refType) {
+            case 'note': navigate(`/notes/${refId}`); break
+            case 'sandbox': navigate(`/sandboxes/${refId}`); break
+            case 'task': navigate(`/tasks?task=${refId}`); break
+            case 'daily': navigate(`/tasks?daily=${refId}`); break
+            case 'project': navigate(`/tasks?bundle=${refId}`); break
+            default: break
+        }
+        setModal(null)
+    }, [navigate])
 
     // Tell App to start fetching calendar data (lazy-load) when this route/pane mounts.
     useEffect(() => { onActivate?.() }, [onActivate])
@@ -39,7 +56,7 @@ function Calendar({ events, addEvent, updateEvent, deleteEvent, dailyTasks, task
         return { from: anchor, to: anchor }
     }, [view, monthDate, anchor])
 
-    const { itemsAt, retime } = useCalendar({ events, tasks, dailyTasks, range, updateEvent, updateTask: onTaskRetime })
+    const { itemsAt, retime } = useCalendar({ events, tasks, dailyTasks, dailyCompletions, range, updateEvent, updateTask: onTaskRetime })
 
     const shift = (dir) => {
         if (view === 'month') setFocusedDay(isoDate(new Date(anchor.getFullYear(), anchor.getMonth() + dir, Math.min(anchor.getDate(), 28))))
@@ -81,6 +98,8 @@ function Calendar({ events, addEvent, updateEvent, deleteEvent, dailyTasks, task
                 startTime: e.all_day ? '09:00' : timeOf(e.start_at),
                 endTime: e.end_at ? timeOf(e.end_at) : '',
                 color: e.color || null,
+                ref_type: e.ref_type || null,
+                ref_id: e.ref_id || null,
             },
         })
     }, [])
@@ -120,17 +139,17 @@ function Calendar({ events, addEvent, updateEvent, deleteEvent, dailyTasks, task
             </div>
 
             {view === 'month' && (
-                <MonthView monthDate={monthDate} focusedDay={focusedDay} itemsAt={itemsAt} onDayClick={handleDayClick} onEventClick={handleEventClick} onRetime={retime} />
+                <MonthView monthDate={monthDate} focusedDay={focusedDay} itemsAt={itemsAt} onDayClick={handleDayClick} onEventClick={handleEventClick} onRetime={retime} onToggleDaily={onToggleDaily} />
             )}
             {view === 'week' && (
-                <WeekView anchor={anchor} itemsAt={itemsAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} />
+                <WeekView anchor={anchor} itemsAt={itemsAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onToggleDaily={onToggleDaily} />
             )}
             {view === 'day' && (
-                <DayView dayISO={focusedDay} itemsAt={itemsAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} undated={undated} onSchedule={handleSchedule} />
+                <DayView dayISO={focusedDay} itemsAt={itemsAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} undated={undated} onSchedule={handleSchedule} onToggleDaily={onToggleDaily} />
             )}
 
             {modal && (
-                <EventModal mode={modal.mode} draft={modal.draft} onSave={handleSave} onDelete={handleDelete} onClose={() => setModal(null)} />
+                <EventModal mode={modal.mode} draft={modal.draft} onSave={handleSave} onDelete={handleDelete} onClose={() => setModal(null)} onOpenLink={handleOpenLink} />
             )}
         </div>
     )

@@ -15,7 +15,7 @@ const COLLAPSE_KEY = 'cinder_cal_peek_collapsed'
 // Root-mounted peek drawer (fixed, right edge). Only renders in 'peek' mode — 'half' is rendered
 // by the app shell as a split pane, 'hidden'/'full' render nothing here. Mirrors the Sandbox dock
 // pattern (without touching any Sandbox file).
-export default function CalendarPeek({ events, tasks, dailyTasks, addEvent }) {
+export default function CalendarPeek({ events, tasks, dailyTasks, dailyCompletions, onToggleDaily, addEvent }) {
     const cal = useCalendarView()
     const navigate = useNavigate()
 
@@ -49,7 +49,7 @@ export default function CalendarPeek({ events, tasks, dailyTasks, addEvent }) {
         const d = monthGridDays(monthDate)
         return { from: d[0], to: d[d.length - 1] }
     }, [monthDate])
-    const { itemsAt } = useCalendar({ events, tasks, dailyTasks, range: monthRange })
+    const { itemsAt } = useCalendar({ events, tasks, dailyTasks, dailyCompletions, range: monthRange })
 
     const todayISO = isoDate(new Date())
     const todayItems = itemsAt(todayISO)
@@ -97,7 +97,7 @@ export default function CalendarPeek({ events, tasks, dailyTasks, addEvent }) {
                     </AccordionSection>
 
                     <AccordionSection label="Today" meta={`${todayItems.length} items`} collapsed={collapsed.today} onToggle={() => toggleSection('today')}>
-                        <FocusedDayList items={todayItems} emptyText="Nothing on today's plate." />
+                        <FocusedDayList items={todayItems} emptyText="Nothing on today's plate." onToggleDaily={onToggleDaily} />
                     </AccordionSection>
 
                     <AccordionSection label="Quick Add" meta="⌘⏎" collapsed={collapsed.quick} onToggle={() => toggleSection('quick')}>
@@ -105,7 +105,7 @@ export default function CalendarPeek({ events, tasks, dailyTasks, addEvent }) {
                     </AccordionSection>
 
                     <AccordionSection label={`On ${dayFullLabel(cal.focusedDay)}`} meta={`${focusedItems.length} items`} collapsed={collapsed.focused} onToggle={() => toggleSection('focused')}>
-                        <FocusedDayList items={focusedItems} emptyText="No items on this day." />
+                        <FocusedDayList items={focusedItems} emptyText="No items on this day." onToggleDaily={onToggleDaily} />
                     </AccordionSection>
                 </div>
 

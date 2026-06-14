@@ -133,6 +133,22 @@
 .evtTime { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); letter-spacing: 0.08em; }
 .evtDone { color: var(--text-muted); }
 .evtDone .evtBody { text-decoration: line-through; }
+
+/* Per-day check-off for recurring daily items. */
+.dailyCheck {
+  flex: 0 0 auto;
+  width: 16px; height: 16px;
+  padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--accent-warning);
+  font-size: 11px; line-height: 1;
+  cursor: pointer;
+}
+.dailyCheck:hover { border-color: var(--accent-warning); }
+.dailyCheckOn { background: var(--accent-warning-alpha); border-color: var(--accent-warning); }
 .srcNote { border-left-color: var(--src-note); }
 .srcTask { border-left-color: var(--src-task); }
 .srcDaily { border-left-color: var(--src-daily); }

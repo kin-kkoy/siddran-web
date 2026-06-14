@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react"
+import { useSearchParams } from "react-router-dom"
+import { toast } from "../../utils/toast"
 import TaskCard from "../../components/Tasks/TaskCard"
 import AddTaskCard from "../../components/Tasks/AddTaskCard"
 import styles from './TasksHub.module.css'
@@ -15,6 +17,8 @@ import Skeleton from "../../components/Common/Skeleton"
 import { useCalendarView } from '../../contexts/CalendarViewContext'
 
 function TasksHub({
+  authFetch,
+  API,
   tasks,
   dailyTasks,
   tasksPagination,
@@ -66,6 +70,48 @@ function TasksHub({
   const [openDailyTask, setOpenDailyTask] = useState(null)
   const [openBundle, setOpenBundle] = useState(null)
   const [isDailyCardOpen, setIsDailyCardOpen] = useState(false)
+
+  // Calendar deep-link bridge: ?task= / ?daily= / ?bundle= opens that item's detail modal, then
+  // clears the param. The object is fetched by-id (works even if it's past the loaded page); a
+  // missing/orphaned target degrades gracefully (toast, no modal).
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const taskId = searchParams.get('task')
+    const dailyId = searchParams.get('daily')
+    const bundleId = searchParams.get('bundle')
+    if (!taskId && !dailyId && !bundleId) return
+
+    let cancelled = false
+    const fetchById = async (resource, id) => {
+      try {
+        const res = await authFetch(`${API}/${resource}/${id}`)
+        if (!res.ok) { toast.error('That linked item no longer exists.'); return null }
+        return await res.json()
+      } catch {
+        toast.error('Could not open that linked item.')
+        return null
+      }
+    }
+
+    const open = async () => {
+      let obj = null
+      if (taskId) obj = await fetchById('tasks', taskId)
+      else if (dailyId) obj = await fetchById('daily-tasks', dailyId)
+      else if (bundleId) obj = await fetchById('projects', bundleId)
+      if (cancelled) return
+      if (obj) {
+        if (taskId) setOpenTask(obj)
+        else if (dailyId) setOpenDailyTask(obj)
+        else if (bundleId) setOpenBundle(obj)
+      }
+      const next = new URLSearchParams(searchParams)
+      next.delete('task'); next.delete('daily'); next.delete('bundle')
+      setSearchParams(next, { replace: true })
+    }
+    open()
+    return () => { cancelled = true }
+  }, [searchParams, authFetch, API, setSearchParams])
+
   const tasksSentinelRef = useRef(null)
   const dailyTasksSentinelRef = useRef(null)
   const bundlesSentinelRef = useRef(null)

@@ -20,7 +20,7 @@ function srcClass(item) {
     return styles.srcEvent
 }
 
-function FocusedDayList({ items, emptyText }) {
+function FocusedDayList({ items, emptyText, onToggleDaily }) {
     if (!items.length) {
         return <div className={styles.empty}>{emptyText || 'Nothing here.'}</div>
     }
@@ -33,6 +33,13 @@ function FocusedDayList({ items, emptyText }) {
                     style={it.color ? { borderLeftColor: it.color } : undefined}
                     title={it.title}
                 >
+                    {it.kind === 'daily' && onToggleDaily && (
+                        <button
+                            className={`${styles.dailyCheck} ${it.done ? styles.dailyCheckOn : ''}`}
+                            aria-label={it.done ? 'Mark not done' : 'Mark done'}
+                            onClick={() => onToggleDaily(it.id, it.day, !it.done)}
+                        >{it.done ? '✓' : ''}</button>
+                    )}
                     <span className={styles.evtBody}>{it.title}</span>
                     {it.time && <span className={styles.evtTime}>{it.time}</span>}
                 </div>

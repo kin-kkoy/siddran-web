@@ -22,7 +22,9 @@ const SWATCHES = [
     { name: 'Red',    value: '#e05c5c' },
 ]
 
-export default function EventModal({ mode, draft, onSave, onDelete, onClose }) {
+const REF_LABEL = { note: 'note', task: 'task', daily: 'daily', project: 'project', sandbox: 'sandbox' }
+
+export default function EventModal({ mode, draft, onSave, onDelete, onClose, onOpenLink }) {
     const [title, setTitle] = useState(draft.title || '')
     const [day, setDay] = useState(draft.day)
     const [allDay, setAllDay] = useState(draft.all_day ?? true)
@@ -57,6 +59,12 @@ export default function EventModal({ mode, draft, onSave, onDelete, onClose }) {
                 </div>
 
                 <div className={styles.body}>
+                    {draft.ref_type && draft.ref_id && (
+                        <button className={styles.openLink} onClick={() => onOpenLink?.(draft.ref_type, draft.ref_id)}>
+                            Open linked {REF_LABEL[draft.ref_type] || 'item'} →
+                        </button>
+                    )}
+
                     <input
                         className={styles.titleInput}
                         type="text"

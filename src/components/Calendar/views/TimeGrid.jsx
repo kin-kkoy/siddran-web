@@ -42,7 +42,7 @@ function srcClass(item) {
 // to fit its blocks — no overlap, no absolute positioning. Day lays a cell's blocks side-by-side;
 // Week stacks them (narrow columns). All-day items sit in the all-day row. Clicking a cell creates
 // a block at that hour; dragging a block onto a cell moves it to that hour/day.
-export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onRetime }) {
+export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onRetime, onToggleDaily }) {
     const sideBySide = days.length === 1 // Day view → side-by-side; Week → stacked
     const nowHour = new Date().getHours()
 
@@ -164,6 +164,14 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
                 onPointerMove={draggable ? onChipPointerMove : undefined}
                 onPointerUp={draggable ? (e) => { e.stopPropagation(); onChipPointerUp(e, it) } : undefined}
             >
+                {it.kind === 'daily' && onToggleDaily && (
+                    <button
+                        className={`${styles.dailyCheck} ${it.done ? styles.dailyCheckOn : ''}`}
+                        aria-label={it.done ? 'Mark not done' : 'Mark done'}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); onToggleDaily(it.id, it.day, !it.done) }}
+                    >{it.done ? '✓' : ''}</button>
+                )}
                 {showTime && it.time && <span className={styles.chipTime}>{it.time}</span>}
                 <span className={styles.chipTitle}>{it.title}</span>
             </div>

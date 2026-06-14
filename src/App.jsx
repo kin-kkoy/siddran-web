@@ -19,6 +19,7 @@ import { useNotes } from "./hooks/useNotes.js"
 import { useTasks } from "./hooks/useTasks.js"
 import { useCalendarEvents } from "./hooks/useCalendarEvents.js"
 import { useCalendarTasks } from "./hooks/useCalendarTasks.js"
+import { useCalendarDailies } from "./hooks/useCalendarDailies.js"
 import { useCalendarView } from "./contexts/CalendarViewContext.jsx"
 import CalendarPeek from "./components/Calendar/Peek/CalendarPeek.jsx"
 import { SettingsProvider } from "./contexts/SettingsContext.jsx"
@@ -278,6 +279,10 @@ function App() {
   const {
     tasks: calendarTasks, undated: calendarUndated, retimeTask, scheduleTask
   } = useCalendarTasks(authFetch, API, isAuthed && calendarActive)
+  // Recurring dailies + per-day completions (gated the same way so non-calendar pages stay quiet).
+  const {
+    recurringDailies, completions: dailyCompletions, toggleCompletion
+  } = useCalendarDailies(authFetch, API, isAuthed && calendarActive)
 
   // Calendar owns the PUT; patchTaskInCache also syncs the app-level useTasks cache so TasksHub
   // reflects new dates live (no extra request).
@@ -317,7 +322,9 @@ function App() {
   const calendarProps = {
     events: calendarEvents,
     addEvent, updateEvent, deleteEvent,
-    dailyTasks,
+    dailyTasks: recurringDailies, // all recurring dailies (not useTasks' paginated first page)
+    dailyCompletions,
+    onToggleDaily: toggleCompletion,
     tasks: calendarTasks,
     undated: calendarUndated,
     onTaskRetime, onTaskSchedule,
@@ -381,6 +388,8 @@ function App() {
   )
   const tasksHubElement = (
     <TasksHub
+      authFetch={authFetch}
+      API={API}
       tasks={tasks}
       dailyTasks={dailyTasks}
       tasksPagination={tasksPagination}
@@ -582,7 +591,9 @@ function App() {
           <CalendarPeek
             events={calendarEvents}
             tasks={calendarTasks}
-            dailyTasks={dailyTasks}
+            dailyTasks={recurringDailies}
+            dailyCompletions={dailyCompletions}
+            onToggleDaily={toggleCompletion}
             addEvent={addEvent}
           />
         )}
