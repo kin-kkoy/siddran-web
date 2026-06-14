@@ -85,8 +85,7 @@ export default function MonthView({ monthDate, focusedDay, itemsAt, onDayClick, 
                 const iso = isoDate(d)
                 const dim = d.getMonth() !== monthDate.getMonth()
                 const items = itemsAt(iso)
-                const shown = items.slice(0, 3)
-                const more = items.length - shown.length
+                const shown = items // cells expand to show every item (no "+N more" cap)
 
                 const cellCls = [
                     styles.cell,
@@ -138,8 +137,6 @@ export default function MonthView({ monthDate, focusedDay, itemsAt, onDayClick, 
                                 </div>
                             )
                         })}
-
-                        {more > 0 && <span className={styles.more}>+ {more} more</span>}
                     </div>
                 )
             })}

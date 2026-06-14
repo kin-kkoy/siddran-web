@@ -10,7 +10,7 @@ import { useCalendar } from '../../hooks/useCalendar.js'
 import { useCalendarView } from '../../contexts/CalendarViewContext.jsx'
 import {
     isoDate, parseISODate, monthGridDays, mondayOf, addDays,
-    MONTH_NAMES, MONTH_NAMES_SHORT, DAY_NAMES, timeOf, taskDueStamp,
+    MONTH_NAMES, MONTH_NAMES_SHORT, DAY_NAMES, timeOf, taskDueStamp, toISOFromParts,
 } from '../../components/Calendar/calendarDates.js'
 
 const VIEWS = ['day', 'week', 'month']
@@ -113,6 +113,14 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
     const handleDelete = useCallback((id) => { deleteEvent(id); setModal(null) }, [deleteEvent])
     const handleSchedule = useCallback((taskId, dayISO, time) => { onTaskSchedule(taskId, taskDueStamp(dayISO, time)) }, [onTaskSchedule])
 
+    // Drag-resize a block's bottom edge → rewrite its end_at (blocks only; tasks/dailies have no
+    // editable duration on the grid).
+    const handleResize = useCallback((item, dayISO, endTime) => {
+        if (item.kind !== 'event') return
+        const newEndISO = toISOFromParts(dayISO, endTime)
+        if (newEndISO) updateEvent(item.source.id, { end_at: newEndISO })
+    }, [updateEvent])
+
     return (
         <div className={`${styles.page} ${mode === 'half' ? styles.pageHalf : ''}`}>
             <div className={styles.head}>
@@ -142,10 +150,10 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
                 <MonthView monthDate={monthDate} focusedDay={focusedDay} itemsAt={itemsAt} onDayClick={handleDayClick} onEventClick={handleEventClick} onRetime={retime} onToggleDaily={onToggleDaily} />
             )}
             {view === 'week' && (
-                <WeekView anchor={anchor} itemsAt={itemsAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onToggleDaily={onToggleDaily} />
+                <WeekView anchor={anchor} itemsAt={itemsAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} onToggleDaily={onToggleDaily} />
             )}
             {view === 'day' && (
-                <DayView dayISO={focusedDay} itemsAt={itemsAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} undated={undated} onSchedule={handleSchedule} onToggleDaily={onToggleDaily} />
+                <DayView dayISO={focusedDay} itemsAt={itemsAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} undated={undated} onSchedule={handleSchedule} onToggleDaily={onToggleDaily} />
             )}
 
             {modal && (

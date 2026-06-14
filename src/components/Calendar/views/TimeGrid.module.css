@@ -7,26 +7,25 @@
   background: var(--bg-primary);
 }
 
+/* Horizontal scroller wrapping header + all-day + timeline together, so day columns can keep a
+   real minimum width (expandable / roomy) and all three rows stay column-aligned while scrolling
+   sideways. Vertical scroll lives on .body. */
+.hscroll {
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-height: calc(100vh - 200px);
+}
+.headRow, .allDayRow { flex: 0 0 auto; }
+
 /* ── Day header ── */
 .headRow {
   display: grid;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
 }
-.gutterCorner { border-right: 1px solid var(--border-default); display: grid; place-items: center; }
-.compactBtn {
-  width: 26px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: 5px;
-  color: var(--text-muted);
-  font-size: 13px;
-  transition: color 0.15s, border-color 0.15s;
-}
-.compactBtn:hover { color: var(--accent-warning); border-color: var(--accent-warning); }
+.gutterCorner { border-right: 1px solid var(--border-default); }
 .dayHead {
   display: flex;
   align-items: baseline;
@@ -68,114 +67,14 @@
   flex-direction: column;
   gap: 2px;
   cursor: pointer;
+  min-width: 0;
 }
 .allDayCell:hover { background: var(--bg-hover); }
 
-/* ── Hour-bucket grid ── */
-.body { overflow-y: auto; max-height: calc(100vh - 240px); }
-.grid {
-  display: grid;
-  grid-auto-rows: minmax(40px, auto); /* each hour row grows to fit its blocks */
-  background: var(--bg-primary);
-}
-.timeLabel {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 3px;
-  border-top: 1px solid var(--border-default);
-  border-right: 1px solid var(--border-default);
-  padding: 4px 5px 0;
-}
-.timeLabel span {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text-muted);
-}
-.hideHourBtn {
-  opacity: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 15px;
-  line-height: 1;
-  padding: 0;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: opacity 0.12s, color 0.12s;
-}
-.timeLabel:hover .hideHourBtn { opacity: 0.7; }
-.hideHourBtn:hover { opacity: 1; color: var(--accent-warning); }
-.cell {
-  position: relative;
-  border-top: 1px solid var(--border-default);
-  border-left: 1px solid var(--border-default);
-  padding: 3px;
-  cursor: pointer;
-  display: flex;
-  gap: 3px;
-  min-width: 0;
-  transition: min-height 0.16s ease;
-}
-/* Day → cell is a column of time sub-rows; each sub-row lays same-time blocks side-by-side with
-   a gap. Week → blocks stacked vertically. */
-/* Day view is scaled up a notch — taller cells, roomier blocks. */
-.sideBySide .cell { flex-direction: column; gap: 7px; min-height: 52px; padding: 5px; }
-.subRow { display: flex; flex-flow: row wrap; gap: 7px; }
-.stacked .cell { flex-direction: column; }
-.sideBySide .chip { font-size: 13px; padding: 4px 10px; }
-.sideBySide .chipTime { font-size: 10px; }
-.cell:hover { background: var(--bg-surface); }
-.cellNow { background: rgba(240, 184, 64, 0.04); }
-.cellOver { background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--accent-warning); }
-
-/* Drag-over: cell expands (smooth) to reveal the four 15-min quarter bands; the target quarter
-   is highlighted with its time. Collapses back when the pointer leaves (min-height transition). */
-.cellDrop { min-height: 64px; background: var(--bg-surface); box-shadow: inset 0 0 0 1px var(--border-strong); }
-.dropGuide { position: absolute; inset: 0; display: flex; flex-direction: column; pointer-events: none; z-index: 5; }
-.quarter { flex: 1; border-top: 1px dashed var(--border-default); }
-.quarter:first-child { border-top: none; }
-.quarterActive { background: rgba(240, 184, 64, 0.16); box-shadow: inset 0 0 0 1px var(--accent-warning); }
-.quarterLabel { position: absolute; right: 5px; top: 1px; font-family: var(--font-mono); font-size: 9px; color: var(--accent-warning); }
-
-/* Hidden-hours bar — sits under the all-day row; hidden runs become pills (click to reveal). */
-.hiddenBar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-default);
-}
-.hiddenBarLabel {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-.hiddenPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: 4px;
-  padding: 3px 8px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-secondary);
-  transition: color 0.15s, border-color 0.15s;
-}
-.hiddenPill svg { font-size: 11px; }
-.hiddenPill:hover { color: var(--accent-warning); border-color: var(--accent-warning); }
-
-/* ── Block chips ── */
+/* All-day chip */
 .chip {
-  display: inline-flex;
-  align-items: baseline;
+  display: flex;
+  align-items: center;
   gap: 5px;
   background: var(--bg-elevated);
   border-left: 2px solid var(--accent-warning);
@@ -183,30 +82,132 @@
   padding: 2px 6px;
   font-family: var(--font-body);
   font-size: 12px;
-  line-height: 1.3;
   color: var(--text-primary);
   overflow: hidden;
-  max-width: 100%;
+  cursor: pointer;
 }
-.sideBySide .chip { width: auto; }
-.stacked .chip { width: 100%; }
-.chipTime { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); flex-shrink: 0; }
 .chipTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ── Scrollable timeline ── */
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+.grid { display: grid; background: var(--bg-primary); }
+
+/* Hour gutter (left) */
+.gutter { position: relative; border-right: 1px solid var(--border-default); }
+.hourLabel {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+}
+.hourLabel:first-child { transform: none; } /* 12 AM sits at the very top, not clipped */
+
+/* Day column */
+.col { position: relative; border-left: 1px solid var(--border-default); cursor: pointer; }
+.colToday { background: var(--accent-warning-alpha); }
+.hourLine {
+  position: absolute;
+  left: 0; right: 0;
+  border-top: 1px solid var(--border-default);
+  pointer-events: none;
+}
+
+/* Now-line */
+.nowLine {
+  position: absolute;
+  left: 0; right: 0;
+  border-top: 2px solid var(--accent-danger);
+  z-index: 6;
+  pointer-events: none;
+}
+.nowDot {
+  position: absolute;
+  left: -3px; top: -4px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent-danger);
+}
+
+/* Positioned event block */
+.block {
+  position: absolute;
+  border-radius: 5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-left: 2px solid var(--accent-warning);
+  padding: 2px 6px;
+  overflow: hidden;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  z-index: 4;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.block:hover { background: var(--bg-hover); z-index: 5; }
+.blockBody { display: flex; align-items: flex-start; gap: 5px; overflow: hidden; }
+.bTime { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); flex-shrink: 0; padding-top: 1px; }
+/* Word-wrap (not letter-wrap): titles wrap on spaces, only breaking a word if it can't fit. */
+.bTitle { flex: 1; min-width: 0; font-size: 12px; line-height: 1.3; white-space: normal; overflow-wrap: break-word; word-break: normal; }
+.dim { opacity: 0.4; }
+
+.draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.draggable:active { cursor: grabbing; }
+
+/* Bottom resize handle (blocks only) */
+.resizeHandle {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 7px;
+  cursor: ns-resize;
+}
+.resizeHandle::after {
+  content: "";
+  position: absolute;
+  left: 50%; bottom: 2px;
+  transform: translateX(-50%);
+  width: 18px; height: 2px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.block:hover .resizeHandle::after { opacity: 1; }
+
+/* Live drag/resize preview */
+.preview {
+  position: absolute;
+  left: 1px; right: 1px;
+  border: 1px dashed var(--accent-warning);
+  background: var(--accent-warning-alpha);
+  border-radius: 5px;
+  z-index: 8;
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--accent-warning);
+  padding: 2px 5px;
+}
+
+/* Source-colour accents (block left border + all-day chip) */
 .srcNote    { border-left-color: var(--src-note); }
 .srcTask    { border-left-color: var(--src-task); }
 .srcDaily   { border-left-color: var(--src-daily); }
 .srcBundle  { border-left-color: var(--src-bundle); }
 .srcSandbox { border-left-color: var(--src-sandbox); }
 .srcEvent   { border-left-color: var(--accent-warning); }
-/* Dim the whole chip when done, but strike ONLY the title text — not the daily checkbox
-   (a flex item: a chip-level line-through would draw across the checkbox box too). */
-.done { color: var(--text-muted); }
-.done .chipTitle { text-decoration: line-through; }
-.draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
-.draggable:active { cursor: grabbing; }
 
-/* Per-day check-off for recurring daily chips. */
+/* Done: dim the block/chip but strike ONLY the title text, not the daily checkbox. */
+.done { color: var(--text-muted); }
+.done .bTitle, .done .chipTitle { text-decoration: line-through; }
+
+/* Per-day check-off for recurring daily items */
 .dailyCheck {
   flex: 0 0 auto;
   align-self: center;
@@ -222,24 +223,3 @@
 }
 .dailyCheck:hover { border-color: var(--accent-warning); }
 .dailyCheckOn { background: var(--accent-warning-alpha); border-color: var(--accent-warning); }
-
-/* ── Drag ghost ── */
-.ghost {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 1001;
-  pointer-events: none;
-  background: var(--bg-elevated);
-  border: 1px solid var(--accent-warning);
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-family: var(--font-body);
-  font-size: 12px;
-  color: var(--text-primary);
-  max-width: 220px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  box-shadow: 0 6px 18px var(--shadow-color);
-}

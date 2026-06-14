@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import styles from './UnscheduledDrawer.module.css'
-import { slotFromPoint } from './timeGridGeom'
+import { pointToDayTime, snap15, minutesToTime } from './timeGridGeom'
 
 const DRAG_THRESHOLD = 4
 
@@ -35,8 +35,8 @@ export default function UnscheduledDrawer({ tasks, onSchedule }) {
         try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* no-op */ }
         setDragTitle(null)
         if (st?.dragging) {
-            const slot = slotFromPoint(e.clientX, e.clientY)
-            if (slot) onSchedule(st.task.id, slot.day, slot.time)
+            const pt = pointToDayTime(e.clientX, e.clientY)
+            if (pt) onSchedule(st.task.id, pt.day, minutesToTime(snap15(pt.minutes)))
         }
     }
 
