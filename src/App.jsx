@@ -320,6 +320,7 @@ function App() {
 
   // Props shared by the /calendar route and the half-split pane.
   const calendarProps = {
+    authFetch, API,
     events: calendarEvents,
     addEvent, updateEvent, deleteEvent,
     dailyTasks: recurringDailies, // all recurring dailies (not useTasks' paginated first page)

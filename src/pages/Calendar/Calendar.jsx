@@ -18,7 +18,7 @@ const VIEWS = ['day', 'week', 'month']
 // Full-route Calendar (also rendered in the half-split pane via mode="half"). View + focused day
 // live in CalendarViewContext so the peek, the route, and the half pane all stay in sync. Calendar
 // data + task mutations are passed in from App (shared with the peek — single fetch).
-function Calendar({ events, addEvent, updateEvent, deleteEvent, dailyTasks, dailyCompletions, onToggleDaily, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
+function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, dailyTasks, dailyCompletions, onToggleDaily, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
     const { view, setView, focusedDay, setFocusedDay, unpin } = useCalendarView()
     const navigate = useNavigate()
     const [modal, setModal] = useState(null) // { mode, draft } | null
@@ -149,7 +149,7 @@ function Calendar({ events, addEvent, updateEvent, deleteEvent, dailyTasks, dail
             )}
 
             {modal && (
-                <EventModal mode={modal.mode} draft={modal.draft} onSave={handleSave} onDelete={handleDelete} onClose={() => setModal(null)} onOpenLink={handleOpenLink} />
+                <EventModal mode={modal.mode} draft={modal.draft} onSave={handleSave} onDelete={handleDelete} onClose={() => setModal(null)} onOpenLink={handleOpenLink} authFetch={authFetch} API={API} />
             )}
         </div>
     )

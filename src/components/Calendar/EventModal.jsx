@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { HiOutlineTrash } from 'react-icons/hi'
 import styles from './EventModal.module.css'
 import { toISOFromParts } from './calendarDates'
 import { toast } from '../../utils/toast'
+import logger from '../../utils/logger'
 
 // Create / edit a standalone calendar block (a "sticky"/event). Linking a block to an existing
 // note/task/etc. is a later phase (P5); this P1 modal handles title / day / time / colour.
@@ -24,13 +25,62 @@ const SWATCHES = [
 
 const REF_LABEL = { note: 'note', task: 'task', daily: 'daily', project: 'project', sandbox: 'sandbox' }
 
-export default function EventModal({ mode, draft, onSave, onDelete, onClose, onOpenLink }) {
+const REF_OPTIONS = [
+    { value: '',        label: 'No link' },
+    { value: 'note',    label: 'Note' },
+    { value: 'task',    label: 'Task' },
+    { value: 'daily',   label: 'Daily' },
+    { value: 'project', label: 'Project' },
+    { value: 'sandbox', label: 'Sandbox' },
+]
+
+// ref_type → how to fetch its id+title candidates. Sandboxes reuse the existing list endpoint
+// (it already returns all id+title and must not be modified); the rest use ?picker=1.
+const PICKER = {
+    note:    { path: 'notes?picker=1',       key: 'items' },
+    task:    { path: 'tasks?picker=1',       key: 'items' },
+    daily:   { path: 'daily-tasks?picker=1', key: 'items' },
+    project: { path: 'projects?picker=1',    key: 'items' },
+    sandbox: { path: 'sandboxes',            key: 'sandboxes' },
+}
+
+export default function EventModal({ mode, draft, onSave, onDelete, onClose, onOpenLink, authFetch, API }) {
     const [title, setTitle] = useState(draft.title || '')
     const [day, setDay] = useState(draft.day)
     const [allDay, setAllDay] = useState(draft.all_day ?? true)
     const [startTime, setStartTime] = useState(draft.startTime || '09:00')
     const [endTime, setEndTime] = useState(draft.endTime || '')
     const [color, setColor] = useState(draft.color || null)
+
+    // Linking (P5b-2): a block can point at an existing note/task/daily/project/sandbox. refId is
+    // kept as a string (DB ref_id is TEXT; sandbox ids are UUIDs).
+    const [refType, setRefType] = useState(draft.ref_type || '')
+    const [refId, setRefId] = useState(draft.ref_id != null ? String(draft.ref_id) : '')
+    const [candidates, setCandidates] = useState([])
+    const [pickerLoading, setPickerLoading] = useState(false)
+    const [pickerFilter, setPickerFilter] = useState('')
+
+    // Fetch id+title candidates whenever a (non-empty) link type is selected.
+    useEffect(() => {
+        const cfg = refType ? PICKER[refType] : null
+        if (!cfg || !authFetch || !API) { setCandidates([]); return }
+        let cancelled = false
+        setPickerLoading(true)
+        ;(async () => {
+            try {
+                const res = await authFetch(`${API}/${cfg.path}`)
+                if (res.ok && !cancelled) {
+                    const data = await res.json()
+                    setCandidates((data[cfg.key] || []).map(x => ({ id: String(x.id), title: x.title || '(untitled)' })))
+                }
+            } catch (error) {
+                logger.error('Error fetching link candidates:', error)
+            } finally {
+                if (!cancelled) setPickerLoading(false)
+            }
+        })()
+        return () => { cancelled = true }
+    }, [refType, authFetch, API])
 
     const handleSave = () => {
         if (!title.trim()) {
@@ -41,9 +91,18 @@ export default function EventModal({ mode, draft, onSave, onDelete, onClose, onO
             toast.warning('Pick a date for this block.')
             return
         }
+        if (refType && !refId) {
+            toast.warning('Pick something to link to, or set the link to "No link".')
+            return
+        }
         const start_at = toISOFromParts(day, allDay ? null : startTime)
         const end_at = (!allDay && endTime) ? toISOFromParts(day, endTime) : null
-        onSave({ title: title.trim(), start_at, end_at, all_day: allDay, color })
+        onSave({
+            title: title.trim(),
+            start_at, end_at, all_day: allDay, color,
+            ref_type: refType || null,
+            ref_id: refType ? refId : null,
+        })
     }
 
     const handleBackdrop = (e) => {
@@ -120,6 +179,45 @@ export default function EventModal({ mode, draft, onSave, onDelete, onClose, onO
                             ))}
                         </div>
                     </div>
+
+                    <div className={styles.row}>
+                        <label className={styles.label}>Link</label>
+                        <select
+                            className={styles.field}
+                            value={refType}
+                            onChange={e => { setRefType(e.target.value); setRefId(''); setPickerFilter('') }}
+                        >
+                            {REF_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                    </div>
+
+                    {refType && (
+                        <div className={styles.picker}>
+                            <input
+                                className={styles.field}
+                                type="text"
+                                value={pickerFilter}
+                                placeholder={pickerLoading ? 'Loading…' : `Search ${REF_LABEL[refType] || 'item'}s…`}
+                                onChange={e => setPickerFilter(e.target.value)}
+                            />
+                            <div className={styles.pickerList}>
+                                {candidates
+                                    .filter(c => !pickerFilter || c.title.toLowerCase().includes(pickerFilter.toLowerCase()))
+                                    .slice(0, 50)
+                                    .map(c => (
+                                        <button
+                                            key={c.id}
+                                            type="button"
+                                            className={`${styles.pickerItem} ${refId === c.id ? styles.pickerItemOn : ''}`}
+                                            onClick={() => setRefId(c.id)}
+                                        >{c.title}</button>
+                                    ))}
+                                {!pickerLoading && candidates.length === 0 && (
+                                    <div className={styles.pickerEmpty}>Nothing to link.</div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className={styles.footer}>
