@@ -11,14 +11,23 @@ export default function AccordionSection({ label, meta, collapsed, onToggle, chi
     useEffect(() => {
         const el = innerRef.current
         if (!el) return
+
         if (collapsed) {
-            setMaxH(el.scrollHeight)                       // pin current height (instant)
+            setMaxH(el.scrollHeight)                        // pin current height (instant)
             const id = requestAnimationFrame(() => setMaxH(0)) // then animate closed
             return () => cancelAnimationFrame(id)
         }
-        setMaxH(el.scrollHeight)                            // animate 0 → content height
-        const t = setTimeout(() => setMaxH(undefined), 240) // release to auto (lets content grow later)
-        return () => clearTimeout(t)
+
+        // Open: keep max-height tracking the content's natural height so the section always fits AND
+        // animates when its content grows/shrinks (e.g. QuickAdd Block↔Daily, toggling Custom days).
+        // A ResizeObserver on the inner content avoids the stale-height clipping the old timed
+        // release-to-auto had. (RO watches the content's own size, not the animated container — no loop.)
+        const apply = () => setMaxH(innerRef.current?.scrollHeight)
+        apply()
+        if (typeof ResizeObserver === 'undefined') return
+        const ro = new ResizeObserver(apply)
+        ro.observe(el)
+        return () => ro.disconnect()
     }, [collapsed])
 
     return (

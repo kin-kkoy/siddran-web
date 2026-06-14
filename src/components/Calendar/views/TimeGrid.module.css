@@ -199,7 +199,10 @@
 .srcBundle  { border-left-color: var(--src-bundle); }
 .srcSandbox { border-left-color: var(--src-sandbox); }
 .srcEvent   { border-left-color: var(--accent-warning); }
-.done { color: var(--text-muted); text-decoration: line-through; }
+/* Dim the whole chip when done, but strike ONLY the title text — not the daily checkbox
+   (a flex item: a chip-level line-through would draw across the checkbox box too). */
+.done { color: var(--text-muted); }
+.done .chipTitle { text-decoration: line-through; }
 .draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .draggable:active { cursor: grabbing; }
 

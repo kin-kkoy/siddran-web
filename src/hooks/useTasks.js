@@ -352,22 +352,29 @@ export const useTasks = (authFetch, API, isAuthed) => {
 
 
     // ----------- Daily Task Operations ===========================
-    const addDailyTask = useCallback(async (title, priority) => {
+    // opts (optional): { recurrence, time } — a recurrence makes the daily non-expiring & recurring
+    // (the calendar expands it per-day). Returns the created row (or null) so callers can sync it.
+    const addDailyTask = useCallback(async (title, priority, opts = {}) => {
 
         if (!title?.trim()) {
             toast.warning(whatMessage("validation", "noTitle"))
-            return
+            return null
         }
 
         try {
+            const item = { title: title.trim(), priority }
+            if (opts.recurrence !== undefined) item.recurrence = opts.recurrence
+            if (opts.time !== undefined) item.time = opts.time
+
             const res = await authFetch(`${API}/daily-tasks`, {
                 method: 'POST',
-                body: JSON.stringify({ tasks: [{title: title.trim(), priority}] })
+                body: JSON.stringify({ tasks: [item] })
             })
 
             if(res.ok) {
                 const newTasks = await res.json()
                 setDailyTasks(prev => [...newTasks, ...prev])
+                return newTasks[0] || null
             }
 
         } catch (error) {
@@ -375,7 +382,7 @@ export const useTasks = (authFetch, API, isAuthed) => {
             toast.error(whatMessage("failed", "create"))
         }
 
-        return
+        return null
     }, [authFetch, API])
 
     const updateDailyTask = useCallback(async (id, {title, priority, is_completed}) => {

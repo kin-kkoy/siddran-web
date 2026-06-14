@@ -281,7 +281,7 @@ function App() {
   } = useCalendarTasks(authFetch, API, isAuthed && calendarActive)
   // Recurring dailies + per-day completions (gated the same way so non-calendar pages stay quiet).
   const {
-    recurringDailies, completions: dailyCompletions, toggleCompletion
+    recurringDailies, completions: dailyCompletions, toggleCompletion, addRecurring
   } = useCalendarDailies(authFetch, API, isAuthed && calendarActive)
 
   // Calendar owns the PUT; patchTaskInCache also syncs the app-level useTasks cache so TasksHub
@@ -294,6 +294,14 @@ function App() {
     scheduleTask(taskId, due)
     patchTaskInCache(taskId, { due_date: due })
   }, [scheduleTask, patchTaskInCache])
+
+  // Quick-Add "Daily": persist via useTasks (so TasksHub shows it) and, if recurring, inject into
+  // the calendar's recurring set so it plots immediately (the two stores are separate).
+  const onCreateDaily = useCallback(async (title, opts) => {
+    const created = await addDailyTask(title, 'normal', opts)
+    if (created && created.recurrence != null) addRecurring(created)
+    return created
+  }, [addDailyTask, addRecurring])
 
   // Global Cmd/Ctrl+; toggles the peek; Esc closes it (when not typing in a field).
   useEffect(() => {
@@ -596,6 +604,7 @@ function App() {
             dailyCompletions={dailyCompletions}
             onToggleDaily={toggleCompletion}
             addEvent={addEvent}
+            onCreateDaily={onCreateDaily}
           />
         )}
 

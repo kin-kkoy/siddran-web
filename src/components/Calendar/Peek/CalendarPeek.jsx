@@ -15,7 +15,7 @@ const COLLAPSE_KEY = 'cinder_cal_peek_collapsed'
 // Root-mounted peek drawer (fixed, right edge). Only renders in 'peek' mode — 'half' is rendered
 // by the app shell as a split pane, 'hidden'/'full' render nothing here. Mirrors the Sandbox dock
 // pattern (without touching any Sandbox file).
-export default function CalendarPeek({ events, tasks, dailyTasks, dailyCompletions, onToggleDaily, addEvent }) {
+export default function CalendarPeek({ events, tasks, dailyTasks, dailyCompletions, onToggleDaily, addEvent, onCreateDaily }) {
     const cal = useCalendarView()
     const navigate = useNavigate()
 
@@ -101,7 +101,7 @@ export default function CalendarPeek({ events, tasks, dailyTasks, dailyCompletio
                     </AccordionSection>
 
                     <AccordionSection label="Quick Add" meta="⌘⏎" collapsed={collapsed.quick} onToggle={() => toggleSection('quick')}>
-                        <QuickAdd day={cal.focusedDay} onCreate={addEvent} />
+                        <QuickAdd day={cal.focusedDay} onCreate={addEvent} onCreateDaily={onCreateDaily} />
                     </AccordionSection>
 
                     <AccordionSection label={`On ${dayFullLabel(cal.focusedDay)}`} meta={`${focusedItems.length} items`} collapsed={collapsed.focused} onToggle={() => toggleSection('focused')}>

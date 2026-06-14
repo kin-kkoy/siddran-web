@@ -71,7 +71,10 @@
 .body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 
 /* ── Accordion ── */
-.section { border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-elevated); overflow: hidden; }
+/* flex-shrink:0 so open sections take their FULL natural height instead of being compressed to
+   share the body's height (which clipped them, since .section is overflow:hidden). The body
+   (flex:1; overflow-y:auto) scrolls when the sections together exceed it. */
+.section { flex-shrink: 0; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-elevated); overflow: hidden; }
 .sectionHead {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 12px;
@@ -159,6 +162,22 @@
 
 /* ── Quick add ── */
 .quick { display: flex; flex-direction: column; gap: 8px; }
+.quickTypes { display: flex; gap: 6px; }
+.quickType {
+  flex: 1;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 6px 0;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.quickType:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.quickTypeOn { background: var(--accent-warning-alpha); border-color: var(--accent-warning); color: var(--text-primary); }
 .quickInput {
   width: 100%;
   background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px;

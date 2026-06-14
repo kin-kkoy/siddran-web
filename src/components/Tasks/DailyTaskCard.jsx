@@ -1,8 +1,25 @@
 import { useState } from 'react'
 import { FaCheck } from 'react-icons/fa'
 import { HiOutlineTrash } from 'react-icons/hi'
+import { LuRepeat } from 'react-icons/lu'
 import styles from './DailyTaskCard.module.css'
 import ConfirmModal from '../Common/ConfirmModal'
+
+// Short label for a recurring daily's schedule (null = ephemeral one-off, no badge).
+function recurrenceLabel(rec) {
+    if (rec == null) return null
+    const s = String(rec)
+    if (s === 'every-day') return 'daily'
+    if (s === 'weekdays') return 'weekdays'
+    if (s === 'weekends') return 'weekends'
+    if (s.startsWith('{')) {
+        try {
+            const p = JSON.parse(s)
+            if (Array.isArray(p?.mask)) return `${p.mask.filter(Boolean).length}×/wk`
+        } catch { /* ignore */ }
+    }
+    return 'repeats'
+}
 
 function DailyTaskCard({ tasks, toggleCompletion, deleteTask, onOpenDetail, onOpenCard }) {
     const [deleteModalOpen, setDeleteModalOpen] = useState(false)
@@ -88,6 +105,11 @@ function DailyTaskCard({ tasks, toggleCompletion, deleteTask, onOpenDetail, onOp
                         {/* Task Content */}
                         <div className={styles.taskContent}>
                             <span className={styles.taskTitle}>{task.title}</span>
+                            {recurrenceLabel(task.recurrence) && (
+                                <span className={styles.recurBadge} title={`Recurring · ${recurrenceLabel(task.recurrence)}`}>
+                                    <LuRepeat size={10} /> {recurrenceLabel(task.recurrence)}
+                                </span>
+                            )}
                         </div>
 
                         {/* Delete Button */}

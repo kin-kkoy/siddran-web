@@ -44,6 +44,13 @@ export function useCalendarDailies(authFetch, API, isAuthed) {
         return () => { cancelled = true }
     }, [isAuthed, authFetch, API])
 
+    // Inject a freshly-created recurring daily into the calendar's set (it's created via useTasks,
+    // which owns a separate store) so it plots immediately without a refetch. Recurring only.
+    const addRecurring = useCallback((row) => {
+        if (!row || row.recurrence == null) return
+        setRecurringDailies(prev => prev.some(r => r.id === row.id) ? prev : [row, ...prev])
+    }, [])
+
     const keyOf = (c) => `${c.daily_task_id}|${c.date}`
 
     // Toggle a recurring daily's completion on one date. Optimistic add/remove with revert.
@@ -67,5 +74,5 @@ export function useCalendarDailies(authFetch, API, isAuthed) {
         }
     }, [authFetch, API])
 
-    return { recurringDailies, completions, toggleCompletion, loading }
+    return { recurringDailies, completions, toggleCompletion, addRecurring, loading }
 }
