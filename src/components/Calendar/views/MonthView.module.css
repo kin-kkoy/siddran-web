@@ -121,9 +121,9 @@
   align-items: center;
   justify-content: center;
   vertical-align: middle;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--text-muted);
   border-radius: 3px;
-  background: transparent;
+  background: var(--bg-surface);
   color: var(--accent-warning);
   font-size: 10px;
   line-height: 1;
@@ -131,6 +131,24 @@
 }
 .dailyCheck:hover { border-color: var(--accent-warning); }
 .dailyCheckOn { background: var(--accent-warning-alpha); border-color: var(--accent-warning); }
+
+/* "N dailies" badge — today's ephemeral daily tasks; click jumps to Day view. */
+.ephBadge {
+  align-self: flex-start;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-warning);
+  background: var(--accent-warning-alpha);
+  border: 1px dashed var(--accent-warning);
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.ephBadge:hover { background: var(--bg-hover); }
 
 .more {
   font-family: var(--font-mono);

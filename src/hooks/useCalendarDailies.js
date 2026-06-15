@@ -25,14 +25,8 @@ export function useCalendarDailies(authFetch, API, isAuthed) {
                     authFetch(`${API}/daily-tasks?recurring=1`),
                     authFetch(`${API}/daily-tasks/completions`),
                 ])
-                if (!cancelled && rdRes.ok) {
-                    const d = await rdRes.json()
-                    setRecurringDailies(d.dailyTasks || [])
-                }
-                if (!cancelled && cRes.ok) {
-                    const d = await cRes.json()
-                    setCompletions(d.completions || [])
-                }
+                if (!cancelled && rdRes.ok) setRecurringDailies((await rdRes.json()).dailyTasks || [])
+                if (!cancelled && cRes.ok) setCompletions((await cRes.json()).completions || [])
             } catch (error) {
                 logger.error('Error fetching calendar dailies:', error)
             } finally {
@@ -43,6 +37,10 @@ export function useCalendarDailies(authFetch, API, isAuthed) {
         load()
         return () => { cancelled = true }
     }, [isAuthed, authFetch, API])
+
+    // NOTE: ephemeral ("today's") dailies are NOT fetched here — the calendar derives them from the
+    // shared useTasks.dailyTasks store (single source) so TasksHub add/delete/edit reflect live, and
+    // edits go through useTasks (setDailyTime / toggleDailyTaskCompletion). See App.jsx.
 
     // Inject a freshly-created recurring daily into the calendar's set (it's created via useTasks,
     // which owns a separate store) so it plots immediately without a refetch. Recurring only.

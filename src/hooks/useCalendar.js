@@ -50,6 +50,7 @@ export function useCalendar({
     tasks = [],
     dailyTasks = [],
     dailyCompletions = [],
+    ephemeralDailies = [],
     range,
     updateEvent,
     updateTask,
@@ -158,7 +159,35 @@ export function useCalendar({
         return map;
     }, [events, tasks, dailyTasks, completedSet, range]);
 
+    // Ephemeral (one-off) dailies, kept SEPARATE from eventsByDate so Week/Month can show just a
+    // badge while Day renders them. Plotted on their created day (they have no date; "today"-ish).
+    const ephemeralByDate = useMemo(() => {
+        const map = new Map();
+        if (!range?.from || !range?.to) return map;
+        const fromISO = isoDate(range.from), toISO = isoDate(range.to);
+        for (const dt of ephemeralDailies) {
+            const day = localDayOf(dt.created_at);
+            if (day < fromISO || day > toISO) continue;
+            if (!map.has(day)) map.set(day, []);
+            map.get(day).push({
+                key: `eph-${dt.id}`,
+                kind: 'daily',
+                ephemeral: true,
+                id: dt.id,
+                title: dt.title,
+                day,
+                done: !!dt.is_completed,
+                color: null,
+                time: dt.time || null,
+                all_day: !dt.time,
+                source: dt,
+            });
+        }
+        return map;
+    }, [ephemeralDailies, range]);
+
     const itemsAt = useCallback((dayISO) => eventsByDate.get(dayISO) || [], [eventsByDate]);
+    const ephemeralAt = useCallback((dayISO) => ephemeralByDate.get(dayISO) || [], [ephemeralByDate]);
 
     // Move an item to a new local day, optionally to a new time-of-day (`newTime` 'HH:MM',
     // supplied by time-grid drags). Blocks rewrite start/end (duration preserved); tasks
@@ -211,5 +240,5 @@ export function useCalendar({
         return false;
     }, [updateEvent, updateTask]);
 
-    return { eventsByDate, itemsAt, retime };
+    return { eventsByDate, itemsAt, ephemeralAt, retime };
 }

@@ -309,6 +309,22 @@ export const useTasks = (authFetch, API, isAuthed) => {
         setTasks(prev => prev.map(task => task.id === id ? { ...task, ...patch } : task))
     }, [])
 
+    // Set/clear an ephemeral daily's time from the Calendar (drag to a slot, or to/from all-day).
+    // Lives here so it mutates the SHARED dailyTasks store → TasksHub + Calendar stay in sync.
+    // Optimistic with revert. time = 'HH:MM' schedules; time = null makes it untimed.
+    const setDailyTime = useCallback(async (id, time) => {
+        let snap = null
+        setDailyTasks(prev => { snap = prev.find(t => t.id === id) ?? null; return prev.map(t => t.id === id ? { ...t, time } : t) })
+        try {
+            const res = await authFetch(`${API}/daily-tasks/${id}`, { method: 'PUT', body: JSON.stringify({ time }) })
+            if (!res.ok) throw new Error('Failed to set daily time')
+        } catch (error) {
+            logger.error('Error setting daily time:', error)
+            if (snap) setDailyTasks(prev => prev.map(t => t.id === id ? snap : t))
+            toast.error('Could not reschedule that daily.')
+        }
+    }, [authFetch, API])
+
     const deleteTask = useCallback(async (id) => {
         let removed = null
         setTasks(prev => {
@@ -691,6 +707,7 @@ export const useTasks = (authFetch, API, isAuthed) => {
         addTask,
         updateTask,
         patchTaskInCache,
+        setDailyTime,
         deleteTask,
         toggleTaskCompletion,
         addDailyTask,

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } from "react"
 import { BrowserRouter, Route, Routes, useParams } from 'react-router-dom'
 import Sidebar from "./components/Layout/Sidebar/Sidebar.jsx"
 import StarCanvas from "./components/Layout/StarCanvas/StarCanvas.jsx"
@@ -261,7 +261,7 @@ function App() {
 
   // ------------- TASKS DATA LOGIC ===================================
   const {
-    tasks, dailyTasks, bundles, tasksPagination, dailyTasksPagination, bundlesPagination, loadMoreTasks, loadMoreDailyTasks, loadMoreBundles, loadingMore: tasksLoadingMore, loading: tasksLoading, addTask, updateTask, patchTaskInCache, deleteTask, toggleTaskCompletion, addDailyTask, updateDailyTask, deleteDailyTask, toggleDailyTaskCompletion, batchToggleDailyTasks, batchDeleteDailyTasks, addBundle, updateBundle, deleteBundle, addBundleTasks, batchUpdateBundleTasks, toggleBundleTaskCompletion, batchDeleteBundleTasks
+    tasks, dailyTasks, bundles, tasksPagination, dailyTasksPagination, bundlesPagination, loadMoreTasks, loadMoreDailyTasks, loadMoreBundles, loadingMore: tasksLoadingMore, loading: tasksLoading, addTask, updateTask, patchTaskInCache, setDailyTime, deleteTask, toggleTaskCompletion, addDailyTask, updateDailyTask, deleteDailyTask, toggleDailyTaskCompletion, batchToggleDailyTasks, batchDeleteDailyTasks, addBundle, updateBundle, deleteBundle, addBundleTasks, batchUpdateBundleTasks, toggleBundleTaskCompletion, batchDeleteBundleTasks
   } = useTasks(authFetch, API, isAuthed)
 
   // ------------- CALENDAR DATA LOGIC ===================================
@@ -283,6 +283,9 @@ function App() {
   const {
     recurringDailies, completions: dailyCompletions, toggleCompletion, addRecurring
   } = useCalendarDailies(authFetch, API, isAuthed && calendarActive)
+  // Ephemeral ("today's") dailies come from the SHARED useTasks store (single source) so TasksHub
+  // add/delete/edit reflect on the calendar live, with no refetch.
+  const ephemeralDailies = useMemo(() => dailyTasks.filter(d => d.recurrence == null), [dailyTasks])
 
   // Calendar owns the PUT; patchTaskInCache also syncs the app-level useTasks cache so TasksHub
   // reflects new dates live (no extra request).
@@ -302,6 +305,9 @@ function App() {
     if (created && created.recurrence != null) addRecurring(created)
     return created
   }, [addDailyTask, addRecurring])
+
+  // Ephemeral-daily edits from the calendar go straight through useTasks (shared store) so both
+  // TasksHub and the calendar reflect them: onDailyTime = setDailyTime, onDailyDone = toggleDailyTaskCompletion.
 
   // Global Cmd/Ctrl+; toggles the peek; Esc closes it (when not typing in a field).
   useEffect(() => {
@@ -332,8 +338,11 @@ function App() {
     events: calendarEvents,
     addEvent, updateEvent, deleteEvent,
     dailyTasks: recurringDailies, // all recurring dailies (not useTasks' paginated first page)
+    ephemeralDailies,             // active one-off "today's tasks" — Day view + Week/Month badge
     dailyCompletions,
     onToggleDaily: toggleCompletion,
+    onDailyTime: setDailyTime,
+    onDailyDone: toggleDailyTaskCompletion,
     tasks: calendarTasks,
     undated: calendarUndated,
     onTaskRetime, onTaskSchedule,

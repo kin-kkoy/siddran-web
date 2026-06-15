@@ -29,7 +29,7 @@ function srcClass(item) {
 // cell calls onDayClick (quick-add + focus); clicking a chip calls onEventClick. Dragging a
 // chip onto another day calls onRetime(item, newDayISO) — daily chips are recurrence-bound and
 // not draggable.
-export default function MonthView({ monthDate, focusedDay, itemsAt, onDayClick, onEventClick, onRetime, onToggleDaily }) {
+export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt, onDayClick, onEventClick, onRetime, onToggleDaily, onJumpToDay }) {
     const days = monthGridDays(monthDate)
 
     // Drag bookkeeping kept in a ref so pointer-move doesn't re-render the whole grid; only the
@@ -137,6 +137,14 @@ export default function MonthView({ monthDate, focusedDay, itemsAt, onDayClick, 
                                 </div>
                             )
                         })}
+
+                        {ephemeralAt && ephemeralAt(iso).length > 0 && (
+                            <button
+                                className={styles.ephBadge}
+                                title="Daily tasks — open Day view"
+                                onClick={(e) => { e.stopPropagation(); onJumpToDay?.(iso) }}
+                            >⏳ {ephemeralAt(iso).length} {ephemeralAt(iso).length === 1 ? 'daily' : 'dailies'}</button>
+                        )}
                     </div>
                 )
             })}

@@ -42,8 +42,10 @@ function endMinutesOf(it, startMin) {
 // (HOUR_PX/hr); blocks are absolutely positioned (top = start, height = duration) and overlaps
 // pack into side-by-side lanes. Drag a block to move it (snap 15 min); drag its bottom edge to
 // resize (blocks only). Click empty space to create at that time. All-day items sit in the top row.
-export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onRetime, onResizeEvent, onToggleDaily }) {
+export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEventClick, onRetime, onResizeEvent, onToggleDaily, onDailyTime, onDailyDone, onJumpToDay }) {
     const scrollRef = useRef(null)
+    const sideBySide = days.length === 1 // Day view → render ephemeral dailies; Week → just a badge
+    const ephAt = (iso) => (ephemeralAt ? ephemeralAt(iso) : [])
 
     // Now-line position, refreshed each minute.
     const [nowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() })
@@ -69,7 +71,10 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
     const dayLayouts = useMemo(() => {
         const map = {}
         for (const iso of days) {
-            const timed = itemsAt(iso).filter(it => it.time).map(it => {
+            // Day view also lays out timed ephemeral dailies alongside blocks/tasks; Week doesn't.
+            const base = itemsAt(iso).filter(it => it.time)
+            const eph = sideBySide ? ephAt(iso).filter(it => it.time) : []
+            const timed = [...base, ...eph].map(it => {
                 const startMin = timeToMinutes(it.time)
                 return { it, startMin, endMin: endMinutesOf(it, startMin) }
             })
@@ -77,14 +82,14 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
         }
         return map
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [days.join('|'), itemsAt])
+    }, [days.join('|'), itemsAt, ephemeralAt, sideBySide])
 
     // Drag/resize bookkeeping. `dragInfo` drives the live preview (and dims the source block).
     const drag = useRef(null)
     const [dragInfo, setDragInfo] = useState(null) // { key, mode, day, startMin, endMin }
 
     const onBlockDown = (e, it) => {
-        if (it.kind === 'daily') return // recurrence-bound — not draggable
+        if (it.kind === 'daily' && !it.ephemeral) return // recurring is recurrence-bound; ephemeral is draggable
         const isResize = !!e.target.closest?.('[data-resize]')
         const startMin = timeToMinutes(it.time)
         drag.current = {
@@ -119,7 +124,13 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
         try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* */ }
         const info = dragInfo
         setDragInfo(null)
-        if (!st?.dragging) { onEventClick(it); return }
+        if (!st?.dragging) { if (it.kind === 'event') onEventClick(it); return }
+        // Ephemeral daily: dragging sets its time (drop on the all-day row → untimed); never changes day.
+        if (it.ephemeral) {
+            const onAllDay = !!document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-allday]')
+            onDailyTime?.(it.id, onAllDay ? null : minutesToTime((info ?? st).startMin))
+            return
+        }
         if (st.mode === 'move' && info) onRetime?.(it, info.day, minutesToTime(info.startMin))
         else if (st.mode === 'resize' && info && it.kind === 'event') onResizeEvent?.(it, info.day, minutesToTime(info.endMin))
     }
@@ -136,13 +147,14 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
         const height = Math.max(MIN_BLOCK_PX, minutesToY(b.endMin) - top)
         const widthPct = 100 / b.colCount
         const leftPct = b.colIndex * widthPct
-        const draggable = it.kind !== 'daily'
+        const recurring = it.kind === 'daily' && !it.ephemeral
+        const draggable = !recurring
         const resizable = it.kind === 'event'
         const dim = dragInfo && dragInfo.key === it.key
         return (
             <div
                 key={it.key}
-                className={[styles.block, srcClass(it), it.done ? styles.done : '', draggable ? styles.draggable : '', dim ? styles.dim : ''].filter(Boolean).join(' ')}
+                className={[styles.block, srcClass(it), it.ephemeral ? styles.volatile : '', it.done ? styles.done : '', draggable ? styles.draggable : '', dim ? styles.dim : ''].filter(Boolean).join(' ')}
                 style={{ top, height, left: `calc(${leftPct}% + 1px)`, width: `calc(${widthPct}% - 2px)`, ...(it.color ? { borderLeftColor: it.color } : {}) }}
                 title={it.title}
                 onClick={(e) => e.stopPropagation()}
@@ -151,14 +163,15 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
                 onPointerUp={draggable ? (e) => { e.stopPropagation(); onBlockUp(e, it) } : undefined}
             >
                 <div className={styles.blockBody}>
-                    {it.kind === 'daily' && onToggleDaily && (
+                    {it.kind === 'daily' && (
                         <button
                             className={`${styles.dailyCheck} ${it.done ? styles.dailyCheckOn : ''}`}
                             aria-label={it.done ? 'Mark not done' : 'Mark done'}
                             onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => { e.stopPropagation(); onToggleDaily(it.id, it.day, !it.done) }}
+                            onClick={(e) => { e.stopPropagation(); it.ephemeral ? onDailyDone?.(it.id, !it.done) : onToggleDaily?.(it.id, it.day, !it.done) }}
                         >{it.done ? '✓' : ''}</button>
                     )}
+                    {it.ephemeral && <span className={styles.volatileMark} title="Daily task (expires)">⏳</span>}
                     <span className={styles.bTime}>{it.time}</span>
                     <span className={styles.bTitle}>{it.title}</span>
                 </div>
@@ -186,13 +199,15 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
                 })}
             </div>
 
-            {/* All-day row */}
+            {/* All-day row (data-allday → dropping an ephemeral daily here makes it untimed) */}
             <div className={styles.allDayRow} style={gridStyle}>
                 <div className={styles.gutterLabel}>all-day</div>
                 {days.map(iso => {
                     const allDayItems = itemsAt(iso).filter(it => !it.time)
+                    const ephUntimed = sideBySide ? ephAt(iso).filter(it => !it.time) : []
+                    const ephCount = sideBySide ? 0 : ephAt(iso).length
                     return (
-                        <div key={iso} className={styles.allDayCell} data-col={iso} onClick={() => onSlotClick(iso, null)}>
+                        <div key={iso} className={styles.allDayCell} data-col={iso} data-allday="1" onClick={() => onSlotClick(iso, null)}>
                             {allDayItems.map(it => (
                                 <div
                                     key={it.key}
@@ -211,6 +226,33 @@ export default function TimeGrid({ days, itemsAt, onSlotClick, onEventClick, onR
                                     <span className={styles.chipTitle}>{it.title}</span>
                                 </div>
                             ))}
+                            {/* Untimed ephemeral dailies (Day) — drag onto the grid to give them a time */}
+                            {ephUntimed.map(it => (
+                                <div
+                                    key={it.key}
+                                    className={[styles.chip, styles.srcDaily, styles.volatile, styles.draggable, it.done ? styles.done : ''].filter(Boolean).join(' ')}
+                                    title={it.title}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onPointerDown={(e) => onBlockDown(e, it)}
+                                    onPointerMove={onBlockMove}
+                                    onPointerUp={(e) => { e.stopPropagation(); onBlockUp(e, it) }}
+                                >
+                                    <button
+                                        className={`${styles.dailyCheck} ${it.done ? styles.dailyCheckOn : ''}`}
+                                        aria-label={it.done ? 'Mark not done' : 'Mark done'}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => { e.stopPropagation(); onDailyDone?.(it.id, !it.done) }}
+                                    >{it.done ? '✓' : ''}</button>
+                                    <span className={styles.volatileMark}>⏳</span>
+                                    <span className={styles.chipTitle}>{it.title}</span>
+                                </div>
+                            ))}
+                            {/* Week: just a badge → jump into that day's Day view */}
+                            {ephCount > 0 && (
+                                <button className={styles.ephBadge} onClick={(e) => { e.stopPropagation(); onJumpToDay?.(iso) }} title="Daily tasks — open Day view">
+                                    ⏳ {ephCount} {ephCount === 1 ? 'daily' : 'dailies'}
+                                </button>
+                            )}
                         </div>
                     )
                 })}

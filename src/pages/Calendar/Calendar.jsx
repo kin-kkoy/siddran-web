@@ -18,7 +18,7 @@ const VIEWS = ['day', 'week', 'month']
 // Full-route Calendar (also rendered in the half-split pane via mode="half"). View + focused day
 // live in CalendarViewContext so the peek, the route, and the half pane all stay in sync. Calendar
 // data + task mutations are passed in from App (shared with the peek — single fetch).
-function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, dailyTasks, dailyCompletions, onToggleDaily, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
+function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
     const { view, setView, focusedDay, setFocusedDay, unpin } = useCalendarView()
     const navigate = useNavigate()
     const [modal, setModal] = useState(null) // { mode, draft } | null
@@ -56,7 +56,10 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
         return { from: anchor, to: anchor }
     }, [view, monthDate, anchor])
 
-    const { itemsAt, retime } = useCalendar({ events, tasks, dailyTasks, dailyCompletions, range, updateEvent, updateTask: onTaskRetime })
+    const { itemsAt, ephemeralAt, retime } = useCalendar({ events, tasks, dailyTasks, dailyCompletions, ephemeralDailies, range, updateEvent, updateTask: onTaskRetime })
+
+    // Badge in Week/Month → jump into that day's Day view.
+    const onJumpToDay = useCallback((dayISO) => { setFocusedDay(dayISO); setView('day') }, [setFocusedDay, setView])
 
     const shift = (dir) => {
         if (view === 'month') setFocusedDay(isoDate(new Date(anchor.getFullYear(), anchor.getMonth() + dir, Math.min(anchor.getDate(), 28))))
@@ -147,13 +150,13 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
             </div>
 
             {view === 'month' && (
-                <MonthView monthDate={monthDate} focusedDay={focusedDay} itemsAt={itemsAt} onDayClick={handleDayClick} onEventClick={handleEventClick} onRetime={retime} onToggleDaily={onToggleDaily} />
+                <MonthView monthDate={monthDate} focusedDay={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onDayClick={handleDayClick} onEventClick={handleEventClick} onRetime={retime} onToggleDaily={onToggleDaily} onJumpToDay={onJumpToDay} />
             )}
             {view === 'week' && (
-                <WeekView anchor={anchor} itemsAt={itemsAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} onToggleDaily={onToggleDaily} />
+                <WeekView anchor={anchor} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} />
             )}
             {view === 'day' && (
-                <DayView dayISO={focusedDay} itemsAt={itemsAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} undated={undated} onSchedule={handleSchedule} onToggleDaily={onToggleDaily} />
+                <DayView dayISO={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} undated={undated} onSchedule={handleSchedule} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} />
             )}
 
             {modal && (

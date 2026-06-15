@@ -207,18 +207,37 @@
 .done { color: var(--text-muted); }
 .done .bTitle, .done .chipTitle { text-decoration: line-through; }
 
+/* Ephemeral ("today's") dailies — SOLID (dashed is reserved for plan-mode drafts, so these mustn't
+   read as temporary). The small ⏳ marker + amber daily accent are the only cue. */
+.volatile { border-style: solid; }
+.volatileMark { flex: 0 0 auto; font-size: 9px; line-height: 1; opacity: 0.75; }
+
+/* Week/Month count badge for a day's ephemeral dailies (Day view renders them individually). */
+.ephBadge {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--accent-warning);
+  background: var(--accent-warning-alpha);
+  border: 1px dashed var(--accent-warning);
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.ephBadge:hover { background: var(--bg-hover); }
+
 /* Per-day check-off for recurring daily items */
 .dailyCheck {
   flex: 0 0 auto;
   align-self: center;
-  width: 13px; height: 13px;
+  width: 15px; height: 15px;
   padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--text-muted);   /* visibly reads as a checkbox on the dark surface */
   border-radius: 3px;
-  background: transparent;
+  background: var(--bg-surface);
   color: var(--accent-warning);
-  font-size: 10px; line-height: 1;
+  font-size: 11px; line-height: 1;
   cursor: pointer;
 }
 .dailyCheck:hover { border-color: var(--accent-warning); }

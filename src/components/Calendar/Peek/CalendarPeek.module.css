@@ -143,9 +143,9 @@
   width: 16px; height: 16px;
   padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--text-muted);
   border-radius: 3px;
-  background: transparent;
+  background: var(--bg-surface);
   color: var(--accent-warning);
   font-size: 11px; line-height: 1;
   cursor: pointer;
