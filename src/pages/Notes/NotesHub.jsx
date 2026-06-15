@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import Card from '../../components/Notes/Card'
 import HorizontalCard from '../../components/Notes/HorizontalCard'
 import AddCard from '../../components/Notes/AddCard'
@@ -145,9 +145,9 @@ function NotesHub({ notes, notebooks, notesLoading, notebookNotesById, notesPagi
     setSelectedNotes([])
   }
 
-  const toggleNoteSelection = noteId => {
+  const toggleNoteSelection = useCallback(noteId => {
     setSelectedNotes(prevNote => prevNote.includes(noteId) ? prevNote.filter(id => id !== noteId) : [...prevNote, noteId])
-  }
+  }, [])
 
   const handleOpenCreateModal = () => {
     if(selectedNotes.length === 0){
@@ -187,8 +187,18 @@ function NotesHub({ notes, notebooks, notesLoading, notebookNotesById, notesPagi
 
   const handleCloseModal = () => setSelectedNotebook(null)
 
-  // Filter notebooks based on search query
-  const filteredNotebooks = notebooks.filter(notebook => {
+  // One pass over notes → note-count per notebook + a Set of notebook ids, so the render below
+  // doesn't do an O(notes) scan per notebook row and the orphan test isn't O(notebooks) per note.
+  const notebookIdSet = useMemo(() => new Set(notebooks.map(nb => nb.id)), [notebooks])
+  const countByNotebook = useMemo(() => {
+    const m = new Map()
+    for (const n of notes) if (n.notebook_id != null) m.set(n.notebook_id, (m.get(n.notebook_id) || 0) + 1)
+    return m
+  }, [notes])
+
+  // Search/sort derivations are memoized — they ran on every render (incl. each search keystroke),
+  // and notes/notebooks grow unbounded via infinite scroll, so doing this inline was O(notes·notebooks).
+  const filteredNotebooks = useMemo(() => notebooks.filter(notebook => {
     if (!searchQuery.trim()) return true // if search bar is empty then return everything (show everythign basically)
 
     const query = searchQuery.toLowerCase().trim()
@@ -202,13 +212,13 @@ function NotesHub({ notes, notebooks, notesLoading, notebookNotesById, notesPagi
     if (tags.includes(searchTerm)) return true
 
     return false
-  }).sort(compareByFavorite)
+  }).sort(compareByFavorite), [notebooks, searchQuery])
 
   // Filter notes that aren't a part of any notebook, then apply search filter, then sort by favorites first
-  const loneNotes = notes.filter(note =>
+  const loneNotes = useMemo(() => notes.filter(note =>
       !note.notebook_id
       || note.notebook_id === "null"
-      || !notebooks.some(nb => nb.id === note.notebook_id)
+      || !notebookIdSet.has(note.notebook_id)
     ).filter(note => {
       if (!searchQuery.trim()) return true // if search bar is empty then return everything (show everythign basically)
 
@@ -223,7 +233,7 @@ function NotesHub({ notes, notebooks, notesLoading, notebookNotesById, notesPagi
 
       return false
     })
-    .sort(compareByFavorite)
+    .sort(compareByFavorite), [notes, notebookIdSet, searchQuery])
 
 
   if (notesLoading && notes.length === 0 && notebooks.length === 0) {
@@ -345,7 +355,7 @@ function NotesHub({ notes, notebooks, notesLoading, notebookNotesById, notesPagi
         {!isSelectionMode && (
           viewMode === "list" ?
             filteredNotebooks.map(notebook => {
-              const noteCount = notes.filter(n => n.notebook_id === notebook.id).length
+              const noteCount = countByNotebook.get(notebook.id) || 0
               return (
                 <HorizontalNotebookCard
                   key={notebook.id}
@@ -360,7 +370,7 @@ function NotesHub({ notes, notebooks, notesLoading, notebookNotesById, notesPagi
             })
             :
             filteredNotebooks.map(notebook => {
-              const noteCount = notes.filter(n => n.notebook_id === notebook.id).length
+              const noteCount = countByNotebook.get(notebook.id) || 0
               return (
                 <NotebookCard
                   key={notebook.id}
@@ -385,7 +395,7 @@ function NotesHub({ notes, notebooks, notesLoading, notebookNotesById, notesPagi
               updateColor={updateColor}
               isSelectionMode={isSelectionMode}
               isSelected={selectedNotes.includes(note.id)}
-              onToggleSelect={() => toggleNoteSelection(note.id)}
+              onToggleSelect={toggleNoteSelection}
             />
           ))
           :
@@ -397,7 +407,7 @@ function NotesHub({ notes, notebooks, notesLoading, notebookNotesById, notesPagi
               updateColor={updateColor}
               isSelectionMode={isSelectionMode}
               isSelected={selectedNotes.includes(note.id)}
-              onToggleSelect={() => toggleNoteSelection(note.id)}
+              onToggleSelect={toggleNoteSelection}
             />
           ))
         }

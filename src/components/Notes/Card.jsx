@@ -2,7 +2,7 @@ import { FaStar, FaRegStar, FaEllipsisV } from 'react-icons/fa'
 import { HiOutlineTrash } from 'react-icons/hi'
 import styles from './Card.module.css'
 import { Link, useNavigate } from 'react-router-dom'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, memo } from 'react'
 import ConfirmModal from '../Common/ConfirmModal'
 import { MdChromeReaderMode } from 'react-icons/md'
 import { NOTE_COLORS, getNoteBackground, getSwatchColor } from './noteColors'
@@ -63,7 +63,7 @@ function Card({ note, deleteNote, isSelectionMode, isSelected, onToggleSelect, t
     // stop the usual navigation if in selection mode (selecting notes to add to notebook) and instead allow selection
     if(isSelectionMode){
       e.preventDefault()
-      onToggleSelect()
+      onToggleSelect(note.id)
     }
   }
 
@@ -115,7 +115,7 @@ function Card({ note, deleteNote, isSelectionMode, isSelected, onToggleSelect, t
         <div className={styles.checkbox}>
           <input type='checkbox'
             checked={isSelected}
-            onChange={onToggleSelect}
+            onChange={() => onToggleSelect(note.id)}
             onClick={e => e.stopPropagation()}
           />
         </div>
@@ -197,4 +197,4 @@ function Card({ note, deleteNote, isSelectionMode, isSelected, onToggleSelect, t
   )
 }
 
-export default Card
+export default memo(Card)

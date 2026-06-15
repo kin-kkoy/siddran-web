@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useSearchParams } from "react-router-dom"
 import { toast } from "../../utils/toast"
 import TaskCard from "../../components/Tasks/TaskCard"
@@ -123,61 +123,69 @@ function TasksHub({
   const hasMoreBundles = bundlesPagination?.hasNextPage
 
   // Filter tasks: show completed/in progress then show including any of the 3: today within today/3 days/ this week
-  const filteredTasks = tasks.filter(task => {
-    if(!showCompleted) return task.is_completed === false
-    return true
-  }).filter(task => {
-    if (deadlineFilter === 'all') return true
-    if (!task.due_date) return false
-
+  // Memoized so the filter+sort (and their per-task new Date()) only re-run when an input actually
+  // changes — not on every render (e.g. entering selection mode or toggling one task). `tasks` grows
+  // unbounded via infinite scroll, so doing this inline each render was needless O(n log n) work.
+  const filteredTasks = useMemo(() => {
+    // Compute "today" once for the whole pass instead of per task.
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const due = new Date(task.due_date)
-    due.setHours(0, 0, 0, 0)
+    return tasks.filter(task => {
+      if(!showCompleted) return task.is_completed === false
+      return true
+    }).filter(task => {
+      if (deadlineFilter === 'all') return true
+      if (!task.due_date) return false
 
-    if (deadlineFilter === 'today')   return due.getTime() === today.getTime()
-    if (deadlineFilter === 'overdue') return due.getTime() < today.getTime()
+      const due = new Date(task.due_date)
+      due.setHours(0, 0, 0, 0)
 
-    // deadlineFilter === 'hasDeadline'
-    if (deadlineRange === 'all') return true
-    if (deadlineRange === '3days') {
-      const threeDays = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
-      return due <= threeDays
-    }
-    if (deadlineRange === 'week') {
-      const week = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-      return due <= week
-    }
-  })
+      if (deadlineFilter === 'today')   return due.getTime() === today.getTime()
+      if (deadlineFilter === 'overdue') return due.getTime() < today.getTime()
+
+      // deadlineFilter === 'hasDeadline'
+      if (deadlineRange === 'all') return true
+      if (deadlineRange === '3days') {
+        const threeDays = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
+        return due <= threeDays
+      }
+      if (deadlineRange === 'week') {
+        const week = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+        return due <= week
+      }
+    })
+  }, [tasks, showCompleted, deadlineFilter, deadlineRange])
 
   // Sort tasks: incomplete first, then by priority (High -> Normal -> Low)
-  const priorityOrder = { high: 0, normal: 1, low: 2 }
-  const sortedTasks = [...filteredTasks].sort((a, b) => {
-    // First sort by completion status (incomplete first)
-    if (a.is_completed !== b.is_completed) {
-      return a.is_completed ? 1 : -1
-    }
-
-    // Sort by priority within each group
-    if(sortBy === 'priority') return (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1)
-
-    // Or sort by due date
-    if(sortBy === 'dueDate'){
-
-      // check if both have date or are null
-      if(!a.due_date && !b.due_date) return 0
-      if(!a.due_date) return 1
-      if(!b.due_date) return -1
-
-      //if both have dates then compare and sort
-      if(sortDir === 'dsc'){
-        return new Date(a.due_date) - new Date(b.due_date)
-      }else{
-        return new Date(b.due_date) - new Date(a.due_date)
+  const sortedTasks = useMemo(() => {
+    const priorityOrder = { high: 0, normal: 1, low: 2 }
+    return [...filteredTasks].sort((a, b) => {
+      // First sort by completion status (incomplete first)
+      if (a.is_completed !== b.is_completed) {
+        return a.is_completed ? 1 : -1
       }
-    }
 
-  })
+      // Sort by priority within each group
+      if(sortBy === 'priority') return (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1)
+
+      // Or sort by due date
+      if(sortBy === 'dueDate'){
+
+        // check if both have date or are null
+        if(!a.due_date && !b.due_date) return 0
+        if(!a.due_date) return 1
+        if(!b.due_date) return -1
+
+        //if both have dates then compare and sort
+        if(sortDir === 'dsc'){
+          return new Date(a.due_date) - new Date(b.due_date)
+        }else{
+          return new Date(b.due_date) - new Date(a.due_date)
+        }
+      }
+
+    })
+  }, [filteredTasks, sortBy, sortDir])
 
   // Intersection Observer for tasks infinite scroll
   useEffect(() => {
@@ -287,9 +295,9 @@ function TasksHub({
   const openDailyCardDetails = (task) => {
     setOpenDailyTask(task);
   }
-  const openCardDetails = (task) => {
+  const openCardDetails = useCallback((task) => {
     setOpenTask(task);
-  }
+  }, [])
   
   // Toggle Selection for DELETING ------
   const toggleSelectionMode = () => {
@@ -297,11 +305,11 @@ function TasksHub({
     setSelectedTasks([])
   }
 
-  const toggleTaskSelection = (taskId) => {
+  const toggleTaskSelection = useCallback((taskId) => {
     setSelectedTasks(prev =>
       prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
     )
-  }
+  }, [])
 
   const handleBatchDelete = () => {
     if (selectedTasks.length === 0) return
@@ -459,7 +467,7 @@ function TasksHub({
               <p>Loading tasks...</p>
             ) : sortedTasks.length > 0 ? (
               sortedTasks.map(task => (
-                <TaskCard key={task.id} task={task} deleteTask={deleteTask} toggleCompletion={toggleTaskCompletion} viewMode={viewMode} isSelectionMode={isSelectionMode} isSelected={selectedTasks.includes(task.id)} onToggleSelect={() => toggleTaskSelection(task.id)} onOpenDetail={openCardDetails} />
+                <TaskCard key={task.id} task={task} deleteTask={deleteTask} toggleCompletion={toggleTaskCompletion} viewMode={viewMode} isSelectionMode={isSelectionMode} isSelected={selectedTasks.includes(task.id)} onToggleSelect={toggleTaskSelection} onOpenDetail={openCardDetails} />
               ))
             ) : (
               <div className={styles.emptyState}><p>No tasks yet. Create today's set of tasks or create a new task to do</p></div>
@@ -494,7 +502,7 @@ function TasksHub({
               <p style={{ gridColumn: '1 / -1' }}>Loading tasks...</p>
             ) : sortedTasks.length > 0 ? (
               sortedTasks.map(task => (
-                <TaskCard key={task.id} task={task} deleteTask={deleteTask} toggleCompletion={toggleTaskCompletion} viewMode={viewMode} isSelectionMode={isSelectionMode} isSelected={selectedTasks.includes(task.id)} onToggleSelect={() => toggleTaskSelection(task.id)} onOpenDetail={openCardDetails} />
+                <TaskCard key={task.id} task={task} deleteTask={deleteTask} toggleCompletion={toggleTaskCompletion} viewMode={viewMode} isSelectionMode={isSelectionMode} isSelected={selectedTasks.includes(task.id)} onToggleSelect={toggleTaskSelection} onOpenDetail={openCardDetails} />
               ))
             ) : (
               <div className={styles.emptyStatePacked}><p>No tasks yet. Create today's set of tasks or create a new task to do</p></div>
@@ -538,7 +546,7 @@ function TasksHub({
                 <p>Loading tasks...</p>
               ) : sortedTasks.length > 0 ? (
                 sortedTasks.map(task => (
-                  <TaskCard key={task.id} task={task} deleteTask={deleteTask} toggleCompletion={toggleTaskCompletion} viewMode={viewMode} isSelectionMode={isSelectionMode} isSelected={selectedTasks.includes(task.id)} onToggleSelect={() => toggleTaskSelection(task.id)} onOpenDetail={openCardDetails} />
+                  <TaskCard key={task.id} task={task} deleteTask={deleteTask} toggleCompletion={toggleTaskCompletion} viewMode={viewMode} isSelectionMode={isSelectionMode} isSelected={selectedTasks.includes(task.id)} onToggleSelect={toggleTaskSelection} onOpenDetail={openCardDetails} />
                 ))
               ) : (
                 <div className={styles.emptyState}><p>No tasks yet. Create today's set of tasks or create a new task to do</p></div>

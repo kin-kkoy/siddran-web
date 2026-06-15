@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import styles from './TaskCard.module.css'
 import { FaCheck } from "react-icons/fa"
 import { HiOutlineTrash } from "react-icons/hi"
 import ConfirmModal from '../Common/ConfirmModal'
 
-function TaskCard({ task, deleteTask, toggleCompletion, viewMode, isSelectionMode, isSelected, onToggleSelect, onOpenDetail }) {
+function TaskCard({ task, deleteTask, toggleCompletion, isSelectionMode, isSelected, onToggleSelect, onOpenDetail }) {
     const [showDeleteModal, setShowDeleteModal] = useState(false)
 
     const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -30,7 +30,7 @@ function TaskCard({ task, deleteTask, toggleCompletion, viewMode, isSelectionMod
 
     const handleCardClick = () => {
         if (isSelectionMode) {
-            onToggleSelect()
+            onToggleSelect(task.id)
         }else{
             onOpenDetail(task);
         }
@@ -56,7 +56,7 @@ function TaskCard({ task, deleteTask, toggleCompletion, viewMode, isSelectionMod
                     <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={onToggleSelect}
+                        onChange={() => onToggleSelect(task.id)}
                         onClick={e => e.stopPropagation()}
                     />
                 </div>
@@ -126,4 +126,4 @@ function TaskCard({ task, deleteTask, toggleCompletion, viewMode, isSelectionMod
     )
 }
 
-export default TaskCard
+export default memo(TaskCard)

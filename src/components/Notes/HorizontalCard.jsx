@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import styles from './Card.module.css'
 import { FaStar, FaRegStar, FaEllipsisV } from 'react-icons/fa'
 import { HiOutlineTrash } from 'react-icons/hi'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, memo } from 'react'
 import ConfirmModal from '../Common/ConfirmModal'
 import { MdChromeReaderMode } from 'react-icons/md'
 import { NOTE_COLORS, getNoteBackground, getSwatchColor } from './noteColors'
@@ -47,7 +47,7 @@ function HorizontalCard({ note, deleteNote, isSelectionMode, isSelected, onToggl
     // If in selection mode, toggle selection instead of navigating
     if (isSelectionMode) {
       e.preventDefault()
-      onToggleSelect()
+      onToggleSelect(note.id)
     }
   }
 
@@ -100,7 +100,7 @@ function HorizontalCard({ note, deleteNote, isSelectionMode, isSelected, onToggl
         <div className={styles.checkbox}>
           <input type='checkbox'
             checked={isSelected}
-            onChange={onToggleSelect}
+            onChange={() => onToggleSelect(note.id)}
             onClick={e => e.stopPropagation()}
           />
         </div>
@@ -183,4 +183,4 @@ function HorizontalCard({ note, deleteNote, isSelectionMode, isSelected, onToggl
   )
 }
 
-export default HorizontalCard
+export default memo(HorizontalCard)
