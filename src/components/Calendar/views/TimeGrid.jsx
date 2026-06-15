@@ -2,7 +2,8 @@ import { useRef, useState, useMemo, useEffect } from 'react'
 import styles from './TimeGrid.module.css'
 import { isTodayISO, DAY_NAMES } from '../calendarDates'
 import {
-    HOUR_PX, DAY_PX, MIN_BLOCK_PX, snap15, minutesToY, timeToMinutes, minutesToTime, pointToDayTime, packLanes,
+    HOUR_PX, MIN_BLOCK_PX, snap15, minutesToY, timeToMinutes, minutesToTime, pointToDayTime, packLanes,
+    setVisibleHours, gridHeight, hourToY,
 } from './timeGridGeom'
 
 const DRAG_THRESHOLD = 4
@@ -10,7 +11,21 @@ const DEFAULT_DUR = 60 // minutes — display height for items without a real en
 const MIN_COL = 150    // px — each day column's minimum width; columns expand to fill, else scroll
 const HOURS = Array.from({ length: 24 }, (_, h) => h)
 
-const hourLabel = (h) => h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`
+const hourLabel = (h) => h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : h === 24 ? '12 AM' : `${h - 12} PM`
+const hourOf = (it) => Math.floor(timeToMinutes(it.time) / 60)
+
+// Maximal runs of consecutive hidden hours, e.g. {1,2,3,9} → [[1,3],[9,9]].
+function hiddenRuns(hiddenSet) {
+    const runs = []
+    let start = null
+    for (let h = 0; h <= 24; h++) {
+        const on = h < 24 && hiddenSet.has(h)
+        if (on && start === null) start = h
+        else if (!on && start !== null) { runs.push([start, h - 1]); start = null }
+    }
+    return runs
+}
+const runLabel = (s, e) => `${hourLabel(s)}–${hourLabel(e + 1)}`
 
 function srcClass(item) {
     if (item.kind === 'task') return styles.srcTask
@@ -47,6 +62,29 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
     const sideBySide = days.length === 1 // Day view → render ephemeral dailies; Week → just a badge
     const ephAt = (iso) => (ephemeralAt ? ephemeralAt(iso) : [])
 
+    // Hidden hours — per-view (Day/Week independent), persisted. The geometry mapping is a module
+    // singleton synced here each render (only one TimeGrid renders at a time), so minutesToY /
+    // pointToDayTime / the drawer all stay hidden-aware. Empty set → identity (default unchanged).
+    const storageKey = `cinder_cal_hidden_hours_${sideBySide ? 'day' : 'week'}`
+    const [hidden, setHidden] = useState(() => {
+        try { const a = JSON.parse(localStorage.getItem(storageKey) || '[]'); return new Set(Array.isArray(a) ? a : []) } catch { return new Set() }
+    })
+    setVisibleHours(hidden)
+    const anchorRef = useRef(null)
+    const saveHidden = (next) => { setHidden(next); try { localStorage.setItem(storageKey, JSON.stringify([...next])) } catch { /* */ } }
+    const hideHour = (h, shift) => {
+        const next = new Set(hidden)
+        if (shift && anchorRef.current != null) {
+            const lo = Math.min(anchorRef.current, h), hi = Math.max(anchorRef.current, h)
+            for (let x = lo; x <= hi; x++) next.add(x)
+        } else next.add(h)
+        anchorRef.current = h
+        saveHidden(next)
+    }
+    const revealRun = (s, e) => { const next = new Set(hidden); for (let h = s; h <= e; h++) next.delete(h); saveHidden(next) }
+    const showAllHours = () => saveHidden(new Set())
+    const visibleHours = HOURS.filter(h => !hidden.has(h))
+
     // Now-line position, refreshed each minute.
     const [nowMin, setNowMin] = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() })
     useEffect(() => {
@@ -74,7 +112,8 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
             // Day view also lays out timed ephemeral dailies alongside blocks/tasks; Week doesn't.
             const base = itemsAt(iso).filter(it => it.time)
             const eph = sideBySide ? ephAt(iso).filter(it => it.time) : []
-            const timed = [...base, ...eph].map(it => {
+            // Items starting in a hidden hour drop off the grid (counted on the pill instead).
+            const timed = [...base, ...eph].filter(it => !hidden.has(hourOf(it))).map(it => {
                 const startMin = timeToMinutes(it.time)
                 return { it, startMin, endMin: endMinutesOf(it, startMin) }
             })
@@ -82,7 +121,20 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
         }
         return map
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [days.join('|'), itemsAt, ephemeralAt, sideBySide])
+    }, [days.join('|'), itemsAt, ephemeralAt, sideBySide, hidden])
+
+    // Block count per hidden run (shown on the pills) so hidden content isn't silently lost.
+    const hiddenMeta = useMemo(() => {
+        const runs = hiddenRuns(hidden)
+        if (!runs.length) return []
+        const perHour = {}
+        for (const iso of days) {
+            const timed = [...itemsAt(iso).filter(it => it.time), ...(sideBySide ? ephAt(iso).filter(it => it.time) : [])]
+            for (const it of timed) { const h = hourOf(it); if (hidden.has(h)) perHour[h] = (perHour[h] || 0) + 1 }
+        }
+        return runs.map(([s, e]) => { let k = 0; for (let h = s; h <= e; h++) k += perHour[h] || 0; return { s, e, count: k } })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hidden, days.join('|'), itemsAt, ephemeralAt, sideBySide])
 
     // Drag/resize bookkeeping. `dragInfo` drives the live preview (and dims the source block).
     const drag = useRef(null)
@@ -216,7 +268,11 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
           <div className={styles.hscroll}>
             {/* Day header */}
             <div className={styles.headRow} style={gridStyle}>
-                <div className={styles.gutterCorner} />
+                <div className={styles.gutterCorner}>
+                    {hidden.size > 0 && (
+                        <button className={styles.showAllBtn} title="Show all hours" onClick={showAllHours}>👁 all</button>
+                    )}
+                </div>
                 {days.map(iso => {
                     const d = new Date(iso + 'T00:00:00')
                     return (
@@ -300,13 +356,31 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                 })}
             </div>
 
+            {/* Hidden-hours pills — click to reveal that run; eye-all in the gutter corner shows all. */}
+            {hiddenMeta.length > 0 && (
+                <div className={styles.hiddenBar}>
+                    {hiddenMeta.map(run => (
+                        <button key={run.s} className={styles.hiddenPill} onClick={() => revealRun(run.s, run.e)} title="Show these hours">
+                            {run.e - run.s + 1}h hidden · {runLabel(run.s, run.e)}{run.count ? ` · ${run.count}` : ''} · show
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {/* Scrollable timeline */}
             <div className={styles.body} ref={scrollRef}>
                 <div className={styles.grid} style={gridStyle}>
-                    {/* Hour gutter */}
-                    <div className={styles.gutter} style={{ height: DAY_PX }}>
-                        {HOURS.map(h => (
-                            <div key={h} className={styles.hourLabel} style={{ top: h * HOUR_PX }}>{hourLabel(h)}</div>
+                    {/* Hour gutter — visible hours only; each label has a hide (eye-off) button. */}
+                    <div className={styles.gutter} style={{ height: gridHeight() }}>
+                        {visibleHours.map(h => (
+                            <div key={h} className={styles.hourLabel} style={{ top: hourToY(h) }}>
+                                <span>{hourLabel(h)}</span>
+                                <button
+                                    className={styles.hideHourBtn}
+                                    title="Hide this hour (shift-click for a range)"
+                                    onClick={(e) => { e.stopPropagation(); hideHour(h, e.shiftKey) }}
+                                >⊘</button>
+                            </div>
                         ))}
                     </div>
 
@@ -322,12 +396,12 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                             key={iso}
                             className={`${styles.col} ${isTodayISO(iso) ? styles.colToday : ''}`}
                             data-col={iso}
-                            style={{ height: DAY_PX }}
+                            style={{ height: gridHeight() }}
                             onClick={(e) => onColClick(e, iso)}
                         >
-                            {HOURS.map(h => <div key={h} className={styles.hourLine} style={{ top: h * HOUR_PX }} />)}
+                            {visibleHours.map(h => <div key={h} className={styles.hourLine} style={{ top: hourToY(h) }} />)}
 
-                            {isTodayISO(iso) && (
+                            {isTodayISO(iso) && !hidden.has(Math.floor(nowMin / 60)) && (
                                 <div className={styles.nowLine} style={{ top: minutesToY(nowMin) }}><span className={styles.nowDot} /></div>
                             )}
 

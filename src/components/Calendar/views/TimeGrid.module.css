@@ -30,7 +30,7 @@
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
 }
-.gutterCorner { border-right: 1px solid var(--border-default); }
+.gutterCorner { border-right: 1px solid var(--border-default); display: grid; place-items: center; padding: 2px; }
 .dayHead {
   display: flex;
   align-items: baseline;
@@ -127,8 +127,63 @@
   font-family: var(--font-mono);
   font-size: 9px;
   color: var(--text-muted);
+  /* Time on top, the hide button stacked just below it. */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
 }
 .hourLabel:first-child { transform: none; } /* 12 AM sits at the very top, not clipped */
+/* Per-hour hide (eye-off) button, below the hour label — appears on gutter hover. */
+.hideHourBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  padding: 1px 3px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.gutter:hover .hideHourBtn { opacity: 0.5; }
+.hideHourBtn:hover { opacity: 1; color: var(--accent-warning); }
+
+/* "Show all hours" in the gutter corner (only when some are hidden). */
+.showAllBtn {
+  background: var(--accent-warning-alpha);
+  border: 1px solid var(--accent-warning);
+  color: var(--accent-warning);
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 2px 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Hidden-hours pill bar (under the all-day row). */
+.hiddenBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  flex: 0 0 auto;
+}
+.hiddenPill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.hiddenPill:hover { border-color: var(--accent-warning); color: var(--accent-warning); }
 
 /* Day column */
 .col { position: relative; border-left: 1px solid var(--border-default); cursor: pointer; }
