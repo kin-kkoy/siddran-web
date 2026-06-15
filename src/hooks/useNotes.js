@@ -62,7 +62,8 @@ export const useNotes = (authFetch, API, isAuthed) => {
 
     }, [isAuthed, authFetch, API])
 
-    // ----------- Prefetch each notebook's notes in parallel ===============================
+    // ----------- Prefetch notebook notes in ONE batched request ===========================
+    // (was one GET /notebooks/:id/notes per notebook — an N+1 on every load.)
     useEffect(() => {
         if (!isAuthed || notebooks.length === 0) return
 
@@ -75,26 +76,18 @@ export const useNotes = (authFetch, API, isAuthed) => {
 
         let cancelled = false
         const prefetch = async () => {
-            const results = await Promise.allSettled(
-                idsToFetch.map(async (id) => {
-                    const res = await authFetch(`${API}/notebooks/${id}/notes`)
-                    if (!res.ok) throw new Error(`Failed to prefetch notes for notebook ${id}`)
-                    const data = await res.json()
-                    return { id, notes: data.notes }
-                })
-            )
-            if (cancelled) return
-            setNotebookNotesById(prev => {
-                const next = { ...prev }
-                for (const r of results) {
-                    if (r.status === 'fulfilled') {
-                        next[r.value.id] = r.value.notes
-                    } else {
-                        logger.error('Notebook prefetch failed:', r.reason)
-                    }
-                }
-                return next
-            })
+            try {
+                const res = await authFetch(`${API}/notebooks/notes-batch?ids=${idsToFetch.join(',')}`)
+                if (!res.ok) throw new Error('Failed to prefetch notebook notes')
+                const { notesByNotebook } = await res.json()
+                if (cancelled) return
+                setNotebookNotesById(prev => ({ ...prev, ...notesByNotebook }))
+            } catch (error) {
+                if (cancelled) return
+                logger.error('Notebook prefetch failed:', error)
+                // This set didn't load — un-mark so a later notebooks change can retry it.
+                idsToFetch.forEach(id => prefetchedNotebookIdsRef.current.delete(id))
+            }
         }
         prefetch()
         return () => { cancelled = true }
@@ -423,9 +416,10 @@ export const useNotes = (authFetch, API, isAuthed) => {
             })
             prefetchedNotebookIdsRef.current.delete(id)
 
-            // Refresh the notes to update their notebook_id and appear on the lists of notes
-            const noteRes = await authFetch(`${API}/notes`) // just call GET again
-            if(noteRes.ok) setNotes(await noteRes.json())
+            // The notebook's notes were ON DELETE SET NULL'd server-side, so they're now lone notes.
+            // Clear notebook_id locally so they show in the lists — no need to refetch all of /notes.
+            // (The old refetch also stored the wrong shape: /notes returns {notes, pagination}, not an array.)
+            setNotes(prev => prev.map(n => n.notebook_id === id ? { ...n, notebook_id: null } : n))
 
         } catch (error) {
             logger.error(error)
