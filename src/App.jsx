@@ -20,6 +20,8 @@ import { useTasks } from "./hooks/useTasks.js"
 import { useCalendarEvents } from "./hooks/useCalendarEvents.js"
 import { useCalendarTasks } from "./hooks/useCalendarTasks.js"
 import { useCalendarDailies } from "./hooks/useCalendarDailies.js"
+import { useSchedules } from "./hooks/useSchedules.js"
+import { stampWeeklyPattern } from "./components/Calendar/calendarDates.js"
 import { useCalendarView } from "./contexts/CalendarViewContext.jsx"
 import CalendarPeek from "./components/Calendar/Peek/CalendarPeek.jsx"
 import { SettingsProvider } from "./contexts/SettingsContext.jsx"
@@ -31,6 +33,7 @@ import logger from "./utils/logger.js"
 
 // Block fields compared when diffing a plan-mode session (snapshot vs working copy).
 const PLAN_EVENT_FIELDS = ['title', 'description', 'start_at', 'end_at', 'all_day', 'color', 'ref_type', 'ref_id']
+const EMPTY_LIST = [] // stable ref: hidden tasks/dailies while in the Designer's blank canvas
 
 // Lightweight loading state shown while the lazy Sandbox chunk is fetching.
 // Kept minimal so it does not flash garishly against the dark Cinder shell.
@@ -277,8 +280,9 @@ function App() {
 
   // Lifted to App level so the root-mounted peek and the /calendar route share one source.
   const {
-    events: calendarEvents, addEvent, updateEvent, deleteEvent
+    events: calendarEvents, addEvent, updateEvent, deleteEvent, addEvents, removeEventsBySchedule, recolorEventsBySchedule
   } = useCalendarEvents(authFetch, API, isAuthed && calendarActive)
+  const { schedules, createSchedule, deleteSchedule, updateSchedule } = useSchedules(authFetch, API, isAuthed && calendarActive)
   const {
     tasks: calendarTasks, undated: calendarUndated, retimeTask, scheduleTask
   } = useCalendarTasks(authFetch, API, isAuthed && calendarActive)
@@ -402,14 +406,39 @@ function App() {
     return { total: n }
   }, [planning, planEvents, planSnapshot, planTasks, planTaskSnap, planEph, planEphSnap])
 
-  // Effective sources + mutations: staged while planning, real otherwise.
-  const effEvents = planning ? planAnnotated : calendarEvents
-  const effAddEvent = planning ? stagedAddEvent : addEvent
-  const effUpdateEvent = planning ? stagedUpdateEvent : updateEvent
-  const effDeleteEvent = planning ? stagedDeleteEvent : deleteEvent
-  const effTasks = planning ? planTasksAnnotated : calendarTasks
-  const effUndated = planning ? planUndated : calendarUndated
-  const effEphemeral = planning ? planEphAnnotated : ephemeralDailies
+  // ---- Schedule Designer: a blank-canvas mode to design a weekly timetable, then stamp it across a
+  // date range as a named "schedule" (a group of concrete blocks). While designing, the calendar shows
+  // ONLY the plotted working set (real items hidden); Apply → POST /schedules; close → drop the plot.
+  const [designing, setDesigning] = useState(false)
+  const [plotEvents, setPlotEvents] = useState([])
+  const plotTempId = useRef(0)
+  const enterDesigner = useCallback(() => { setPlotEvents([]); setDesigning(true); calView.setView('week') }, [calView])
+  const exitDesigner = useCallback(() => { setDesigning(false); setPlotEvents([]) }, [])
+  const plotAddEvent = useCallback((payload) => { const id = `plot-${plotTempId.current++}`; setPlotEvents(prev => [...prev, { id, description: null, ...payload }]) }, [])
+  const plotUpdateEvent = useCallback((id, patch) => setPlotEvents(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e)), [])
+  const plotDeleteEvent = useCallback((id) => setPlotEvents(prev => prev.filter(e => e.id !== id)), [])
+  const plotAnnotated = useMemo(() => plotEvents.map(e => ({ ...e, _planState: 'new' })), [plotEvents]) // all plotted blocks render as drafts
+  const applyDesign = useCallback(async ({ name, color, from, to }) => {
+    const events = stampWeeklyPattern(plotEvents, from, to)
+    if (!events.length) return
+    const colored = color ? events.map(e => ({ ...e, color: e.color || color })) : events
+    const result = await createSchedule({ name, color: color || null, events: colored })
+    if (result) { addEvents(result.events); exitDesigner() }
+  }, [plotEvents, createSchedule, addEvents, exitDesigner])
+
+  // Schedule management — reflect the DB op in the events cache.
+  const onDeleteSchedule = useCallback(async (id) => { if (await deleteSchedule(id)) removeEventsBySchedule(id) }, [deleteSchedule, removeEventsBySchedule])
+  const onRecolorSchedule = useCallback(async (id, color) => { if (await updateSchedule(id, { color })) recolorEventsBySchedule(id, color) }, [updateSchedule, recolorEventsBySchedule])
+  const onRenameSchedule = useCallback((id, name) => updateSchedule(id, { name }), [updateSchedule])
+
+  // Effective sources + mutations: designer (blank plot) > plan session (staged) > real.
+  const effEvents = designing ? plotAnnotated : (planning ? planAnnotated : calendarEvents)
+  const effAddEvent = designing ? plotAddEvent : (planning ? stagedAddEvent : addEvent)
+  const effUpdateEvent = designing ? plotUpdateEvent : (planning ? stagedUpdateEvent : updateEvent)
+  const effDeleteEvent = designing ? plotDeleteEvent : (planning ? stagedDeleteEvent : deleteEvent)
+  const effTasks = designing ? EMPTY_LIST : (planning ? planTasksAnnotated : calendarTasks)
+  const effUndated = designing ? EMPTY_LIST : (planning ? planUndated : calendarUndated)
+  const effEphemeral = designing ? EMPTY_LIST : (planning ? planEphAnnotated : ephemeralDailies)
   const effOnTaskRetime = planning ? stagedRetimeTask : onTaskRetime
   const effOnTaskSchedule = planning ? stagedScheduleTask : onTaskSchedule
   const effOnDailyTime = planning ? stagedSetDailyTime : setDailyTime
@@ -443,6 +472,8 @@ function App() {
     events: effEvents,
     addEvent: effAddEvent, updateEvent: effUpdateEvent, deleteEvent: effDeleteEvent,
     planning, enterPlan, applyPlan, discardPlan, planPending,
+    designing, enterDesigner, exitDesigner, applyDesign,
+    schedules, onDeleteSchedule, onRecolorSchedule, onRenameSchedule,
     dailyTasks: recurringDailies, // all recurring dailies (not useTasks' paginated first page)
     ephemeralDailies: effEphemeral, // active one-off "today's tasks" — Day view + Week/Month badge
     dailyCompletions,

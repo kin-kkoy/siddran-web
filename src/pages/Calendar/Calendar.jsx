@@ -6,6 +6,8 @@ import MonthView from '../../components/Calendar/views/MonthView.jsx'
 import WeekView from '../../components/Calendar/views/WeekView.jsx'
 import DayView from '../../components/Calendar/views/DayView.jsx'
 import EventModal from '../../components/Calendar/EventModal.jsx'
+import ApplyDesignDialog from '../../components/Calendar/ApplyDesignDialog.jsx'
+import SchedulesModal from '../../components/Calendar/SchedulesModal.jsx'
 import { useCalendar } from '../../hooks/useCalendar.js'
 import { useCalendarView } from '../../contexts/CalendarViewContext.jsx'
 import {
@@ -18,10 +20,12 @@ const VIEWS = ['day', 'week', 'month']
 // Full-route Calendar (also rendered in the half-split pane via mode="half"). View + focused day
 // live in CalendarViewContext so the peek, the route, and the half pane all stay in sync. Calendar
 // data + task mutations are passed in from App (shared with the peek — single fetch).
-function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, planning, enterPlan, applyPlan, discardPlan, planPending, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
+function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, planning, enterPlan, applyPlan, discardPlan, planPending, designing, enterDesigner, exitDesigner, applyDesign, schedules, onDeleteSchedule, onRecolorSchedule, onRenameSchedule, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
     const { view, setView, focusedDay, setFocusedDay, unpin } = useCalendarView()
     const navigate = useNavigate()
     const [modal, setModal] = useState(null) // { mode, draft } | null
+    const [applyOpen, setApplyOpen] = useState(false)
+    const [schedulesOpen, setSchedulesOpen] = useState(false)
 
     // Deep-link a linked block to its target. note/sandbox have real detail routes; task/daily/
     // project open their detail modal in TasksHub via a query param the TasksHub bridge consumes.
@@ -125,36 +129,53 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
     }, [updateEvent])
 
     return (
-        <div className={`${styles.page} ${mode === 'half' ? styles.pageHalf : ''} ${planning ? styles.planning : ''}`}>
+        <div className={`${styles.page} ${mode === 'half' ? styles.pageHalf : ''} ${(planning || designing) ? styles.planning : ''}`}>
             <div className={styles.head}>
                 <h1 className={styles.title}>Cal<span className={styles.accent}>endar</span></h1>
 
-                <div className={styles.monthNav}>
-                    <button className={styles.navBtn} onClick={() => shift(-1)} aria-label="Previous"><FiChevronLeft /></button>
-                    <button className={styles.todayBtn} onClick={goToday}>Today</button>
-                    <button className={styles.navBtn} onClick={() => shift(1)} aria-label="Next"><FiChevronRight /></button>
-                    <span className={styles.monthLabel}>{headerLabel}</span>
-                </div>
+                {designing ? (
+                    <span className={styles.planPill}><span className={styles.planDot} /> Designer · blank week</span>
+                ) : (
+                    <div className={styles.monthNav}>
+                        <button className={styles.navBtn} onClick={() => shift(-1)} aria-label="Previous"><FiChevronLeft /></button>
+                        <button className={styles.todayBtn} onClick={goToday}>Today</button>
+                        <button className={styles.navBtn} onClick={() => shift(1)} aria-label="Next"><FiChevronRight /></button>
+                        <span className={styles.monthLabel}>{headerLabel}</span>
+                    </div>
+                )}
 
                 <div className={styles.spacer} />
 
-                <div className={styles.planControls}>
-                    {!planning ? (
-                        <button className={styles.planBtn} onClick={enterPlan} title="Plan tentatively — changes apply only when you save">✎ Plan</button>
-                    ) : (
-                        <>
-                            <span className={styles.planPill}><span className={styles.planDot} /> Planning{planPending?.total ? ` · ${planPending.total}` : ''}</span>
-                            <button className={styles.applyBtn} onClick={applyPlan} disabled={!planPending?.total} title="Apply all changes">✓ Apply</button>
-                            <button className={styles.discardBtn} onClick={discardPlan} title="Discard changes">↩ Discard</button>
-                        </>
-                    )}
-                </div>
+                {designing ? (
+                    <div className={styles.planControls}>
+                        <button className={styles.applyBtn} onClick={() => setApplyOpen(true)} disabled={events.length === 0} title="Apply this week across a date range">✓ Apply…</button>
+                        <button className={styles.discardBtn} onClick={exitDesigner} title="Close the designer (discard the plot)">✕ Close</button>
+                    </div>
+                ) : (
+                    <>
+                        <div className={styles.planControls}>
+                            {!planning ? (
+                                <>
+                                    <button className={styles.planBtn} onClick={enterPlan} title="Plan tentatively — changes apply only when you save">✎ Plan</button>
+                                    <button className={styles.planBtn} onClick={enterDesigner} title="Design a weekly schedule on a blank canvas, then stamp it across a date range">⊞ Designer</button>
+                                    <button className={styles.planBtn} onClick={() => setSchedulesOpen(true)} title="Manage saved schedules">≡ Schedules</button>
+                                </>
+                            ) : (
+                                <>
+                                    <span className={styles.planPill}><span className={styles.planDot} /> Planning{planPending?.total ? ` · ${planPending.total}` : ''}</span>
+                                    <button className={styles.applyBtn} onClick={applyPlan} disabled={!planPending?.total} title="Apply all changes">✓ Apply</button>
+                                    <button className={styles.discardBtn} onClick={discardPlan} title="Discard changes">↩ Discard</button>
+                                </>
+                            )}
+                        </div>
 
-                <div className={styles.seg}>
-                    {VIEWS.map(v => (
-                        <button key={v} className={view === v ? styles.segOn : ''} onClick={() => setView(v)}>{v}</button>
-                    ))}
-                </div>
+                        <div className={styles.seg}>
+                            {VIEWS.map(v => (
+                                <button key={v} className={view === v ? styles.segOn : ''} onClick={() => setView(v)}>{v}</button>
+                            ))}
+                        </div>
+                    </>
+                )}
 
                 {mode === 'half' && (
                     <button className={styles.collapseBtn} onClick={unpin} title="Collapse to peek"><FiMinimize2 /></button>
@@ -173,6 +194,23 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
 
             {modal && (
                 <EventModal mode={modal.mode} draft={modal.draft} onSave={handleSave} onDelete={handleDelete} onClose={() => setModal(null)} onOpenLink={handleOpenLink} authFetch={authFetch} API={API} />
+            )}
+
+            {applyOpen && (
+                <ApplyDesignDialog
+                    blockCount={events.length}
+                    onApply={async (args) => { await applyDesign(args); setApplyOpen(false) }}
+                    onClose={() => setApplyOpen(false)}
+                />
+            )}
+            {schedulesOpen && (
+                <SchedulesModal
+                    schedules={schedules}
+                    onDelete={onDeleteSchedule}
+                    onRecolor={onRecolorSchedule}
+                    onRename={onRenameSchedule}
+                    onClose={() => setSchedulesOpen(false)}
+                />
             )}
         </div>
     )

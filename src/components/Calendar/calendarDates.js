@@ -112,3 +112,37 @@ export function timeOf(ts) {
     const d = new Date(ts);
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
+
+// Schedule Designer: repeat each plotted block (an event in a representative week) on every matching
+// weekday across the inclusive [fromISO, toISO] range → concrete event payloads. weekday + time-of-day
+// are extracted from each block; all-day blocks stamp as all-day.
+export function stampWeeklyPattern(blocks, fromISO, toISO) {
+    const from = parseISODate(fromISO), to = parseISODate(toISO);
+    if (!from || !to || from > to) return [];
+    const specs = blocks.map(b => {
+        const start = new Date(b.start_at);
+        return {
+            weekday: start.getDay(),
+            startTime: b.all_day ? null : timeOf(b.start_at),
+            endTime: (!b.all_day && b.end_at) ? timeOf(b.end_at) : null,
+            all_day: !!b.all_day,
+            title: b.title,
+            color: b.color || null,
+        };
+    });
+    const out = [];
+    for (let d = from; d <= to; d = addDays(d, 1)) {
+        const wd = d.getDay(), dayISO = isoDate(d);
+        for (const s of specs) {
+            if (s.weekday !== wd) continue;
+            out.push({
+                title: s.title,
+                start_at: toISOFromParts(dayISO, s.all_day ? null : s.startTime),
+                end_at: s.endTime ? toISOFromParts(dayISO, s.endTime) : null,
+                all_day: s.all_day,
+                color: s.color,
+            });
+        }
+    }
+    return out;
+}

@@ -135,11 +135,26 @@ export const useCalendarEvents = (authFetch, API, isAuthed) => {
     }, [authFetch, API])
 
 
+    // Bulk-append created rows (Schedule Designer apply → POST /schedules returns its events).
+    const addEvents = useCallback((list) => {
+        if (Array.isArray(list) && list.length) setEvents(prev => [...prev, ...list])
+    }, [])
+    // Schedule management reflected in the cache (the schedules route did the DB work).
+    const removeEventsBySchedule = useCallback((scheduleId) => {
+        setEvents(prev => prev.filter(e => e.schedule_id !== scheduleId))
+    }, [])
+    const recolorEventsBySchedule = useCallback((scheduleId, color) => {
+        setEvents(prev => prev.map(e => e.schedule_id === scheduleId ? { ...e, color } : e))
+    }, [])
+
     return {
         events,
         loading,
         addEvent,
         updateEvent,
         deleteEvent,
+        addEvents,
+        removeEventsBySchedule,
+        recolorEventsBySchedule,
     }
 }
