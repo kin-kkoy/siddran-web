@@ -42,7 +42,7 @@ function endMinutesOf(it, startMin) {
 // (HOUR_PX/hr); blocks are absolutely positioned (top = start, height = duration) and overlaps
 // pack into side-by-side lanes. Drag a block to move it (snap 15 min); drag its bottom edge to
 // resize (blocks only). Click empty space to create at that time. All-day items sit in the top row.
-export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEventClick, onRetime, onResizeEvent, onToggleDaily, onDailyTime, onDailyDone, onJumpToDay, onDismissConflict }) {
+export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEventClick, onRetime, onResizeEvent, onUnschedule, onToggleDaily, onDailyTime, onDailyDone, onJumpToDay, onDismissConflict }) {
     const scrollRef = useRef(null)
     const sideBySide = days.length === 1 // Day view → render ephemeral dailies; Week → just a badge
     const ephAt = (iso) => (ephemeralAt ? ephemeralAt(iso) : [])
@@ -87,11 +87,13 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
     // Drag/resize bookkeeping. `dragInfo` drives the live preview (and dims the source block).
     const drag = useRef(null)
     const [dragInfo, setDragInfo] = useState(null) // { key, mode, day, startMin, endMin }
+    const [allDayOver, setAllDayOver] = useState(null) // { iso, title } while dragging over the all-day row
 
     const onBlockDown = (e, it) => {
         if (it.kind === 'daily' && !it.ephemeral) return // recurring is recurrence-bound; ephemeral is draggable
         const isResize = !!e.target.closest?.('[data-resize]')
-        const startMin = timeToMinutes(it.time)
+        // All-day items have no time — default to 9:00 so dropping one on the timeline lands sensibly.
+        const startMin = it.time ? timeToMinutes(it.time) : 9 * 60
         drag.current = {
             mode: isResize && it.kind === 'event' ? 'resize' : 'move',
             it, startX: e.clientX, startY: e.clientY, dragging: false,
@@ -106,6 +108,16 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
         if (!st.dragging) {
             if (Math.hypot(e.clientX - st.startX, e.clientY - st.startY) < DRAG_THRESHOLD) return
             st.dragging = true
+        }
+        // Over the all-day row → show an all-day drop indicator instead of the timeline ghost.
+        if (st.mode === 'move') {
+            const allDayCell = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-allday]')
+            if (allDayCell) {
+                setAllDayOver({ iso: allDayCell.getAttribute('data-col'), title: st.it.title })
+                setDragInfo(null)
+                return
+            }
+            setAllDayOver(null)
         }
         const pt = pointToDayTime(e.clientX, e.clientY)
         if (!pt) return
@@ -124,12 +136,26 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
         try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* */ }
         const info = dragInfo
         setDragInfo(null)
+        setAllDayOver(null)
         if (!st?.dragging) { onEventClick(it); return }
+        // Drop a dated task onto the unscheduled drawer → clear its due_date (un-schedule it).
+        if (it.kind === 'task' && onUnschedule && document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-unschedule]')) {
+            onUnschedule(it.id)
+            return
+        }
         // Ephemeral daily: dragging sets its time (drop on the all-day row → untimed); never changes day.
         if (it.ephemeral) {
             const onAllDay = !!document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-allday]')
             onDailyTime?.(it.id, onAllDay ? null : minutesToTime((info ?? st).startMin))
             return
+        }
+        // Dropped on the all-day row → make this block/task all-day on that cell's day.
+        if (it.kind === 'task' || it.kind === 'event') {
+            const allDayCell = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-allday]')
+            if (allDayCell) {
+                onRetime?.(it, allDayCell.getAttribute('data-col') || it.day, null)
+                return
+            }
         }
         if (st.mode === 'move' && info) onRetime?.(it, info.day, minutesToTime(info.startMin))
         else if (st.mode === 'resize' && info && it.kind === 'event') onResizeEvent?.(it, info.day, minutesToTime(info.endMin))
@@ -210,25 +236,38 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                     const ephUntimed = sideBySide ? ephAt(iso).filter(it => !it.time) : []
                     const ephCount = sideBySide ? 0 : ephAt(iso).length
                     return (
-                        <div key={iso} className={styles.allDayCell} data-col={iso} data-allday="1" onClick={() => onSlotClick(iso, null)}>
-                            {allDayItems.map(it => (
+                        <div key={iso} className={`${styles.allDayCell} ${allDayOver?.iso === iso ? styles.allDayCellOver : ''}`} data-col={iso} data-allday="1" onClick={() => onSlotClick(iso, null)}>
+                            {allDayOver?.iso === iso && (
+                                <div className={styles.allDayPreview}>{allDayOver.title || 'All day'}</div>
+                            )}
+                            {allDayItems.map(it => {
+                                // Events + tasks can be dragged onto the timeline (set a time), to
+                                // another day's all-day cell, or (tasks) onto the drawer to unschedule.
+                                // Recurring dailies stay recurrence-bound (click only).
+                                const draggable = it.kind === 'event' || it.kind === 'task'
+                                return (
                                 <div
                                     key={it.key}
-                                    className={[styles.chip, srcClass(it), it.planState === 'new' ? styles.draft : '', it.planState === 'edited' ? styles.modified : '', it.done ? styles.done : ''].filter(Boolean).join(' ')}
+                                    className={[styles.chip, srcClass(it), it.planState === 'new' ? styles.draft : '', it.planState === 'edited' ? styles.modified : '', it.done ? styles.done : '', draggable ? styles.draggable : ''].filter(Boolean).join(' ')}
                                     style={it.color ? { borderLeftColor: it.color } : undefined}
                                     title={it.title}
-                                    onClick={(e) => { e.stopPropagation(); onEventClick(it) }}
+                                    onClick={(e) => { e.stopPropagation(); if (!draggable) onEventClick(it) }}
+                                    onPointerDown={draggable ? (e) => onBlockDown(e, it) : undefined}
+                                    onPointerMove={draggable ? onBlockMove : undefined}
+                                    onPointerUp={draggable ? (e) => { e.stopPropagation(); onBlockUp(e, it) } : undefined}
                                 >
                                     {it.kind === 'daily' && onToggleDaily && (
                                         <button
                                             className={`${styles.dailyCheck} ${it.done ? styles.dailyCheckOn : ''}`}
                                             aria-label={it.done ? 'Mark not done' : 'Mark done'}
+                                            onPointerDown={(e) => e.stopPropagation()}
                                             onClick={(e) => { e.stopPropagation(); onToggleDaily(it.id, it.day, !it.done) }}
                                         >{it.done ? '✓' : ''}</button>
                                     )}
                                     <span className={styles.chipTitle}>{it.title}</span>
                                 </div>
-                            ))}
+                                )
+                            })}
                             {/* Untimed ephemeral dailies (Day) — drag onto the grid to give them a time */}
                             {ephUntimed.map(it => (
                                 <div

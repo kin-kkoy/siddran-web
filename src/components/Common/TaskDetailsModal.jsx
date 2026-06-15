@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { FiXCircle } from 'react-icons/fi'
 import styles from './TaskDetailsModal.module.css'
 import { useModalPresence } from '../../utils/modalPresence'
 
@@ -46,15 +47,12 @@ function TaskDetailsModal({onClose, task, updateTask, isDailyTask}) {
         if (e.target === e.currentTarget) handleClose()
     }
 
-    const formatDate = (dateStr) => {
-        if (!dateStr) return null
-        const date = new Date(dateStr)
-        return date.toLocaleDateString(undefined, {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        })
+    // ISO timestamp → value for a <input type="datetime-local"> (local time, no seconds).
+    const toLocalInput = (iso) => {
+        if (!iso) return ''
+        const d = new Date(iso)
+        const pad = n => String(n).padStart(2, '0')
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
     }
 
     return (
@@ -106,7 +104,7 @@ function TaskDetailsModal({onClose, task, updateTask, isDailyTask}) {
 
                     {/* Priority & Deadline */}
                     <div className={styles.metaRow}>
-                        <div className={styles.metaItem}>
+                        <div className={`${styles.metaItem} ${styles.priorityItem}`}>
                             <span className={styles.fieldLabel}>Priority</span>
                             <select
                                 className={styles.prioritySelect}
@@ -120,11 +118,29 @@ function TaskDetailsModal({onClose, task, updateTask, isDailyTask}) {
                         </div>
 
                         {!isDailyTask && (
-                            <div className={styles.metaItem}>
+                            <div className={`${styles.metaItem} ${styles.deadlineItem}`}>
                                 <span className={styles.fieldLabel}>Deadline</span>
-                                <span className={`${styles.deadline} ${!dueDate ? styles.noDate : ''}`}>
-                                    {formatDate(dueDate) || 'No deadline set'}
-                                </span>
+                                <div className={styles.deadlineRow}>
+                                    <input
+                                        type="datetime-local"
+                                        className={styles.dateInput}
+                                        style={{ colorScheme: 'dark' }}
+                                        value={toLocalInput(dueDate)}
+                                        onChange={e => {
+                                            setDueDate(e.target.value ? new Date(e.target.value).toISOString() : null)
+                                            isDirtyRef.current = true
+                                        }}
+                                    />
+                                    {dueDate && (
+                                        <button
+                                            type="button"
+                                            className={styles.clearDeadlineBtn}
+                                            onClick={() => { setDueDate(null); isDirtyRef.current = true }}
+                                            title="Clear deadline"
+                                            aria-label="Clear deadline"
+                                        ><FiXCircle size={16} /></button>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>

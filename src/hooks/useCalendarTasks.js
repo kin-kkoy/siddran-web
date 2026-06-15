@@ -101,6 +101,32 @@ export function useCalendarTasks(authFetch, API, isAuthed) {
         }
     }, [authFetch, API])
 
+    // Unschedule a dated task (drag it onto the drawer): clear due_date, moving it from the dated
+    // list into the undated list. Mirror of scheduleTask; optimistic with revert.
+    const unscheduleTask = useCallback(async (id) => {
+        let moved = null
+        setTasks(prev => {
+            moved = prev.find(t => t.id === id) ?? null
+            return prev.filter(t => t.id !== id)
+        })
+        if (moved) setUndated(prev => [{ ...moved, due_date: null }, ...prev])
+
+        try {
+            const res = await authFetch(`${API}/tasks/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ due_date: null })
+            })
+            if (!res.ok) throw new Error('Failed to unschedule task')
+        } catch (error) {
+            logger.error('Error unscheduling task:', error)
+            if (moved) {
+                setUndated(prev => prev.filter(t => t.id !== id))
+                setTasks(prev => [...prev, moved])
+            }
+            toast.error('Could not unschedule that task.')
+        }
+    }, [authFetch, API])
+
     const toggleTask = useCallback(async (id, isCompleted) => {
         setTasks(prev => prev.map(t => t.id === id ? { ...t, is_completed: isCompleted } : t))
         try {
@@ -114,5 +140,5 @@ export function useCalendarTasks(authFetch, API, isAuthed) {
         }
     }, [authFetch, API])
 
-    return { tasks, undated, loading, retimeTask, toggleTask, scheduleTask }
+    return { tasks, undated, loading, retimeTask, toggleTask, scheduleTask, unscheduleTask }
 }

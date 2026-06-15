@@ -182,6 +182,49 @@
     border-color: var(--accent-warning);
 }
 
+/* Priority is compact; Deadline takes the remaining width and its input shrinks (no overflow). */
+.priorityItem { flex: 0 1 150px; min-width: 0; }
+.deadlineItem { flex: 1 1 auto; min-width: 0; }
+.deadlineRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.dateInput {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.dateInput:focus { border-color: var(--accent-warning); }
+
+.clearDeadlineBtn {
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+}
+.clearDeadlineBtn:hover {
+    border-color: var(--accent-danger, #e05c5c);
+    color: var(--accent-danger, #e05c5c);
+}
+
 /* Status toggle */
 .statusBtn {
     display: flex;

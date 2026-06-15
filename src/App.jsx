@@ -284,7 +284,7 @@ function App() {
   } = useCalendarEvents(authFetch, API, isAuthed && calendarActive)
   const { schedules, createSchedule, restampSchedule, deleteSchedule, updateSchedule } = useSchedules(authFetch, API, isAuthed && calendarActive)
   const {
-    tasks: calendarTasks, undated: calendarUndated, retimeTask, scheduleTask
+    tasks: calendarTasks, undated: calendarUndated, retimeTask, scheduleTask, unscheduleTask
   } = useCalendarTasks(authFetch, API, isAuthed && calendarActive)
   // Recurring dailies + per-day completions (gated the same way so non-calendar pages stay quiet).
   const {
@@ -304,6 +304,10 @@ function App() {
     scheduleTask(taskId, due)
     patchTaskInCache(taskId, { due_date: due })
   }, [scheduleTask, patchTaskInCache])
+  const onTaskUnschedule = useCallback((taskId) => {
+    unscheduleTask(taskId)
+    patchTaskInCache(taskId, { due_date: null })
+  }, [unscheduleTask, patchTaskInCache])
 
   // Persist a daily task from ANY surface (TasksHub, calendar quick-add, calendar create-modal) and,
   // if it's recurring, inject it into the calendar's separate recurring set so it plots immediately
@@ -543,7 +547,7 @@ function App() {
     onCreateDaily,
     tasks: effTasks,
     undated: effUndated,
-    onTaskRetime: effOnTaskRetime, onTaskSchedule: effOnTaskSchedule,
+    onTaskRetime: effOnTaskRetime, onTaskSchedule: effOnTaskSchedule, onTaskUnschedule,
     onActivate: activateCalendar,
   }
 

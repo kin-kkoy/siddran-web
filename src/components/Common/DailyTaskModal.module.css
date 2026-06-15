@@ -291,12 +291,20 @@
 
 .taskItem {
     display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-default);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+/* DailyTaskModal-only: stack the clickable row over its inline recurrence panel. (BundleDetailModal
+   shares this stylesheet and keeps the plain row layout above.) */
+.taskItemCol {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-default);
-    transition: background-color 0.2s;
+    cursor: default;
 }
 /* The clickable row (checkbox · title · recur · delete); the recurrence panel sits below it. */
 .taskRow {

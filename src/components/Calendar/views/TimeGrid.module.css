@@ -70,6 +70,21 @@
   min-width: 0;
 }
 .allDayCell:hover { background: var(--bg-hover); }
+/* Drop indicator while dragging a block/task over the all-day row (mirrors .preview). */
+.allDayCellOver { background: var(--accent-warning-alpha); box-shadow: inset 0 0 0 1px var(--accent-warning); }
+.allDayPreview {
+  border: 1px dashed var(--accent-warning);
+  background: var(--accent-warning-alpha);
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-warning);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
 
 /* All-day chip */
 .chip {

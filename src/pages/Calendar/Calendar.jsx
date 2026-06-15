@@ -21,7 +21,7 @@ const VIEWS = ['day', 'week', 'month']
 // Full-route Calendar (also rendered in the half-split pane via mode="half"). View + focused day
 // live in CalendarViewContext so the peek, the route, and the half pane all stay in sync. Calendar
 // data + task mutations are passed in from App (shared with the peek — single fetch).
-function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, planning, enterPlan, applyPlan, discardPlan, planPending, designing, enterDesigner, exitDesigner, applyDesign, onDismissConflict, editingSchedule, schedules, onDeleteSchedule, onRecolorSchedule, onRenameSchedule, onReopenSchedule, onEditSchedule, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, onCreateDaily, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
+function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, planning, enterPlan, applyPlan, discardPlan, planPending, designing, enterDesigner, exitDesigner, applyDesign, onDismissConflict, editingSchedule, schedules, onDeleteSchedule, onRecolorSchedule, onRenameSchedule, onReopenSchedule, onEditSchedule, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, onCreateDaily, tasks, undated, onTaskRetime, onTaskSchedule, onTaskUnschedule, onActivate, mode = 'full' }) {
     const { view, setView, focusedDay, setFocusedDay, unpin } = useCalendarView()
     const navigate = useNavigate()
     const [modal, setModal] = useState(null) // { mode, draft } | null  (event create/edit)
@@ -132,6 +132,7 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
 
     const handleDelete = useCallback((id) => { deleteEvent(id); setModal(null) }, [deleteEvent])
     const handleSchedule = useCallback((taskId, dayISO, time) => { onTaskSchedule(taskId, taskDueStamp(dayISO, time)) }, [onTaskSchedule])
+    const handleUnschedule = useCallback((taskId) => { onTaskUnschedule?.(taskId) }, [onTaskUnschedule])
 
     // Drag-resize a block's bottom edge → rewrite its end_at (blocks only; tasks/dailies have no
     // editable duration on the grid).
@@ -202,7 +203,7 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
                 <WeekView anchor={anchor} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} onDismissConflict={designing ? onDismissConflict : undefined} />
             )}
             {view === 'day' && (
-                <DayView dayISO={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} undated={undated} onSchedule={handleSchedule} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} onDismissConflict={designing ? onDismissConflict : undefined} />
+                <DayView dayISO={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} undated={undated} onSchedule={handleSchedule} onUnschedule={handleUnschedule} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} onDismissConflict={designing ? onDismissConflict : undefined} />
             )}
 
             {modal && (

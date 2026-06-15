@@ -305,6 +305,7 @@ function DailyTaskModal({ tasks, toggleCompletion, addDailyTask, updateDailyTask
                                             key={task.id}
                                             className={[
                                                 styles.taskItem,
+                                                styles.taskItemCol,
                                                 task.is_completed ? styles.completed : '',
                                                 task._pendingDelete ? styles.pendingDelete : '',
                                                 task._pendingToggle ? styles.pendingToggle : '',

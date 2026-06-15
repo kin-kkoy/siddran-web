@@ -35,16 +35,23 @@ export default function UnscheduledDrawer({ tasks, onSchedule }) {
         try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* no-op */ }
         setDragTitle(null)
         if (st?.dragging) {
+            // Drop on the all-day row → schedule all-day (no time) on that cell's day.
+            const allDayCell = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-allday]')
+            if (allDayCell) {
+                const day = allDayCell.getAttribute('data-col')
+                if (day) onSchedule(st.task.id, day, null)
+                return
+            }
             const pt = pointToDayTime(e.clientX, e.clientY)
             if (pt) onSchedule(st.task.id, pt.day, minutesToTime(snap15(pt.minutes)))
         }
     }
 
     return (
-        <aside className={styles.drawer}>
+        <aside className={styles.drawer} data-unschedule="1">
             <h4 className={styles.title}>Unscheduled · {tasks.length}</h4>
             {tasks.length === 0 ? (
-                <div className={styles.empty}>Nothing unscheduled. <br /><small>Drag a task onto the grid to plan it.</small></div>
+                <div className={styles.empty}>Nothing unscheduled. <br /><small>Drag a task onto the grid to plan it, or drop one here to unschedule it.</small></div>
             ) : (
                 tasks.map(t => (
                     <div
