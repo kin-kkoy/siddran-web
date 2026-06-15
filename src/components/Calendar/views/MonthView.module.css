@@ -1,11 +1,19 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  /* Fit/overview mode: fixed-height week rows so overflowing days collapse into "+N more". */
+  grid-template-rows: auto repeat(6, 132px);
   gap: 1px;
   background: var(--border-default);
   border: 1px solid var(--border-default);
   border-radius: 8px;
   overflow: hidden;
+}
+/* Tall mode: stretch the 6 week rows to fill the view area (header row stays compact);
+   grow into the available height but never shrink below natural (short screens scroll). */
+.grid.fill {
+  grid-template-rows: auto repeat(6, minmax(132px, 1fr));
+  flex: 1 0 auto;
 }
 
 .head {
@@ -20,7 +28,7 @@
 
 .cell {
   background: var(--bg-primary);
-  min-height: 128px;
+  min-height: 0;
   padding: 7px 7px 9px;
   display: flex;
   flex-direction: column;
@@ -29,6 +37,8 @@
   text-align: left;
   border: none;
   transition: background 0.12s;
+  /* Row height is fixed (fit) / stretched (fill); clip overflow so days collapse into "+N more". */
+  overflow: hidden;
 }
 .cell:hover { background: var(--bg-surface); }
 .cell:focus-visible { outline: 1px solid var(--accent-warning); outline-offset: -1px; }
@@ -66,13 +76,26 @@
   border-radius: 3px;
   border-left: 2px solid var(--src-event, var(--accent-warning));
   background: var(--bg-elevated);
-  /* Word-wrap (not letter-wrap): wraps on spaces so a multi-word title reads on its own chip. */
-  white-space: normal;
-  overflow-wrap: break-word;
-  word-break: normal;
+  /* Single line + ellipsis so chip height is uniform (enables the "+N more" cap); full title is in
+     the tooltip and the day overview. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1.35;
   cursor: pointer;
 }
+.moreBtn {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 5px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.moreBtn:hover { color: var(--accent-warning); }
 .chip:hover { background: var(--bg-hover); }
 .draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .draggable:active { cursor: grabbing; }

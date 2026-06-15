@@ -1,13 +1,42 @@
 .page {
-  max-width: 1400px;
+  /* No fixed cap — fill the available width so the calendar scales up on big monitors
+     (wider cells/columns → room for more). */
+  max-width: none;
   margin: 0 auto;
-  padding: 0 20px 40px;
+  padding: 0 20px 24px;
+  display: flex;
+  flex-direction: column;
 }
+/* Tall/"generous" mode: fill the viewport height so the views grow to consume the space. */
+.page.fill { min-height: 100vh; }
+
+/* Height-mode toggle (fill ↔ fit). */
+.heightBtn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.heightBtn:hover { color: var(--accent-warning); border-color: var(--accent-warning); }
 
 /* Rendered inside the half-split pane — tighter padding, no max-width. */
 .pageHalf {
   max-width: none;
-  padding: 0 16px 24px;
+  padding: 0 16px 16px;
+}
+
+/* Holds the active view and stretches to fill everything below the sticky header. */
+.viewArea {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .collapseBtn {

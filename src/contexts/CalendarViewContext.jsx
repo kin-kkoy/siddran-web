@@ -14,6 +14,7 @@ export const CAL_VIEW_MODES = {
 }
 
 const VIEW_KEY = 'cinder_cal_last_view'
+const TALL_KEY = 'cinder_cal_tall' // height mode: fill the viewport (true) vs fit/overview (false)
 const VIEWS = ['day', 'week', 'month']
 
 function todayISO() {
@@ -36,6 +37,16 @@ export function CalendarViewProvider({ children }) {
         try { localStorage.setItem(VIEW_KEY, v) } catch { /* ignore */ }
     }, [])
 
+    // Height mode: tall = views fill the viewport (generous, may scroll); false = fit/overview.
+    const [tall, setTall] = useState(() => localStorage.getItem(TALL_KEY) !== 'false')
+    const toggleTall = useCallback(() => {
+        setTall(prev => {
+            const next = !prev
+            try { localStorage.setItem(TALL_KEY, String(next)) } catch { /* ignore */ }
+            return next
+        })
+    }, [])
+
     // Cmd/Ctrl+; — hidden ↔ peek (from half, collapse straight to hidden).
     const toggle = useCallback(() => {
         setMode(m => (m === CAL_VIEW_MODES.HIDDEN ? CAL_VIEW_MODES.PEEK : CAL_VIEW_MODES.HIDDEN))
@@ -52,6 +63,8 @@ export function CalendarViewProvider({ children }) {
         pinned,
         focusedDay,
         view,
+        tall,
+        toggleTall,
         setFocusedDay,
         setView,
         toggle,
@@ -63,7 +76,7 @@ export function CalendarViewProvider({ children }) {
         isPeek: mode === CAL_VIEW_MODES.PEEK,
         isHalf: mode === CAL_VIEW_MODES.HALF,
         isFull: mode === CAL_VIEW_MODES.FULL,
-    }), [mode, pinned, focusedDay, view, setView, toggle, peek, pin, unpin, close])
+    }), [mode, pinned, focusedDay, view, tall, toggleTall, setView, toggle, peek, pin, unpin, close])
 
     return (
         <CalendarViewContext.Provider value={value}>

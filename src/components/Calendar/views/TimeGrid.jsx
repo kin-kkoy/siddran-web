@@ -42,7 +42,7 @@ function endMinutesOf(it, startMin) {
 // (HOUR_PX/hr); blocks are absolutely positioned (top = start, height = duration) and overlaps
 // pack into side-by-side lanes. Drag a block to move it (snap 15 min); drag its bottom edge to
 // resize (blocks only). Click empty space to create at that time. All-day items sit in the top row.
-export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEventClick, onRetime, onResizeEvent, onUnschedule, onToggleDaily, onDailyTime, onDailyDone, onJumpToDay, onDismissConflict, externalPreview }) {
+export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEventClick, onRetime, onResizeEvent, onUnschedule, onToggleDaily, onDailyTime, onDailyDone, onJumpToDay, onDismissConflict, externalPreview, fill }) {
     const scrollRef = useRef(null)
     const sideBySide = days.length === 1 // Day view → render ephemeral dailies; Week → just a badge
     const ephAt = (iso) => (ephemeralAt ? ephemeralAt(iso) : [])
@@ -212,7 +212,7 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
     const gridStyle = { gridTemplateColumns: `56px repeat(${days.length}, minmax(${MIN_COL}px, 1fr))` }
 
     return (
-        <div className={styles.wrap}>
+        <div className={`${styles.wrap} ${fill ? styles.fill : ''}`}>
           <div className={styles.hscroll}>
             {/* Day header */}
             <div className={styles.headRow} style={gridStyle}>

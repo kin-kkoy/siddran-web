@@ -1,6 +1,11 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import styles from './MonthView.module.css'
 import { monthGridDays, isoDate, isTodayISO } from '../calendarDates'
+
+// Rough per-chip row height + the cell's non-chip overhead (day number + paddings), used to derive
+// how many chips fit a cell before showing a "+N more" link. Approximate; the cell clips any slop.
+const CHIP_ROW = 25
+const CELL_RESERVE = 32
 
 // Monday-start weekday header (prototype order).
 const WEEK_HEAD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -29,7 +34,7 @@ function srcClass(item) {
 // cell calls onDayClick (quick-add + focus); clicking a chip calls onEventClick. Dragging a
 // chip onto another day calls onRetime(item, newDayISO) — daily chips are recurrence-bound and
 // not draggable.
-export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt, onDayClick, onDayPeek, onEventClick, onRetime, onToggleDaily, onJumpToDay }) {
+export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt, fill, onDayClick, onDayPeek, onEventClick, onRetime, onToggleDaily, onJumpToDay }) {
     const days = monthGridDays(monthDate)
 
     // Drag bookkeeping kept in a ref so pointer-move doesn't re-render the whole grid; only the
@@ -38,6 +43,23 @@ export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt,
     const ghostRef = useRef(null)
     const [dragTitle, setDragTitle] = useState(null)
     const [overDay, setOverDay] = useState(null)
+
+    // How many chips fit per cell (so the rest collapse into "+N more"). Measured from a real cell,
+    // so it scales with the cell height — taller cells (Fill mode / big monitors) show more.
+    const gridRef = useRef(null)
+    const [capacity, setCapacity] = useState(4)
+    useEffect(() => {
+        const grid = gridRef.current
+        if (!grid) return
+        const measure = () => {
+            const cell = grid.querySelector('[data-day]')
+            if (cell) setCapacity(Math.max(1, Math.floor((cell.clientHeight - CELL_RESERVE) / CHIP_ROW)))
+        }
+        measure()
+        const ro = new ResizeObserver(measure)
+        ro.observe(grid)
+        return () => ro.disconnect()
+    }, [])
 
     const positionGhost = (x, y) => {
         if (ghostRef.current) ghostRef.current.style.transform = `translate(${x + 12}px, ${y + 12}px)`
@@ -78,17 +100,23 @@ export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt,
     }
 
     return (
-        <div className={styles.grid}>
+        <div ref={gridRef} className={`${styles.grid} ${fill ? styles.fill : ''}`}>
             {WEEK_HEAD.map(d => <div key={d} className={styles.head}>{d}</div>)}
 
             {days.map(d => {
                 const iso = isoDate(d)
                 const dim = d.getMonth() !== monthDate.getMonth()
                 const items = itemsAt(iso)
-                const shown = items // cells expand to show every item (no "+N more" cap)
+                const ephCount = ephemeralAt ? ephemeralAt(iso).length : 0
                 // Populated day → clicking the cell opens a day overview; empty day → quick-add.
-                const hasEntries = shown.length > 0 || (ephemeralAt && ephemeralAt(iso).length > 0)
+                const hasEntries = items.length > 0 || ephCount > 0
                 const onCellClick = () => hasEntries ? onDayPeek?.(iso) : onDayClick(iso)
+                // Cap chips to what fits; the rest collapse into "+N more" (reserve a row for the
+                // eph badge, and a row for the "+N more" link itself when overflowing).
+                const cap = Math.max(1, capacity - (ephCount > 0 ? 1 : 0))
+                const overflow = items.length > cap
+                const shown = overflow ? items.slice(0, Math.max(1, cap - 1)) : items
+                const moreCount = items.length - shown.length
 
                 const cellCls = [
                     styles.cell,
@@ -143,12 +171,20 @@ export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt,
                             )
                         })}
 
-                        {ephemeralAt && ephemeralAt(iso).length > 0 && (
+                        {overflow && (
+                            <button
+                                className={styles.moreBtn}
+                                title={`${moreCount} more — open day overview`}
+                                onClick={(e) => { e.stopPropagation(); onDayPeek?.(iso) }}
+                            >+{moreCount} more</button>
+                        )}
+
+                        {ephCount > 0 && (
                             <button
                                 className={styles.ephBadge}
                                 title="Daily tasks — open Day view"
                                 onClick={(e) => { e.stopPropagation(); onJumpToDay?.(iso) }}
-                            >⏳ {ephemeralAt(iso).length} {ephemeralAt(iso).length === 1 ? 'daily' : 'dailies'}</button>
+                            >⏳ {ephCount} {ephCount === 1 ? 'daily' : 'dailies'}</button>
                         )}
                     </div>
                 )

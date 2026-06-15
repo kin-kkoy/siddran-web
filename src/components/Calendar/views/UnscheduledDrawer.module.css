@@ -5,6 +5,9 @@
   padding: 14px;
   position: sticky;
   top: 0;
+  /* Stretches to the full day-view height now; scroll internally if the list is long. */
+  min-height: 0;
+  overflow-y: auto;
 }
 .title {
   font-family: var(--font-display);

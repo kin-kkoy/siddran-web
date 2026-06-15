@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiChevronLeft, FiChevronRight, FiMinimize2 } from 'react-icons/fi'
+import { FiChevronLeft, FiChevronRight, FiMinimize2, FiMaximize2 } from 'react-icons/fi'
 import styles from './Calendar.module.css'
 import MonthView from '../../components/Calendar/views/MonthView.jsx'
 import WeekView from '../../components/Calendar/views/WeekView.jsx'
@@ -23,7 +23,7 @@ const VIEWS = ['day', 'week', 'month']
 // live in CalendarViewContext so the peek, the route, and the half pane all stay in sync. Calendar
 // data + task mutations are passed in from App (shared with the peek — single fetch).
 function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, planning, enterPlan, applyPlan, discardPlan, planPending, designing, enterDesigner, exitDesigner, applyDesign, onDismissConflict, editingSchedule, schedules, onDeleteSchedule, onRecolorSchedule, onRenameSchedule, onReopenSchedule, onEditSchedule, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, onCreateDaily, tasks, undated, onTaskRetime, onTaskSchedule, onTaskUnschedule, onActivate, mode = 'full' }) {
-    const { view, setView, focusedDay, setFocusedDay, unpin } = useCalendarView()
+    const { view, setView, focusedDay, setFocusedDay, unpin, tall, toggleTall } = useCalendarView()
     const navigate = useNavigate()
     const [modal, setModal] = useState(null) // { mode, draft } | null  (event create/edit)
     const [detail, setDetail] = useState(null) // normalized task/daily item, read-only view | null
@@ -148,7 +148,7 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
     }, [updateEvent])
 
     return (
-        <div className={`${styles.page} ${mode === 'half' ? styles.pageHalf : ''} ${(planning || designing) ? styles.planning : ''}`}>
+        <div className={`${styles.page} ${tall ? styles.fill : ''} ${mode === 'half' ? styles.pageHalf : ''} ${(planning || designing) ? styles.planning : ''}`}>
             <div className={styles.head}>
                 <h1 className={styles.title}>Cal<span className={styles.accent}>endar</span></h1>
 
@@ -193,6 +193,15 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
                                 <button key={v} className={view === v ? styles.segOn : ''} onClick={() => setView(v)}>{v}</button>
                             ))}
                         </div>
+
+                        <button
+                            className={styles.heightBtn}
+                            onClick={toggleTall}
+                            title={tall ? 'Fit the view on screen (overview)' : 'Fill the height (more room)'}
+                            aria-pressed={tall}
+                        >
+                            {tall ? <FiMinimize2 /> : <FiMaximize2 />}
+                        </button>
                     </>
                 )}
 
@@ -201,15 +210,17 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
                 )}
             </div>
 
-            {view === 'month' && (
-                <MonthView monthDate={monthDate} focusedDay={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onDayClick={handleDayClick} onDayPeek={handleDayPeek} onEventClick={handleEventClick} onRetime={retime} onToggleDaily={onToggleDaily} onJumpToDay={onJumpToDay} />
-            )}
-            {view === 'week' && (
-                <WeekView anchor={anchor} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} onDismissConflict={designing ? onDismissConflict : undefined} />
-            )}
-            {view === 'day' && (
-                <DayView dayISO={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} undated={undated} onSchedule={handleSchedule} onUnschedule={handleUnschedule} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} onDismissConflict={designing ? onDismissConflict : undefined} />
-            )}
+            <div className={styles.viewArea}>
+                {view === 'month' && (
+                    <MonthView monthDate={monthDate} focusedDay={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} fill={tall} onDayClick={handleDayClick} onDayPeek={handleDayPeek} onEventClick={handleEventClick} onRetime={retime} onToggleDaily={onToggleDaily} onJumpToDay={onJumpToDay} />
+                )}
+                {view === 'week' && (
+                    <WeekView anchor={anchor} itemsAt={itemsAt} ephemeralAt={ephemeralAt} fill={tall} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} onDismissConflict={designing ? onDismissConflict : undefined} />
+                )}
+                {view === 'day' && (
+                    <DayView dayISO={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} fill={tall} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} undated={undated} onSchedule={handleSchedule} onUnschedule={handleUnschedule} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} onDismissConflict={designing ? onDismissConflict : undefined} />
+                )}
+            </div>
 
             {modal && (
                 <EventModal mode={modal.mode} draft={modal.draft} hideDate={view === 'day'} onSave={handleSave} onDelete={handleDelete} onClose={() => setModal(null)} onOpenLink={handleOpenLink} authFetch={authFetch} API={API} />

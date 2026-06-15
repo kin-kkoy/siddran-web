@@ -6,6 +6,8 @@
   overflow: hidden;
   background: var(--bg-primary);
 }
+/* Tall mode: fill the view area; the timeline body scrolls internally. */
+.wrap.fill { flex: 1; min-height: 0; }
 
 /* Horizontal scroller wrapping header + all-day + timeline together, so day columns can keep a
    real minimum width (expandable / roomy) and all three rows stay column-aligned while scrolling
@@ -15,8 +17,11 @@
   flex-direction: column;
   overflow-x: auto;
   overflow-y: hidden;
+  /* Fit/overview mode: cap to the viewport so the page itself doesn't grow tall. */
   max-height: calc(100vh - 200px);
 }
+/* Tall mode: fill .wrap instead of the fixed cap. */
+.wrap.fill .hscroll { max-height: none; flex: 1; min-height: 0; }
 .headRow, .allDayRow { flex: 0 0 auto; }
 
 /* ── Day header ── */
