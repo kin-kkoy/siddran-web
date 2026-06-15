@@ -223,6 +223,7 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
         const it = b.it
         const top = minutesToY(b.startMin)
         const height = Math.max(MIN_BLOCK_PX, minutesToY(b.endMin) - top)
+        const short = height < 40 // collapse the pill + title onto one tight row when vertical room is scarce
         const widthPct = 100 / b.colCount
         const leftPct = b.colIndex * widthPct
         const recurring = it.kind === 'daily' && !it.ephemeral
@@ -232,8 +233,8 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
         return (
             <div
                 key={it.key}
-                className={[styles.block, srcClass(it), it.ephemeral ? styles.volatile : '', it.planState === 'new' ? styles.draft : '', it.planState === 'edited' ? styles.modified : '', it.conflict ? styles.conflict : '', it.done ? styles.done : '', draggable ? styles.draggable : '', dim ? styles.dim : ''].filter(Boolean).join(' ')}
-                style={{ top, height, left: `calc(${leftPct}% + 1px)`, width: `calc(${widthPct}% - 2px)`, ...(it.color ? { borderLeftColor: it.color } : {}) }}
+                className={[styles.block, srcClass(it), short ? styles.short : '', it.ephemeral ? styles.volatile : '', it.planState === 'new' ? styles.draft : '', it.planState === 'edited' ? styles.modified : '', it.conflict ? styles.conflict : '', it.done ? styles.done : '', draggable ? styles.draggable : '', dim ? styles.dim : ''].filter(Boolean).join(' ')}
+                style={{ top, height, left: `calc(${leftPct}% + 1px)`, width: `calc(${widthPct}% - 2px)`, ...(it.color ? { '--src': it.color } : {}) }}
                 title={it.title}
                 onClick={(e) => { e.stopPropagation(); if (!draggable) onEventClick(it) }}
                 onPointerDown={(e) => onBlockDown(e, it)}
@@ -305,7 +306,7 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                                 <div
                                     key={it.key}
                                     className={[styles.chip, srcClass(it), it.planState === 'new' ? styles.draft : '', it.planState === 'edited' ? styles.modified : '', it.done ? styles.done : '', draggable ? styles.draggable : ''].filter(Boolean).join(' ')}
-                                    style={it.color ? { borderLeftColor: it.color } : undefined}
+                                    style={it.color ? { '--src': it.color } : undefined}
                                     title={it.title}
                                     onClick={(e) => { e.stopPropagation(); if (!draggable) onEventClick(it) }}
                                     onPointerDown={draggable ? (e) => onBlockDown(e, it) : undefined}
@@ -382,6 +383,9 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                                 >⊘</button>
                             </div>
                         ))}
+                        {days.some(isTodayISO) && !hidden.has(Math.floor(nowMin / 60)) && (
+                            <div className={styles.nowLabel} style={{ top: minutesToY(nowMin) }}>{minutesToTime(nowMin)}</div>
+                        )}
                     </div>
 
                     {/* Day columns */}

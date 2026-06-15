@@ -69,13 +69,14 @@
 }
 
 .chip {
+  --src: var(--accent-warning);
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-primary);
-  padding: 3px 7px;
-  border-radius: 3px;
-  border-left: 2px solid var(--src-event, var(--accent-warning));
-  background: var(--bg-elevated);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--src) 42%, transparent);
+  background: color-mix(in srgb, var(--src) 20%, var(--bg-surface));
   /* Single line + ellipsis so chip height is uniform (enables the "+N more" cap); full title is in
      the tooltip and the day overview. */
   white-space: nowrap;
@@ -96,7 +97,7 @@
   flex-shrink: 0;
 }
 .moreBtn:hover { color: var(--accent-warning); }
-.chip:hover { background: var(--bg-hover); }
+.chip:hover { background: color-mix(in srgb, var(--src) 28%, var(--bg-surface)); }
 .draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .draggable:active { cursor: grabbing; }
 
@@ -121,12 +122,12 @@
   box-shadow: 0 6px 18px var(--shadow-color);
 }
 
-.srcNote    { border-left-color: var(--src-note); }
-.srcTask    { border-left-color: var(--src-task); }
-.srcDaily   { border-left-color: var(--src-daily); }
-.srcBundle  { border-left-color: var(--src-bundle); }
-.srcSandbox { border-left-color: var(--src-sandbox); }
-.srcEvent   { border-left-color: var(--accent-warning); }
+.srcNote    { --src: var(--src-note); }
+.srcTask    { --src: var(--src-task); }
+.srcDaily   { --src: var(--src-daily); }
+.srcBundle  { --src: var(--src-bundle); }
+.srcSandbox { --src: var(--src-sandbox); }
+.srcEvent   { --src: var(--accent-warning); }
 
 .done {
   color: var(--text-muted);

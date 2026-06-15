@@ -91,21 +91,24 @@
   pointer-events: none;
 }
 
-/* All-day chip */
+/* All-day chip — same bold-capsule fill as timed blocks (no time pill: all-day has no start time). */
 .chip {
   display: flex;
   align-items: center;
-  gap: 5px;
-  background: var(--bg-elevated);
-  border-left: 2px solid var(--accent-warning);
-  border-radius: 3px;
-  padding: 2px 6px;
+  gap: 6px;
+  --src: var(--accent-warning);
+  background: color-mix(in srgb, var(--src) 20%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--src) 42%, transparent);
+  border-radius: 6px;
+  padding: 2px 8px;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-primary);
   overflow: hidden;
   cursor: pointer;
+  transition: background-color 0.12s ease;
 }
+.chip:hover { background: color-mix(in srgb, var(--src) 28%, var(--bg-surface)); }
 .chipTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Scrollable timeline ── */
@@ -195,41 +198,71 @@
   pointer-events: none;
 }
 
-/* Now-line */
+/* Now-line — "fade thread": a gradient that marks the present without slicing the whole column.
+   The current time is read out in the gutter (.nowLabel), all in the reserved --cal-now hue. */
 .nowLine {
   position: absolute;
   left: 0; right: 0;
-  border-top: 2px solid var(--accent-danger);
+  height: 2px;
+  background: linear-gradient(90deg, var(--cal-now), color-mix(in srgb, var(--cal-now) 55%, transparent) 42%, transparent 100%);
   z-index: 6;
   pointer-events: none;
 }
 .nowDot {
   position: absolute;
-  left: -3px; top: -4px;
-  width: 7px; height: 7px;
+  left: -3px; top: -3px;
+  width: 8px; height: 8px;
   border-radius: 50%;
-  background: var(--accent-danger);
+  background: var(--cal-now);
+}
+/* Current-time read-out, pinned in the hour gutter at the now-line's height. */
+.nowLabel {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--cal-now);
+  background: color-mix(in srgb, var(--cal-now) 15%, var(--bg-primary));
+  border-radius: 4px;
+  padding: 1px 4px;
+  z-index: 7;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
-/* Positioned event block */
+/* Positioned event block — "bold capsule": the source colour (--src, set by .srcXxx or inline) tints
+   the whole fill so categories read at a glance, and the start time sits in a solid colour pill.
+   No drop-shadow; hover lifts via transform only (cheap — keeps dense weeks smooth, no paint thrash). */
 .block {
   position: absolute;
-  border-radius: 5px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-left: 2px solid var(--accent-warning);
-  padding: 2px 6px;
+  --src: var(--accent-warning);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--src) 20%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--src) 42%, transparent);
+  padding: 4px 7px;
   overflow: hidden;
   font-family: var(--font-mono);
   color: var(--text-primary);
   z-index: 4;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.12s ease, background-color 0.12s ease;
 }
-.block:hover { background: var(--bg-hover); z-index: 5; }
-.blockBody { display: flex; align-items: flex-start; gap: 5px; overflow: hidden; }
-.bTime { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); flex-shrink: 0; padding-top: 1px; }
+.block:hover { background: color-mix(in srgb, var(--src) 28%, var(--bg-surface)); transform: translateY(-1px); z-index: 5; }
+.blockBody { display: flex; align-items: flex-start; gap: 6px; overflow: hidden; }
+.bTime {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+  background: var(--src); color: #0b0b12;
+  padding: 0 5px; border-radius: 4px;
+  line-height: 1.5; flex-shrink: 0;
+}
 /* Word-wrap (not letter-wrap): titles wrap on spaces, only breaking a word if it can't fit. */
-.bTitle { flex: 1; min-width: 0; font-size: 12px; line-height: 1.3; white-space: normal; overflow-wrap: break-word; word-break: normal; }
+.bTitle { flex: 1; min-width: 0; font-size: 12px; line-height: 1.35; white-space: normal; overflow-wrap: break-word; word-break: normal; }
+/* Short blocks (≲ half-hour): collapse to one tight row so the pill + title never clip mid-wrap. */
+.short { padding: 1px 6px; }
+.short .blockBody { align-items: center; gap: 5px; }
+.short .bTime { font-size: 9px; padding: 0 4px; line-height: 1.45; }
+.short .bTitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
 .dim { opacity: 0.4; }
 
 .draggable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -270,13 +303,13 @@
   padding: 2px 5px;
 }
 
-/* Source-colour accents (block left border + all-day chip) */
-.srcNote    { border-left-color: var(--src-note); }
-.srcTask    { border-left-color: var(--src-task); }
-.srcDaily   { border-left-color: var(--src-daily); }
-.srcBundle  { border-left-color: var(--src-bundle); }
-.srcSandbox { border-left-color: var(--src-sandbox); }
-.srcEvent   { border-left-color: var(--accent-warning); }
+/* Source-colour token — drives the capsule fill, border + time-pill on blocks and all-day chips. */
+.srcNote    { --src: var(--src-note); }
+.srcTask    { --src: var(--src-task); }
+.srcDaily   { --src: var(--src-daily); }
+.srcBundle  { --src: var(--src-bundle); }
+.srcSandbox { --src: var(--src-sandbox); }
+.srcEvent   { --src: var(--accent-warning); }
 
 /* Done: dim the block/chip but strike ONLY the title text, not the daily checkbox. */
 .done { color: var(--text-muted); }
