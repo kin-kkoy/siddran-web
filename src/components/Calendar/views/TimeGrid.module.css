@@ -207,6 +207,11 @@
 .done { color: var(--text-muted); }
 .done .bTitle, .done .chipTitle { text-decoration: line-through; }
 
+/* Plan-mode tentative states: a NEW (ghost) block is dashed + translucent; an EDITED existing block
+   gets a blue inset outline. (Both only appear during a plan session; Apply/Discard resolve them.) */
+.draft { border-style: dashed; opacity: 0.78; }
+.modified { box-shadow: inset 0 0 0 1px var(--accent-blue), 0 1px 4px rgba(0, 0, 0, 0.3); }
+
 /* Ephemeral ("today's") dailies — SOLID (dashed is reserved for plan-mode drafts, so these mustn't
    read as temporary). The small ⏳ marker + amber daily accent are the only cue. */
 .volatile { border-style: solid; }

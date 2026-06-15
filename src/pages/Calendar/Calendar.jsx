@@ -18,7 +18,7 @@ const VIEWS = ['day', 'week', 'month']
 // Full-route Calendar (also rendered in the half-split pane via mode="half"). View + focused day
 // live in CalendarViewContext so the peek, the route, and the half pane all stay in sync. Calendar
 // data + task mutations are passed in from App (shared with the peek — single fetch).
-function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
+function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, planning, enterPlan, applyPlan, discardPlan, planPending, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
     const { view, setView, focusedDay, setFocusedDay, unpin } = useCalendarView()
     const navigate = useNavigate()
     const [modal, setModal] = useState(null) // { mode, draft } | null
@@ -125,7 +125,7 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
     }, [updateEvent])
 
     return (
-        <div className={`${styles.page} ${mode === 'half' ? styles.pageHalf : ''}`}>
+        <div className={`${styles.page} ${mode === 'half' ? styles.pageHalf : ''} ${planning ? styles.planning : ''}`}>
             <div className={styles.head}>
                 <h1 className={styles.title}>Cal<span className={styles.accent}>endar</span></h1>
 
@@ -137,6 +137,18 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
                 </div>
 
                 <div className={styles.spacer} />
+
+                <div className={styles.planControls}>
+                    {!planning ? (
+                        <button className={styles.planBtn} onClick={enterPlan} title="Plan tentatively — changes apply only when you save">✎ Plan</button>
+                    ) : (
+                        <>
+                            <span className={styles.planPill}><span className={styles.planDot} /> Planning{planPending?.total ? ` · ${planPending.total}` : ''}</span>
+                            <button className={styles.applyBtn} onClick={applyPlan} disabled={!planPending?.total} title="Apply all changes">✓ Apply</button>
+                            <button className={styles.discardBtn} onClick={discardPlan} title="Discard changes">↩ Discard</button>
+                        </>
+                    )}
+                </div>
 
                 <div className={styles.seg}>
                     {VIEWS.map(v => (

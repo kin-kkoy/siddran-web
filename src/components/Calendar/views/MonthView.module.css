@@ -110,6 +110,10 @@
   text-decoration: line-through;
 }
 
+/* Plan-mode tentative states (chips): new = dashed + translucent ghost; edited = blue inset outline. */
+.draft { border-style: dashed; opacity: 0.78; }
+.modified { box-shadow: inset 0 0 0 1px var(--accent-blue); }
+
 /* Per-day check-off for recurring daily chips. */
 .dailyCheck {
   flex: 0 0 auto;

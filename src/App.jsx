@@ -29,6 +29,9 @@ import SettingsPopup from "./components/Settings/SettingsPopup.jsx"
 import ToastContainer from "./components/Common/ToastContainer.jsx"
 import logger from "./utils/logger.js"
 
+// Block fields compared when diffing a plan-mode session (snapshot vs working copy).
+const PLAN_EVENT_FIELDS = ['title', 'description', 'start_at', 'end_at', 'all_day', 'color', 'ref_type', 'ref_id']
+
 // Lightweight loading state shown while the lazy Sandbox chunk is fetching.
 // Kept minimal so it does not flash garishly against the dark Cinder shell.
 function SandboxFallback() {
@@ -309,6 +312,75 @@ function App() {
   // Ephemeral-daily edits from the calendar go straight through useTasks (shared store) so both
   // TasksHub and the calendar reflect them: onDailyTime = setDailyTime, onDailyDone = toggleDailyTaskCompletion.
 
+  // ---- Plan mode (blocks-first): a transactional session over calendar BLOCKS. Enter snapshots the
+  // events; while planning, block edits are staged in a working copy (NOT persisted) — new blocks are
+  // ghosts, moved/resized/edited ones are marked; Apply diffs snapshot↔working → real CRUD; Discard
+  // drops the working copy. (Tasks/dailies are not staged yet — next slice.)
+  const [planning, setPlanning] = useState(false)
+  const [planSnapshot, setPlanSnapshot] = useState([])
+  const [planEvents, setPlanEvents] = useState([])
+  const planTempId = useRef(0)
+
+  const enterPlan = useCallback(() => {
+    const snap = calendarEvents.map(e => ({ ...e }))
+    setPlanSnapshot(snap)
+    setPlanEvents(snap.map(e => ({ ...e })))
+    setPlanning(true)
+  }, [calendarEvents])
+  const discardPlan = useCallback(() => { setPlanning(false); setPlanEvents([]); setPlanSnapshot([]) }, [])
+  const applyPlan = useCallback(() => {
+    const snapIds = new Set(planSnapshot.map(e => e.id))
+    const workIds = new Set(planEvents.map(e => e.id))
+    const snapById = new Map(planSnapshot.map(e => [e.id, e]))
+    for (const e of planSnapshot) if (!workIds.has(e.id)) deleteEvent(e.id)              // deletes
+    for (const e of planEvents) {
+      const payload = { title: e.title, description: e.description, start_at: e.start_at, end_at: e.end_at, all_day: e.all_day, color: e.color, ref_type: e.ref_type, ref_id: e.ref_id }
+      if (!snapIds.has(e.id)) addEvent(payload)                                          // new
+      else if (PLAN_EVENT_FIELDS.some(f => snapById.get(e.id)[f] !== e[f])) updateEvent(e.id, payload) // edited
+    }
+    setPlanning(false); setPlanEvents([]); setPlanSnapshot([])
+  }, [planSnapshot, planEvents, addEvent, updateEvent, deleteEvent])
+
+  // Staged block mutations — used in place of the real CRUD while a session is active.
+  const stagedAddEvent = useCallback((payload) => {
+    const id = `plan-${planTempId.current++}`
+    setPlanEvents(prev => [...prev, { id, description: null, ...payload }])
+  }, [])
+  const stagedUpdateEvent = useCallback((id, patch) => {
+    setPlanEvents(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
+  }, [])
+  const stagedDeleteEvent = useCallback((id) => {
+    setPlanEvents(prev => prev.filter(e => e.id !== id))
+  }, [])
+
+  // Working events annotated with their plan state (new/edited) for draft styling.
+  const planAnnotated = useMemo(() => {
+    if (!planning) return calendarEvents
+    const snapById = new Map(planSnapshot.map(e => [e.id, e]))
+    return planEvents.map(e => {
+      const o = snapById.get(e.id)
+      const _planState = !o ? 'new' : (PLAN_EVENT_FIELDS.some(f => o[f] !== e[f]) ? 'edited' : null)
+      return _planState ? { ...e, _planState } : e
+    })
+  }, [planning, planEvents, planSnapshot, calendarEvents])
+
+  const planPending = useMemo(() => {
+    if (!planning) return { total: 0 }
+    const snapIds = new Set(planSnapshot.map(e => e.id))
+    const workIds = new Set(planEvents.map(e => e.id))
+    const snapById = new Map(planSnapshot.map(e => [e.id, e]))
+    let added = 0, edited = 0, deleted = 0
+    for (const e of planEvents) { if (!snapIds.has(e.id)) added++; else if (PLAN_EVENT_FIELDS.some(f => snapById.get(e.id)[f] !== e[f])) edited++ }
+    for (const e of planSnapshot) if (!workIds.has(e.id)) deleted++
+    return { added, edited, deleted, total: added + edited + deleted }
+  }, [planning, planEvents, planSnapshot])
+
+  // Effective event source + mutations: staged while planning, real otherwise.
+  const effEvents = planning ? planAnnotated : calendarEvents
+  const effAddEvent = planning ? stagedAddEvent : addEvent
+  const effUpdateEvent = planning ? stagedUpdateEvent : updateEvent
+  const effDeleteEvent = planning ? stagedDeleteEvent : deleteEvent
+
   // Global Cmd/Ctrl+; toggles the peek; Esc closes it (when not typing in a field).
   useEffect(() => {
     if (!isAuthed) return
@@ -335,8 +407,9 @@ function App() {
   // Props shared by the /calendar route and the half-split pane.
   const calendarProps = {
     authFetch, API,
-    events: calendarEvents,
-    addEvent, updateEvent, deleteEvent,
+    events: effEvents,
+    addEvent: effAddEvent, updateEvent: effUpdateEvent, deleteEvent: effDeleteEvent,
+    planning, enterPlan, applyPlan, discardPlan, planPending,
     dailyTasks: recurringDailies, // all recurring dailies (not useTasks' paginated first page)
     ephemeralDailies,             // active one-off "today's tasks" — Day view + Week/Month badge
     dailyCompletions,
@@ -607,12 +680,12 @@ function App() {
         {/* Calendar peek drawer (root-mounted so it persists across routes) */}
         {isAuthed && (
           <CalendarPeek
-            events={calendarEvents}
+            events={effEvents}
             tasks={calendarTasks}
             dailyTasks={recurringDailies}
             dailyCompletions={dailyCompletions}
             onToggleDaily={toggleCompletion}
-            addEvent={addEvent}
+            addEvent={effAddEvent}
             onCreateDaily={onCreateDaily}
           />
         )}

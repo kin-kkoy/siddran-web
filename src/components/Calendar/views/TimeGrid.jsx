@@ -154,7 +154,7 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
         return (
             <div
                 key={it.key}
-                className={[styles.block, srcClass(it), it.ephemeral ? styles.volatile : '', it.done ? styles.done : '', draggable ? styles.draggable : '', dim ? styles.dim : ''].filter(Boolean).join(' ')}
+                className={[styles.block, srcClass(it), it.ephemeral ? styles.volatile : '', it.planState === 'new' ? styles.draft : '', it.planState === 'edited' ? styles.modified : '', it.done ? styles.done : '', draggable ? styles.draggable : '', dim ? styles.dim : ''].filter(Boolean).join(' ')}
                 style={{ top, height, left: `calc(${leftPct}% + 1px)`, width: `calc(${widthPct}% - 2px)`, ...(it.color ? { borderLeftColor: it.color } : {}) }}
                 title={it.title}
                 onClick={(e) => e.stopPropagation()}

@@ -115,6 +115,8 @@ export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt,
                                     className={[
                                         styles.chip,
                                         srcClass(it),
+                                        it.planState === 'new' ? styles.draft : '',
+                                        it.planState === 'edited' ? styles.modified : '',
                                         it.done ? styles.done : '',
                                         draggable ? styles.draggable : '',
                                     ].filter(Boolean).join(' ')}
