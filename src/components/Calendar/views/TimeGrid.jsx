@@ -211,7 +211,7 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                             {allDayItems.map(it => (
                                 <div
                                     key={it.key}
-                                    className={[styles.chip, srcClass(it), it.done ? styles.done : ''].filter(Boolean).join(' ')}
+                                    className={[styles.chip, srcClass(it), it.planState === 'new' ? styles.draft : '', it.planState === 'edited' ? styles.modified : '', it.done ? styles.done : ''].filter(Boolean).join(' ')}
                                     style={it.color ? { borderLeftColor: it.color } : undefined}
                                     title={it.title}
                                     onClick={(e) => { e.stopPropagation(); if (it.kind === 'event') onEventClick(it) }}
@@ -230,7 +230,7 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                             {ephUntimed.map(it => (
                                 <div
                                     key={it.key}
-                                    className={[styles.chip, styles.srcDaily, styles.volatile, styles.draggable, it.done ? styles.done : ''].filter(Boolean).join(' ')}
+                                    className={[styles.chip, styles.srcDaily, styles.volatile, styles.draggable, it.planState === 'edited' ? styles.modified : '', it.done ? styles.done : ''].filter(Boolean).join(' ')}
                                     title={it.title}
                                     onClick={(e) => e.stopPropagation()}
                                     onPointerDown={(e) => onBlockDown(e, it)}

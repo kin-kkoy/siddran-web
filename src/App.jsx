@@ -314,72 +314,105 @@ function App() {
 
   // ---- Plan mode (blocks-first): a transactional session over calendar BLOCKS. Enter snapshots the
   // events; while planning, block edits are staged in a working copy (NOT persisted) — new blocks are
-  // ghosts, moved/resized/edited ones are marked; Apply diffs snapshot↔working → real CRUD; Discard
-  // drops the working copy. (Tasks/dailies are not staged yet — next slice.)
+  // ghosts, moved/resized/edited ones are marked; Apply diffs snapshot↔working → real mutations;
+  // Discard drops the working copies. Plannable kinds: BLOCKS, dated TASKS (reschedule), UNDATED tasks
+  // (schedule onto the grid), and ephemeral DAILIES (within-day time). Recurring dailies are excluded.
   const [planning, setPlanning] = useState(false)
-  const [planSnapshot, setPlanSnapshot] = useState([])
-  const [planEvents, setPlanEvents] = useState([])
+  const [planSnapshot, setPlanSnapshot] = useState([]); const [planEvents, setPlanEvents] = useState([])
+  const [planTaskSnap, setPlanTaskSnap] = useState([]); const [planTasks, setPlanTasks] = useState([])
+  const [planUndatedSnap, setPlanUndatedSnap] = useState([]); const [planUndated, setPlanUndated] = useState([])
+  const [planEphSnap, setPlanEphSnap] = useState([]); const [planEph, setPlanEph] = useState([])
   const planTempId = useRef(0)
 
   const enterPlan = useCallback(() => {
-    const snap = calendarEvents.map(e => ({ ...e }))
-    setPlanSnapshot(snap)
-    setPlanEvents(snap.map(e => ({ ...e })))
+    const cp = arr => arr.map(x => ({ ...x }))
+    setPlanSnapshot(cp(calendarEvents)); setPlanEvents(cp(calendarEvents))
+    setPlanTaskSnap(cp(calendarTasks)); setPlanTasks(cp(calendarTasks))
+    setPlanUndatedSnap(cp(calendarUndated)); setPlanUndated(cp(calendarUndated))
+    setPlanEphSnap(cp(ephemeralDailies)); setPlanEph(cp(ephemeralDailies))
     setPlanning(true)
-  }, [calendarEvents])
-  const discardPlan = useCallback(() => { setPlanning(false); setPlanEvents([]); setPlanSnapshot([]) }, [])
+  }, [calendarEvents, calendarTasks, calendarUndated, ephemeralDailies])
+  const discardPlan = useCallback(() => {
+    setPlanning(false)
+    setPlanEvents([]); setPlanSnapshot([]); setPlanTasks([]); setPlanTaskSnap([])
+    setPlanUndated([]); setPlanUndatedSnap([]); setPlanEph([]); setPlanEphSnap([])
+  }, [])
   const applyPlan = useCallback(() => {
-    const snapIds = new Set(planSnapshot.map(e => e.id))
-    const workIds = new Set(planEvents.map(e => e.id))
-    const snapById = new Map(planSnapshot.map(e => [e.id, e]))
-    for (const e of planSnapshot) if (!workIds.has(e.id)) deleteEvent(e.id)              // deletes
+    // blocks
+    const evSnapIds = new Set(planSnapshot.map(e => e.id)); const evWorkIds = new Set(planEvents.map(e => e.id)); const evSnapById = new Map(planSnapshot.map(e => [e.id, e]))
+    for (const e of planSnapshot) if (!evWorkIds.has(e.id)) deleteEvent(e.id)
     for (const e of planEvents) {
       const payload = { title: e.title, description: e.description, start_at: e.start_at, end_at: e.end_at, all_day: e.all_day, color: e.color, ref_type: e.ref_type, ref_id: e.ref_id }
-      if (!snapIds.has(e.id)) addEvent(payload)                                          // new
-      else if (PLAN_EVENT_FIELDS.some(f => snapById.get(e.id)[f] !== e[f])) updateEvent(e.id, payload) // edited
+      if (!evSnapIds.has(e.id)) addEvent(payload)
+      else if (PLAN_EVENT_FIELDS.some(f => evSnapById.get(e.id)[f] !== e[f])) updateEvent(e.id, payload)
     }
-    setPlanning(false); setPlanEvents([]); setPlanSnapshot([])
-  }, [planSnapshot, planEvents, addEvent, updateEvent, deleteEvent])
+    // tasks: reschedule (dated, due_date changed) or schedule (was undated → now dated)
+    const tSnapById = new Map(planTaskSnap.map(t => [t.id, t])); const undatedSnapIds = new Set(planUndatedSnap.map(t => t.id))
+    for (const t of planTasks) {
+      const o = tSnapById.get(t.id)
+      if (!o) { if (undatedSnapIds.has(t.id)) onTaskSchedule(t.id, t.due_date) }
+      else if (o.due_date !== t.due_date) onTaskRetime(t.id, { due_date: t.due_date })
+    }
+    // ephemeral dailies: time set/cleared
+    const ephSnapById = new Map(planEphSnap.map(d => [d.id, d]))
+    for (const d of planEph) { const o = ephSnapById.get(d.id); if (o && (o.time || null) !== (d.time || null)) setDailyTime(d.id, d.time) }
+    discardPlan()
+  }, [planSnapshot, planEvents, planTaskSnap, planTasks, planUndatedSnap, planEphSnap, planEph, addEvent, updateEvent, deleteEvent, onTaskRetime, onTaskSchedule, setDailyTime, discardPlan])
 
-  // Staged block mutations — used in place of the real CRUD while a session is active.
-  const stagedAddEvent = useCallback((payload) => {
-    const id = `plan-${planTempId.current++}`
-    setPlanEvents(prev => [...prev, { id, description: null, ...payload }])
-  }, [])
-  const stagedUpdateEvent = useCallback((id, patch) => {
-    setPlanEvents(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
-  }, [])
-  const stagedDeleteEvent = useCallback((id) => {
-    setPlanEvents(prev => prev.filter(e => e.id !== id))
-  }, [])
+  // Staged mutations — used in place of the real ones while a session is active.
+  const stagedAddEvent = useCallback((payload) => { const id = `plan-${planTempId.current++}`; setPlanEvents(prev => [...prev, { id, description: null, ...payload }]) }, [])
+  const stagedUpdateEvent = useCallback((id, patch) => setPlanEvents(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e)), [])
+  const stagedDeleteEvent = useCallback((id) => setPlanEvents(prev => prev.filter(e => e.id !== id)), [])
+  const stagedRetimeTask = useCallback((id, patch) => setPlanTasks(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t)), [])
+  const stagedScheduleTask = useCallback((id, due) => {
+    const moved = planUndated.find(t => t.id === id)
+    if (!moved) return
+    setPlanUndated(prev => prev.filter(t => t.id !== id))
+    setPlanTasks(prev => [...prev, { ...moved, due_date: due }])
+  }, [planUndated])
+  const stagedSetDailyTime = useCallback((id, time) => setPlanEph(prev => prev.map(d => d.id === id ? { ...d, time } : d)), [])
 
-  // Working events annotated with their plan state (new/edited) for draft styling.
+  // Working copies annotated with plan state (new/edited) for draft styling.
   const planAnnotated = useMemo(() => {
     if (!planning) return calendarEvents
     const snapById = new Map(planSnapshot.map(e => [e.id, e]))
-    return planEvents.map(e => {
-      const o = snapById.get(e.id)
-      const _planState = !o ? 'new' : (PLAN_EVENT_FIELDS.some(f => o[f] !== e[f]) ? 'edited' : null)
-      return _planState ? { ...e, _planState } : e
-    })
+    return planEvents.map(e => { const o = snapById.get(e.id); const s = !o ? 'new' : (PLAN_EVENT_FIELDS.some(f => o[f] !== e[f]) ? 'edited' : null); return s ? { ...e, _planState: s } : e })
   }, [planning, planEvents, planSnapshot, calendarEvents])
+  const planTasksAnnotated = useMemo(() => {
+    if (!planning) return calendarTasks
+    const snapById = new Map(planTaskSnap.map(t => [t.id, t]))
+    return planTasks.map(t => { const o = snapById.get(t.id); const s = (!o || o.due_date !== t.due_date) ? 'edited' : null; return s ? { ...t, _planState: s } : t })
+  }, [planning, planTasks, planTaskSnap, calendarTasks])
+  const planEphAnnotated = useMemo(() => {
+    if (!planning) return ephemeralDailies
+    const snapById = new Map(planEphSnap.map(d => [d.id, d]))
+    return planEph.map(d => { const o = snapById.get(d.id); const s = (o && (o.time || null) !== (d.time || null)) ? 'edited' : null; return s ? { ...d, _planState: s } : d })
+  }, [planning, planEph, planEphSnap, ephemeralDailies])
 
   const planPending = useMemo(() => {
     if (!planning) return { total: 0 }
-    const snapIds = new Set(planSnapshot.map(e => e.id))
-    const workIds = new Set(planEvents.map(e => e.id))
-    const snapById = new Map(planSnapshot.map(e => [e.id, e]))
-    let added = 0, edited = 0, deleted = 0
-    for (const e of planEvents) { if (!snapIds.has(e.id)) added++; else if (PLAN_EVENT_FIELDS.some(f => snapById.get(e.id)[f] !== e[f])) edited++ }
-    for (const e of planSnapshot) if (!workIds.has(e.id)) deleted++
-    return { added, edited, deleted, total: added + edited + deleted }
-  }, [planning, planEvents, planSnapshot])
+    let n = 0
+    const evSnapIds = new Set(planSnapshot.map(e => e.id)); const evWorkIds = new Set(planEvents.map(e => e.id)); const evSnapById = new Map(planSnapshot.map(e => [e.id, e]))
+    for (const e of planEvents) { if (!evSnapIds.has(e.id)) n++; else if (PLAN_EVENT_FIELDS.some(f => evSnapById.get(e.id)[f] !== e[f])) n++ }
+    for (const e of planSnapshot) if (!evWorkIds.has(e.id)) n++
+    const tSnapById = new Map(planTaskSnap.map(t => [t.id, t]))
+    for (const t of planTasks) { const o = tSnapById.get(t.id); if (!o || o.due_date !== t.due_date) n++ }
+    const ephSnapById = new Map(planEphSnap.map(d => [d.id, d]))
+    for (const d of planEph) { const o = ephSnapById.get(d.id); if (o && (o.time || null) !== (d.time || null)) n++ }
+    return { total: n }
+  }, [planning, planEvents, planSnapshot, planTasks, planTaskSnap, planEph, planEphSnap])
 
-  // Effective event source + mutations: staged while planning, real otherwise.
+  // Effective sources + mutations: staged while planning, real otherwise.
   const effEvents = planning ? planAnnotated : calendarEvents
   const effAddEvent = planning ? stagedAddEvent : addEvent
   const effUpdateEvent = planning ? stagedUpdateEvent : updateEvent
   const effDeleteEvent = planning ? stagedDeleteEvent : deleteEvent
+  const effTasks = planning ? planTasksAnnotated : calendarTasks
+  const effUndated = planning ? planUndated : calendarUndated
+  const effEphemeral = planning ? planEphAnnotated : ephemeralDailies
+  const effOnTaskRetime = planning ? stagedRetimeTask : onTaskRetime
+  const effOnTaskSchedule = planning ? stagedScheduleTask : onTaskSchedule
+  const effOnDailyTime = planning ? stagedSetDailyTime : setDailyTime
 
   // Global Cmd/Ctrl+; toggles the peek; Esc closes it (when not typing in a field).
   useEffect(() => {
@@ -411,14 +444,14 @@ function App() {
     addEvent: effAddEvent, updateEvent: effUpdateEvent, deleteEvent: effDeleteEvent,
     planning, enterPlan, applyPlan, discardPlan, planPending,
     dailyTasks: recurringDailies, // all recurring dailies (not useTasks' paginated first page)
-    ephemeralDailies,             // active one-off "today's tasks" — Day view + Week/Month badge
+    ephemeralDailies: effEphemeral, // active one-off "today's tasks" — Day view + Week/Month badge
     dailyCompletions,
     onToggleDaily: toggleCompletion,
-    onDailyTime: setDailyTime,
+    onDailyTime: effOnDailyTime,
     onDailyDone: toggleDailyTaskCompletion,
-    tasks: calendarTasks,
-    undated: calendarUndated,
-    onTaskRetime, onTaskSchedule,
+    tasks: effTasks,
+    undated: effUndated,
+    onTaskRetime: effOnTaskRetime, onTaskSchedule: effOnTaskSchedule,
     onActivate: activateCalendar,
   }
 
@@ -681,7 +714,7 @@ function App() {
         {isAuthed && (
           <CalendarPeek
             events={effEvents}
-            tasks={calendarTasks}
+            tasks={effTasks}
             dailyTasks={recurringDailies}
             dailyCompletions={dailyCompletions}
             onToggleDaily={toggleCompletion}

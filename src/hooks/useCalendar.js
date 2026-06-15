@@ -119,6 +119,7 @@ export function useCalendar({
                 color: null,
                 time: mins === 0 ? null : timeOf(t.due_date),
                 all_day: mins === 0,
+                planState: t._planState || null,
                 source: t,
             });
         }
@@ -181,6 +182,7 @@ export function useCalendar({
                 color: null,
                 time: dt.time || null,
                 all_day: !dt.time,
+                planState: dt._planState || null,
                 source: dt,
             });
         }
