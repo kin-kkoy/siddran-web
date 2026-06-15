@@ -196,6 +196,39 @@
     opacity: 0.85;
 }
 
+/* Recurrence toggle (off = ephemeral daily, on = recurring) + the picker it reveals. */
+.repeatToggle {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 17px;
+    line-height: 1;
+    width: 34px;
+    height: 34px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.repeatToggle:hover {
+    border-color: var(--accent-warning);
+    color: var(--text-primary);
+}
+.repeatToggleOn {
+    background: var(--accent-warning);
+    border-color: var(--accent-warning);
+    color: #fff;
+}
+
+.recurrenceRow {
+    padding: 10px 20px 12px;
+    border-bottom: 1px solid var(--border-default);
+    flex-shrink: 0;
+}
+
 /* Columns container */
 .columnsContainer {
     display: flex;
@@ -258,12 +291,19 @@
 
 .taskItem {
     display: flex;
-    align-items: center;
-    gap: 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
     padding: 12px 16px;
     border-bottom: 1px solid var(--border-default);
-    cursor: pointer;
     transition: background-color 0.2s;
+}
+/* The clickable row (checkbox · title · recur · delete); the recurrence panel sits below it. */
+.taskRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
 }
 
 .taskItem:last-child {
@@ -369,6 +409,107 @@
     background-color: #ff444420;
     color: #ff4444;
 }
+
+/* Per-task recurrence toggle (↻). Reveals on row hover; stays amber when the task is recurring. */
+.recurBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1;
+    opacity: 0;
+    flex-shrink: 0;
+    transition: opacity 0.2s, color 0.2s, background-color 0.2s;
+}
+.taskItem:hover .recurBtn { opacity: 1; }
+.recurBtn:hover { color: var(--accent-warning); background-color: var(--accent-warning-alpha); }
+.recurBtnOn { opacity: 1; color: var(--accent-warning); }
+.recurBtnOpen { background-color: var(--accent-warning-alpha); }
+
+/* Small ↻ tag next to a recurring task's title. */
+.recurTag {
+    color: var(--accent-warning);
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+/* Header "Select" toggle for batch recurrence. */
+.batchToggle {
+    background: transparent;
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.batchToggle:hover { border-color: var(--accent-warning); color: var(--text-primary); }
+.batchToggleOn {
+    background: var(--accent-warning);
+    border-color: var(--accent-warning);
+    color: var(--bg-primary, #11111a);
+    font-weight: 600;
+}
+
+/* Batch action bar: pick a recurrence, apply it to all selected tasks. */
+.batchBar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-default);
+    background: var(--accent-warning-alpha);
+    flex-shrink: 0;
+}
+.batchHint { font-size: 13px; color: var(--text-secondary); }
+.batchHint strong { color: var(--accent-warning); }
+.batchActions { display: flex; gap: 8px; }
+.batchApply, .batchStop {
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.batchApply {
+    background: var(--accent-warning);
+    border: none;
+    color: var(--bg-primary, #11111a);
+    font-weight: 600;
+}
+.batchStop {
+    background: transparent;
+    border: 1px solid var(--border-default);
+    color: var(--accent-danger, #e05c5c);
+}
+.batchApply:disabled, .batchStop:disabled { opacity: 0.4; cursor: not-allowed; }
+.batchStop:not(:disabled):hover { border-color: var(--accent-danger, #e05c5c); }
+
+.taskItemSelected { background-color: var(--accent-warning-alpha); }
+
+/* Inline recurrence picker revealed beneath a task row. */
+.recurPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 4px 6px 32px; /* indent under the checkbox to align with the title */
+}
+.recurStop {
+    align-self: flex-start;
+    background: transparent;
+    border: 1px solid var(--border-default);
+    color: var(--accent-danger, #e05c5c);
+    border-radius: 6px;
+    padding: 5px 11px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.recurStop:hover { border-color: var(--accent-danger, #e05c5c); }
 
 /* Pending deletion indicator */
 .pendingDelete {

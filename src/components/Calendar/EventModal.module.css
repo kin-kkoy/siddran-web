@@ -54,6 +54,32 @@
   gap: 14px;
 }
 
+/* Block | Daily type toggle (create only). */
+.typeToggle {
+  display: inline-flex;
+  align-self: flex-start;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+}
+.typeBtn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.typeBtnOn {
+  background: var(--accent-warning);
+  color: var(--bg-primary);
+  font-weight: 600;
+}
+
 .titleInput {
   width: 100%;
   background: var(--bg-primary);
@@ -104,8 +130,8 @@
   cursor: pointer;
 }
 .checkRow input { accent-color: var(--accent-warning); }
-/* All-day toggle sitting beside the Date field, pushed to the row's right edge. */
-.checkRowInline { margin-left: auto; }
+/* All-day toggle sitting just to the right of the Date field (small gap beyond the row's own). */
+.checkRowInline { margin-left: 4px; }
 
 /* Stacked label-over-control (description textarea + its view-mode rendering). */
 .fieldCol {

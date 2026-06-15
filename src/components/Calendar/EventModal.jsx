@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { HiOutlineTrash } from 'react-icons/hi'
 import styles from './EventModal.module.css'
+import RecurrencePicker from './Peek/RecurrencePicker.jsx'
 import { toISOFromParts } from './calendarDates'
 import { toast } from '../../utils/toast'
 import logger from '../../utils/logger'
+import { useModalPresence } from '../../utils/modalPresence'
 
 // Create / view / edit a standalone calendar block (a "sticky"/event), optionally linked to an
 // existing note/task/etc. Opening from a click starts in a read-only DETAILS view with a toggle
@@ -68,8 +70,14 @@ const fmtDate = (iso) => {
     } catch { return iso }
 }
 
-export default function EventModal({ mode, draft, onSave, onDelete, onClose, onOpenLink, authFetch, API }) {
+export default function EventModal({ mode, draft, hideDate, onSave, onDelete, onClose, onOpenLink, authFetch, API }) {
+    useModalPresence()
     const [editMode, setEditMode] = useState(mode === 'create')
+
+    // Block vs recurring-daily, create-only (editing an existing block stays a block). A 'daily'
+    // create routes to the daily-task creator via onSave's `type` field, not addEvent.
+    const [type, setType] = useState('block') // 'block' | 'daily'
+    const [recurrence, setRecurrence] = useState('every-day')
 
     const [title, setTitle] = useState(draft.title || '')
     const [day, setDay] = useState(draft.day)
@@ -128,6 +136,12 @@ export default function EventModal({ mode, draft, onSave, onDelete, onClose, onO
             toast.warning("A title would be nice, don't you think?")
             return
         }
+        // Recurring daily (create-only): no date/colour/link — recurrence governs the days. Parent
+        // routes this to the daily-task creator and closes the modal.
+        if (type === 'daily') {
+            onSave({ type: 'daily', title: title.trim(), recurrence, time: allDay ? null : startTime })
+            return
+        }
         if (!day) {
             toast.warning('Pick a date for this block.')
             return
@@ -174,118 +188,164 @@ export default function EventModal({ mode, draft, onSave, onDelete, onClose, onO
 
                 {editMode ? (
                     <div className={styles.body}>
+                        {mode === 'create' && (
+                            <div className={styles.typeToggle}>
+                                <button
+                                    type="button"
+                                    className={`${styles.typeBtn} ${type === 'block' ? styles.typeBtnOn : ''}`}
+                                    onClick={() => setType('block')}
+                                >Block</button>
+                                <button
+                                    type="button"
+                                    className={`${styles.typeBtn} ${type === 'daily' ? styles.typeBtnOn : ''}`}
+                                    onClick={() => setType('daily')}
+                                >Daily</button>
+                            </div>
+                        )}
+
                         <input
                             className={styles.titleInput}
                             type="text"
                             value={title}
                             autoFocus
-                            placeholder="Title…"
+                            placeholder={type === 'daily' ? 'Recurring task…' : 'Title…'}
                             onChange={e => setTitle(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
                         />
 
-                        <div className={styles.row}>
-                            <label className={styles.label}>Date</label>
-                            <input
-                                className={styles.field}
-                                type="date"
-                                value={day}
-                                onChange={e => setDay(e.target.value)}
-                            />
-                            <label className={`${styles.checkRow} ${styles.checkRowInline}`}>
-                                <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} />
-                                <span>All day</span>
-                            </label>
-                        </div>
-
-                        {!allDay && (
-                            <div className={styles.row}>
-                                <label className={styles.label}>Time</label>
-                                <div className={styles.timeGroup}>
-                                    <input className={styles.field} type="time" step={900} value={startTime} onChange={e => setStartTime(e.target.value)} />
-                                    <span className={styles.dash}>→</span>
-                                    <input className={styles.field} type="time" step={900} value={endTime} onChange={e => setEndTime(e.target.value)} />
+                        {type === 'daily' ? (
+                            <>
+                                <div className={styles.fieldCol}>
+                                    <label className={styles.label}>Repeats</label>
+                                    <RecurrencePicker value={recurrence} onChange={setRecurrence} />
                                 </div>
-                            </div>
-                        )}
 
-                        <div className={styles.fieldCol}>
-                            <label className={styles.label}>Description</label>
-                            <textarea
-                                className={styles.textarea}
-                                value={description}
-                                placeholder="Optional notes…"
-                                rows={3}
-                                onChange={e => setDescription(e.target.value)}
-                            />
-                        </div>
-
-                        <div className={styles.row}>
-                            <label className={styles.label}>Link</label>
-                            <select
-                                className={styles.field}
-                                value={refType}
-                                onChange={e => { setRefType(e.target.value); setRefId(''); setPickerFilter('') }}
-                            >
-                                {REF_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                            </select>
-                        </div>
-
-                        {refType && (
-                            <div className={styles.picker}>
-                                <input
-                                    className={styles.field}
-                                    type="text"
-                                    value={pickerFilter}
-                                    placeholder={pickerLoading ? 'Loading…' : `Search ${REF_LABEL[refType] || 'item'}s…`}
-                                    onChange={e => setPickerFilter(e.target.value)}
-                                />
-                                <div className={styles.pickerList}>
-                                    {pickerLoading ? (
-                                        Array.from({ length: 4 }, (_, i) => (
-                                            <div key={i} className={styles.pickerSkeleton} style={{ width: `${85 - i * 12}%` }} />
-                                        ))
-                                    ) : (
-                                        <>
-                                            {candidates
-                                                .filter(c => !pickerFilter || c.title.toLowerCase().includes(pickerFilter.toLowerCase()))
-                                                .slice(0, 50)
-                                                .map(c => (
-                                                    <button
-                                                        key={c.id}
-                                                        type="button"
-                                                        className={`${styles.pickerItem} ${refId === c.id ? styles.pickerItemOn : ''}`}
-                                                        onClick={() => setRefId(c.id)}
-                                                    >{c.title}</button>
-                                                ))}
-                                            {candidates.length === 0 && (
-                                                <div className={styles.pickerEmpty}>Nothing to link.</div>
-                                            )}
-                                        </>
+                                <div className={styles.row}>
+                                    <label className={styles.checkRow}>
+                                        <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} />
+                                        <span>All day</span>
+                                    </label>
+                                    {!allDay && (
+                                        <input
+                                            className={`${styles.field} ${styles.checkRowInline}`}
+                                            type="time"
+                                            step={900}
+                                            value={startTime}
+                                            onChange={e => setStartTime(e.target.value)}
+                                        />
                                     )}
                                 </div>
-                            </div>
-                        )}
+                            </>
+                        ) : (
+                            <>
+                                <div className={styles.row}>
+                                    {!hideDate && (
+                                        <>
+                                            <label className={styles.label}>Date</label>
+                                            <input
+                                                className={styles.field}
+                                                type="date"
+                                                value={day}
+                                                onChange={e => setDay(e.target.value)}
+                                            />
+                                        </>
+                                    )}
+                                    <label className={`${styles.checkRow} ${styles.checkRowInline}`}>
+                                        <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} />
+                                        <span>All day</span>
+                                    </label>
+                                </div>
 
-                        <div className={styles.row}>
-                            <label className={styles.label}>Colour</label>
-                            <div className={styles.swatches}>
-                                <button
-                                    className={`${styles.swatchNone} ${color == null ? styles.swatchOn : ''}`}
-                                    title="Default"
-                                    onClick={() => setColor(null)}
-                                >∅</button>
-                                {SWATCHES.map(s => (
-                                    <button
-                                        key={s.value}
-                                        className={`${styles.swatch} ${color === s.value ? styles.swatchOn : ''}`}
-                                        style={{ background: s.value }}
-                                        title={s.name}
-                                        onClick={() => setColor(s.value)}
+                                {!allDay && (
+                                    <div className={styles.row}>
+                                        <label className={styles.label}>Time</label>
+                                        <div className={styles.timeGroup}>
+                                            <input className={styles.field} type="time" step={900} value={startTime} onChange={e => setStartTime(e.target.value)} />
+                                            <span className={styles.dash}>→</span>
+                                            <input className={styles.field} type="time" step={900} value={endTime} onChange={e => setEndTime(e.target.value)} />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className={styles.fieldCol}>
+                                    <label className={styles.label}>Description</label>
+                                    <textarea
+                                        className={styles.textarea}
+                                        value={description}
+                                        placeholder="Optional notes…"
+                                        rows={3}
+                                        onChange={e => setDescription(e.target.value)}
                                     />
-                                ))}
-                            </div>
-                        </div>
+                                </div>
+
+                                <div className={styles.row}>
+                                    <label className={styles.label}>Link</label>
+                                    <select
+                                        className={styles.field}
+                                        value={refType}
+                                        onChange={e => { setRefType(e.target.value); setRefId(''); setPickerFilter('') }}
+                                    >
+                                        {REF_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    </select>
+                                </div>
+
+                                {refType && (
+                                    <div className={styles.picker}>
+                                        <input
+                                            className={styles.field}
+                                            type="text"
+                                            value={pickerFilter}
+                                            placeholder={pickerLoading ? 'Loading…' : `Search ${REF_LABEL[refType] || 'item'}s…`}
+                                            onChange={e => setPickerFilter(e.target.value)}
+                                        />
+                                        <div className={styles.pickerList}>
+                                            {pickerLoading ? (
+                                                Array.from({ length: 4 }, (_, i) => (
+                                                    <div key={i} className={styles.pickerSkeleton} style={{ width: `${85 - i * 12}%` }} />
+                                                ))
+                                            ) : (
+                                                <>
+                                                    {candidates
+                                                        .filter(c => !pickerFilter || c.title.toLowerCase().includes(pickerFilter.toLowerCase()))
+                                                        .slice(0, 50)
+                                                        .map(c => (
+                                                            <button
+                                                                key={c.id}
+                                                                type="button"
+                                                                className={`${styles.pickerItem} ${refId === c.id ? styles.pickerItemOn : ''}`}
+                                                                onClick={() => setRefId(c.id)}
+                                                            >{c.title}</button>
+                                                        ))}
+                                                    {candidates.length === 0 && (
+                                                        <div className={styles.pickerEmpty}>Nothing to link.</div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className={styles.row}>
+                                    <label className={styles.label}>Colour</label>
+                                    <div className={styles.swatches}>
+                                        <button
+                                            className={`${styles.swatchNone} ${color == null ? styles.swatchOn : ''}`}
+                                            title="Default"
+                                            onClick={() => setColor(null)}
+                                        >∅</button>
+                                        {SWATCHES.map(s => (
+                                            <button
+                                                key={s.value}
+                                                className={`${styles.swatch} ${color === s.value ? styles.swatchOn : ''}`}
+                                                style={{ background: s.value }}
+                                                title={s.name}
+                                                onClick={() => setColor(s.value)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 ) : (
                     <div className={styles.body}>

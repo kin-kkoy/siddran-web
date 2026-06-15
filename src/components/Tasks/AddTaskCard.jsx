@@ -1,7 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import styles from './TaskCard.module.css'
+import RecurrencePicker from '../Calendar/Peek/RecurrencePicker.jsx'
 import { toast } from '../../utils/toast'
+import { modalPresence } from '../../utils/modalPresence'
+
+// Short label for a draft's recurrence value (preset string or { mask } → "Custom").
+function recurLabel(rec) {
+    if (!rec) return null
+    if (typeof rec === 'object') return 'Custom'
+    if (rec === 'every-day') return 'Every day'
+    if (rec === 'weekdays') return 'Weekdays'
+    if (rec === 'weekends') return 'Weekends'
+    if (String(rec).startsWith('{')) return 'Custom'
+    return String(rec)
+}
 
 function AddTaskCard({ addTask, addBundle, viewMode }) {
     const [taskType, setTaskType] = useState("normal") // normal: normal add task || daily: add daily tasks || bundle: add a bundle card similar to daily tasks
@@ -19,6 +32,17 @@ function AddTaskCard({ addTask, addBundle, viewMode }) {
     // Same thing as above but for bundle tasks this time
     const [bundleTasksDraft, setBundleTasksDraft] = useState([])
     const [submitting, setSubmitting] = useState(false)
+
+    // Optional recurrence for daily-tab drafts (off → ephemeral; on → recurring, per task).
+    const [dailyRepeats, setDailyRepeats] = useState(false)
+    const [dailyRecurrence, setDailyRecurrence] = useState('every-day')
+
+    // Count this as an open modal (pauses the StarCanvas) only while the form is showing.
+    useEffect(() => {
+        if (!showForm) return
+        modalPresence.push()
+        return () => modalPresence.pop()
+    }, [showForm])
 
     // ---------- for normal tasks ----------
     const handleSubmit = async (e) => {
@@ -52,10 +76,11 @@ function AddTaskCard({ addTask, addBundle, viewMode }) {
         setDailyTasksDraft([...dailyTasksDraft, {
             id: Date.now(),
             title: title.trim(),
-            priority
+            priority,
+            recurrence: dailyRepeats ? dailyRecurrence : null,
         }])
 
-        // Clear inputs
+        // Clear inputs (keep the recurrence setting so several recurring dailies add quickly)
         setTitle("")
         setPriority("normal")
     }
@@ -291,7 +316,23 @@ function AddTaskCard({ addTask, addBundle, viewMode }) {
                                 <option value="normal">Normal</option>
                                 <option value="high">High</option>
                             </select>
+
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', color: 'var(--text-secondary)', fontSize: '14px', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={dailyRepeats}
+                                    onChange={e => setDailyRepeats(e.target.checked)}
+                                    style={{ accentColor: 'var(--accent-warning)' }}
+                                />
+                                Repeats
+                            </label>
                         </div>
+
+                        {dailyRepeats && (
+                            <div style={{ marginBottom: '16px' }}>
+                                <RecurrencePicker value={dailyRecurrence} onChange={setDailyRecurrence} />
+                            </div>
+                        )}
 
                         {/* Draft Preview List */}
                         {dailyTasksDraft.length > 0 && (
@@ -300,6 +341,9 @@ function AddTaskCard({ addTask, addBundle, viewMode }) {
                                 {dailyTasksDraft.map(task => (
                                     <div key={task.id} className={styles.draftItem}>
                                         <span className={styles.draftText}>{task.title}</span>
+                                        {recurLabel(task.recurrence) && (
+                                            <span className={styles.draftPriority} style={{ color: 'var(--accent-warning)' }}>↻ {recurLabel(task.recurrence)}</span>
+                                        )}
                                         <span className={`${styles.draftPriority} ${styles[task.priority]}`}>{task.priority}</span>
                                         <button
                                             type="button"

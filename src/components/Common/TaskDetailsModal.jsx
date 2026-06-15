@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import styles from './TaskDetailsModal.module.css'
+import { useModalPresence } from '../../utils/modalPresence'
 
 function TaskDetailsModal({onClose, task, updateTask, isDailyTask}) {
+    useModalPresence()
 
     const [titleData, setTitleData] = useState(task.title)
     const [descriptionData, setDescriptionData] = useState(task.description)

@@ -1,6 +1,7 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useSyncExternalStore } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useSettings } from '../../../contexts/SettingsContext'
+import { modalPresence } from '../../../utils/modalPresence'
 import styles from './StarCanvas.module.css'
 
 const TWO_PI = Math.PI * 2
@@ -67,6 +68,12 @@ function StarCanvas({ lessDistraction = false }) {
   const showStars   = settings.showStars !== false && notePageStarsAllowed && !lessDistraction && !onSandboxEditor
   const reduceStars = settings.reduceStars === true
 
+  // Pause the animation while any modal is open — the stars are hidden behind the backdrop, and
+  // the per-frame redraw otherwise competes for the main thread and makes the modal feel laggy.
+  const anyModalOpen = useSyncExternalStore(modalPresence.subscribe, modalPresence.getCount, modalPresence.getCount) > 0
+  const pausedByModalRef = useRef(false)
+  useEffect(() => { pausedByModalRef.current = anyModalOpen }, [anyModalOpen])
+
   // Animation refs — no state needed; settings sync updates these directly
   const sizeRef         = useRef(settings.starSize         ?? 1.40)
   const driftSpeedRef   = useRef(settings.starDriftSpeed   ?? 3.90)
@@ -127,7 +134,7 @@ function StarCanvas({ lessDistraction = false }) {
 
     const draw = (time) => {
       animId = requestAnimationFrame(draw)
-      if (paused) return
+      if (paused || pausedByModalRef.current) return
 
       const dt = lastTime ? (time - lastTime) / 1000 : 0
       lastTime = time

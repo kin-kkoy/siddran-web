@@ -6,6 +6,7 @@ import MonthView from '../../components/Calendar/views/MonthView.jsx'
 import WeekView from '../../components/Calendar/views/WeekView.jsx'
 import DayView from '../../components/Calendar/views/DayView.jsx'
 import EventModal from '../../components/Calendar/EventModal.jsx'
+import ItemDetailsModal from '../../components/Calendar/ItemDetailsModal.jsx'
 import ApplyDesignDialog from '../../components/Calendar/ApplyDesignDialog.jsx'
 import SchedulesModal from '../../components/Calendar/SchedulesModal.jsx'
 import { useCalendar } from '../../hooks/useCalendar.js'
@@ -20,10 +21,11 @@ const VIEWS = ['day', 'week', 'month']
 // Full-route Calendar (also rendered in the half-split pane via mode="half"). View + focused day
 // live in CalendarViewContext so the peek, the route, and the half pane all stay in sync. Calendar
 // data + task mutations are passed in from App (shared with the peek — single fetch).
-function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, planning, enterPlan, applyPlan, discardPlan, planPending, designing, enterDesigner, exitDesigner, applyDesign, onDismissConflict, editingSchedule, schedules, onDeleteSchedule, onRecolorSchedule, onRenameSchedule, onReopenSchedule, onEditSchedule, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
+function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, planning, enterPlan, applyPlan, discardPlan, planPending, designing, enterDesigner, exitDesigner, applyDesign, onDismissConflict, editingSchedule, schedules, onDeleteSchedule, onRecolorSchedule, onRenameSchedule, onReopenSchedule, onEditSchedule, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, onCreateDaily, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
     const { view, setView, focusedDay, setFocusedDay, unpin } = useCalendarView()
     const navigate = useNavigate()
-    const [modal, setModal] = useState(null) // { mode, draft } | null
+    const [modal, setModal] = useState(null) // { mode, draft } | null  (event create/edit)
+    const [detail, setDetail] = useState(null) // normalized task/daily item, read-only view | null
     const [applyOpen, setApplyOpen] = useState(false)
     const [schedulesOpen, setSchedulesOpen] = useState(false)
 
@@ -40,6 +42,7 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
             default: break
         }
         setModal(null)
+        setDetail(null)
     }, [navigate])
 
     // Tell App to start fetching calendar data (lazy-load) when this route/pane mounts.
@@ -93,7 +96,8 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
     }, [])
 
     const handleEventClick = useCallback((item) => {
-        if (item.kind !== 'event') return
+        // Tasks + dailies (recurring and ephemeral) open a read-only details view, not the editor.
+        if (item.kind !== 'event') { setDetail(item); return }
         const e = item.source
         setModal({
             mode: 'edit',
@@ -113,11 +117,18 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
     }, [])
 
     const handleSave = useCallback((payload) => {
+        // A 'daily' payload (create-only, from the modal's Daily toggle) creates a recurring daily
+        // task instead of a block.
+        if (payload.type === 'daily') {
+            onCreateDaily?.(payload.title, { recurrence: payload.recurrence, time: payload.time })
+            setModal(null)
+            return
+        }
         // Edit persists but keeps the modal open — EventModal returns to its read-only details
         // view after saving. Create adds and closes.
         if (modal?.mode === 'edit') updateEvent(modal.draft.id, payload)
         else { addEvent(payload); setModal(null) }
-    }, [modal, addEvent, updateEvent])
+    }, [modal, addEvent, updateEvent, onCreateDaily])
 
     const handleDelete = useCallback((id) => { deleteEvent(id); setModal(null) }, [deleteEvent])
     const handleSchedule = useCallback((taskId, dayISO, time) => { onTaskSchedule(taskId, taskDueStamp(dayISO, time)) }, [onTaskSchedule])
@@ -195,7 +206,11 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
             )}
 
             {modal && (
-                <EventModal mode={modal.mode} draft={modal.draft} onSave={handleSave} onDelete={handleDelete} onClose={() => setModal(null)} onOpenLink={handleOpenLink} authFetch={authFetch} API={API} />
+                <EventModal mode={modal.mode} draft={modal.draft} hideDate={view === 'day'} onSave={handleSave} onDelete={handleDelete} onClose={() => setModal(null)} onOpenLink={handleOpenLink} authFetch={authFetch} API={API} />
+            )}
+
+            {detail && (
+                <ItemDetailsModal item={detail} onClose={() => setDetail(null)} onOpenLink={handleOpenLink} />
             )}
 
             {applyOpen && (

@@ -288,7 +288,7 @@ function App() {
   } = useCalendarTasks(authFetch, API, isAuthed && calendarActive)
   // Recurring dailies + per-day completions (gated the same way so non-calendar pages stay quiet).
   const {
-    recurringDailies, completions: dailyCompletions, toggleCompletion, addRecurring
+    recurringDailies, completions: dailyCompletions, toggleCompletion, addRecurring, removeRecurring
   } = useCalendarDailies(authFetch, API, isAuthed && calendarActive)
   // Ephemeral ("today's") dailies come from the SHARED useTasks store (single source) so TasksHub
   // add/delete/edit reflect on the calendar live, with no refetch.
@@ -305,13 +305,38 @@ function App() {
     patchTaskInCache(taskId, { due_date: due })
   }, [scheduleTask, patchTaskInCache])
 
-  // Quick-Add "Daily": persist via useTasks (so TasksHub shows it) and, if recurring, inject into
-  // the calendar's recurring set so it plots immediately (the two stores are separate).
-  const onCreateDaily = useCallback(async (title, opts) => {
-    const created = await addDailyTask(title, 'normal', opts)
+  // Persist a daily task from ANY surface (TasksHub, calendar quick-add, calendar create-modal) and,
+  // if it's recurring, inject it into the calendar's separate recurring set so it plots immediately
+  // (the two stores are separate).
+  const createDailyTask = useCallback(async (title, priority, opts) => {
+    const created = await addDailyTask(title, priority, opts)
     if (created && created.recurrence != null) addRecurring(created)
     return created
   }, [addDailyTask, addRecurring])
+
+  // Quick-Add "Daily" (calendar): always 'normal' priority.
+  const onCreateDaily = useCallback((title, opts) => createDailyTask(title, 'normal', opts), [createDailyTask])
+
+  // AddTaskCard creates tasks (incl. daily drafts) via addTask; mirror any recurring dailies it
+  // returns into the calendar's recurring set so they plot without a refetch.
+  const addTaskSynced = useCallback(async (title, description, priority, dueDate, taskType) => {
+    const result = await addTask(title, description, priority, dueDate, taskType)
+    if (taskType === 'daily' && Array.isArray(result)) {
+      for (const row of result) if (row?.recurrence != null) addRecurring(row)
+    }
+    return result
+  }, [addTask, addRecurring])
+
+  // Edit a daily and keep the calendar's recurring set in sync: a patch that sets recurrence adds/
+  // updates the row there; clearing it (→ one-off) removes it. Used by TasksHub's per-task control.
+  const updateDailyTaskSynced = useCallback(async (id, patch) => {
+    const updated = await updateDailyTask(id, patch)
+    if (updated && patch && Object.prototype.hasOwnProperty.call(patch, 'recurrence')) {
+      if (updated.recurrence != null) addRecurring(updated)
+      else removeRecurring(updated.id)
+    }
+    return updated
+  }, [updateDailyTask, addRecurring, removeRecurring])
 
   // Ephemeral-daily edits from the calendar go straight through useTasks (shared store) so both
   // TasksHub and the calendar reflect them: onDailyTime = setDailyTime, onDailyDone = toggleDailyTaskCompletion.
@@ -515,6 +540,7 @@ function App() {
     onToggleDaily: toggleCompletion,
     onDailyTime: effOnDailyTime,
     onDailyDone: toggleDailyTaskCompletion,
+    onCreateDaily,
     tasks: effTasks,
     undated: effUndated,
     onTaskRetime: effOnTaskRetime, onTaskSchedule: effOnTaskSchedule,
@@ -588,12 +614,12 @@ function App() {
       loadMoreDailyTasks={loadMoreDailyTasks}
       loadingMore={tasksLoadingMore}
       loading={tasksLoading}
-      addTask={addTask}
+      addTask={addTaskSynced}
       updateTask={updateTask}
       deleteTask={deleteTask}
       toggleTaskCompletion={toggleTaskCompletion}
-      addDailyTask={addDailyTask}
-      updateDailyTask={updateDailyTask}
+      addDailyTask={createDailyTask}
+      updateDailyTask={updateDailyTaskSynced}
       deleteDailyTask={deleteDailyTask}
       toggleDailyTaskCompletion={toggleDailyTaskCompletion}
       batchToggleDailyTasks={batchToggleDailyTasks}
@@ -695,7 +721,10 @@ function App() {
             backgroundColor: 'transparent',
             minWidth: 0,  /* Allows flex item to shrink below content size */
             position: 'relative',
-            zIndex: 5,
+            /* Above the fixed sidebar (z-index 1000) so modal backdrops rendered inside this
+               stacking context cover the full viewport — including the sidebar — instead of being
+               trapped behind it. Content only overlaps the sidebar via those fixed backdrops. */
+            zIndex: 1001,
           }}>
             <div ref={leftPaneRef} style={{
               flex: (isAuthed && calView.isHalf) ? `0 0 ${100 - halfPct}%` : 1,

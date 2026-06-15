@@ -124,7 +124,7 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
         try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* */ }
         const info = dragInfo
         setDragInfo(null)
-        if (!st?.dragging) { if (it.kind === 'event') onEventClick(it); return }
+        if (!st?.dragging) { onEventClick(it); return }
         // Ephemeral daily: dragging sets its time (drop on the all-day row → untimed); never changes day.
         if (it.ephemeral) {
             const onAllDay = !!document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-allday]')
@@ -157,7 +157,7 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                 className={[styles.block, srcClass(it), it.ephemeral ? styles.volatile : '', it.planState === 'new' ? styles.draft : '', it.planState === 'edited' ? styles.modified : '', it.conflict ? styles.conflict : '', it.done ? styles.done : '', draggable ? styles.draggable : '', dim ? styles.dim : ''].filter(Boolean).join(' ')}
                 style={{ top, height, left: `calc(${leftPct}% + 1px)`, width: `calc(${widthPct}% - 2px)`, ...(it.color ? { borderLeftColor: it.color } : {}) }}
                 title={it.title}
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); if (!draggable) onEventClick(it) }}
                 onPointerDown={(e) => onBlockDown(e, it)}
                 onPointerMove={draggable ? onBlockMove : undefined}
                 onPointerUp={draggable ? (e) => { e.stopPropagation(); onBlockUp(e, it) } : undefined}
@@ -217,7 +217,7 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                                     className={[styles.chip, srcClass(it), it.planState === 'new' ? styles.draft : '', it.planState === 'edited' ? styles.modified : '', it.done ? styles.done : ''].filter(Boolean).join(' ')}
                                     style={it.color ? { borderLeftColor: it.color } : undefined}
                                     title={it.title}
-                                    onClick={(e) => { e.stopPropagation(); if (it.kind === 'event') onEventClick(it) }}
+                                    onClick={(e) => { e.stopPropagation(); onEventClick(it) }}
                                 >
                                     {it.kind === 'daily' && onToggleDaily && (
                                         <button

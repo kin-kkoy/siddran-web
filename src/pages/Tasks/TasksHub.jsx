@@ -557,6 +557,7 @@ function TasksHub({
           tasks={dailyTasks}
           toggleCompletion={toggleDailyTaskCompletion}
           addDailyTask={addDailyTask}
+          updateDailyTask={updateDailyTask}
           deleteTask={deleteDailyTask}
           batchToggleDailyTasks={batchToggleDailyTasks}
           batchDeleteDailyTasks={batchDeleteDailyTasks}

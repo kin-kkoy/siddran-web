@@ -226,6 +226,7 @@ export const useTasks = (authFetch, API, isAuthed) => {
                 if(res.ok) {
                     const newTasks = await res.json()
                     setDailyTasks(prev => [...newTasks, ...prev])
+                    return newTasks
                 }
 
             } catch (error) {
@@ -401,13 +402,15 @@ export const useTasks = (authFetch, API, isAuthed) => {
         return null
     }, [authFetch, API])
 
-    const updateDailyTask = useCallback(async (id, {title, priority, is_completed}) => {
+    // `recurrence` may be a preset string, a { mask } object, or null (null = make it a one-off).
+    // Null must survive the clean step, so only `undefined` is stripped. Returns the updated row.
+    const updateDailyTask = useCallback(async (id, {title, priority, is_completed, recurrence}) => {
         try {
 
             // get the passed values first
-            const params = {title, priority, is_completed};
+            const params = {title, priority, is_completed, recurrence};
 
-            //remove undefined fields (the params that weren't passed)
+            //remove undefined fields (the params that weren't passed) — keep explicit nulls
             const cleanParams = Object.fromEntries(
                 Object.entries(params).filter(([_dirname, v]) => v !== undefined)
             );
@@ -418,7 +421,9 @@ export const useTasks = (authFetch, API, isAuthed) => {
             });
 
             if(res.ok){
-                setDailyTasks(prev => prev.map(dailyTask => dailyTask.id === id ? {...dailyTask, ...cleanParams} : dailyTask))
+                const updated = await res.json()
+                setDailyTasks(prev => prev.map(dailyTask => dailyTask.id === id ? {...dailyTask, ...updated} : dailyTask))
+                return updated
             }
 
         } catch (error) {

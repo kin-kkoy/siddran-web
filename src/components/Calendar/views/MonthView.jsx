@@ -122,7 +122,7 @@ export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt,
                                     ].filter(Boolean).join(' ')}
                                     style={it.color ? { borderLeftColor: it.color } : undefined}
                                     title={it.title}
-                                    onClick={(e) => e.stopPropagation()}
+                                    onClick={(e) => { e.stopPropagation(); if (!draggable) onEventClick(it) }}
                                     onPointerDown={(e) => { e.stopPropagation(); onChipPointerDown(e, it) }}
                                     onPointerMove={draggable ? onChipPointerMove : undefined}
                                     onPointerUp={draggable ? (e) => { e.stopPropagation(); onChipPointerUp(e, it) } : undefined}

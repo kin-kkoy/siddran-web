@@ -42,11 +42,21 @@ export function useCalendarDailies(authFetch, API, isAuthed) {
     // shared useTasks.dailyTasks store (single source) so TasksHub add/delete/edit reflect live, and
     // edits go through useTasks (setDailyTime / toggleDailyTaskCompletion). See App.jsx.
 
-    // Inject a freshly-created recurring daily into the calendar's set (it's created via useTasks,
-    // which owns a separate store) so it plots immediately without a refetch. Recurring only.
+    // Upsert a recurring daily into the calendar's set (it's owned/edited via useTasks' separate
+    // store) so create/convert/edit plot immediately without a refetch. Recurring rows only —
+    // replaces an existing entry so title/time/pattern edits stay in sync.
     const addRecurring = useCallback((row) => {
         if (!row || row.recurrence == null) return
-        setRecurringDailies(prev => prev.some(r => r.id === row.id) ? prev : [row, ...prev])
+        setRecurringDailies(prev => {
+            const i = prev.findIndex(r => r.id === row.id)
+            if (i === -1) return [row, ...prev]
+            const next = prev.slice(); next[i] = row; return next
+        })
+    }, [])
+
+    // Drop a daily from the calendar's recurring set (it was un-recurred → now a one-off).
+    const removeRecurring = useCallback((id) => {
+        setRecurringDailies(prev => prev.filter(r => r.id !== id))
     }, [])
 
     const keyOf = (c) => `${c.daily_task_id}|${c.date}`
@@ -72,5 +82,5 @@ export function useCalendarDailies(authFetch, API, isAuthed) {
         }
     }, [authFetch, API])
 
-    return { recurringDailies, completions, toggleCompletion, addRecurring, loading }
+    return { recurringDailies, completions, toggleCompletion, addRecurring, removeRecurring, loading }
 }
