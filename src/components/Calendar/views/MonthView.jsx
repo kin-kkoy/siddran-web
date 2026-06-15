@@ -29,7 +29,7 @@ function srcClass(item) {
 // cell calls onDayClick (quick-add + focus); clicking a chip calls onEventClick. Dragging a
 // chip onto another day calls onRetime(item, newDayISO) — daily chips are recurrence-bound and
 // not draggable.
-export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt, onDayClick, onEventClick, onRetime, onToggleDaily, onJumpToDay }) {
+export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt, onDayClick, onDayPeek, onEventClick, onRetime, onToggleDaily, onJumpToDay }) {
     const days = monthGridDays(monthDate)
 
     // Drag bookkeeping kept in a ref so pointer-move doesn't re-render the whole grid; only the
@@ -86,6 +86,9 @@ export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt,
                 const dim = d.getMonth() !== monthDate.getMonth()
                 const items = itemsAt(iso)
                 const shown = items // cells expand to show every item (no "+N more" cap)
+                // Populated day → clicking the cell opens a day overview; empty day → quick-add.
+                const hasEntries = shown.length > 0 || (ephemeralAt && ephemeralAt(iso).length > 0)
+                const onCellClick = () => hasEntries ? onDayPeek?.(iso) : onDayClick(iso)
 
                 const cellCls = [
                     styles.cell,
@@ -102,8 +105,8 @@ export default function MonthView({ monthDate, focusedDay, itemsAt, ephemeralAt,
                         className={cellCls}
                         role="button"
                         tabIndex={0}
-                        onClick={() => onDayClick(iso)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') onDayClick(iso) }}
+                        onClick={onCellClick}
+                        onKeyDown={(e) => { if (e.key === 'Enter') onCellClick() }}
                     >
                         <span className={styles.dayNum}>{d.getDate()}</span>
 

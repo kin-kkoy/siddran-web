@@ -7,6 +7,7 @@ import WeekView from '../../components/Calendar/views/WeekView.jsx'
 import DayView from '../../components/Calendar/views/DayView.jsx'
 import EventModal from '../../components/Calendar/EventModal.jsx'
 import ItemDetailsModal from '../../components/Calendar/ItemDetailsModal.jsx'
+import DayAgendaModal from '../../components/Calendar/DayAgendaModal.jsx'
 import ApplyDesignDialog from '../../components/Calendar/ApplyDesignDialog.jsx'
 import SchedulesModal from '../../components/Calendar/SchedulesModal.jsx'
 import { useCalendar } from '../../hooks/useCalendar.js'
@@ -26,6 +27,7 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
     const navigate = useNavigate()
     const [modal, setModal] = useState(null) // { mode, draft } | null  (event create/edit)
     const [detail, setDetail] = useState(null) // normalized task/daily item, read-only view | null
+    const [dayPeek, setDayPeek] = useState(null) // ISO of a Month day whose overview is open | null
     const [applyOpen, setApplyOpen] = useState(false)
     const [schedulesOpen, setSchedulesOpen] = useState(false)
 
@@ -90,6 +92,9 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
         setFocusedDay(dayISO)
         setModal({ mode: 'create', draft: { title: '', day: dayISO, all_day: true, startTime: '09:00', endTime: '', color: null } })
     }, [setFocusedDay])
+
+    // Month: clicking a populated day opens its overview instead of quick-add.
+    const handleDayPeek = useCallback((dayISO) => { setFocusedDay(dayISO); setDayPeek(dayISO) }, [setFocusedDay])
 
     const handleSlotClick = useCallback((dayISO, time) => {
         setModal({ mode: 'create', draft: { title: '', day: dayISO, all_day: time == null, startTime: time || '09:00', endTime: '', color: null } })
@@ -197,7 +202,7 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
             </div>
 
             {view === 'month' && (
-                <MonthView monthDate={monthDate} focusedDay={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onDayClick={handleDayClick} onEventClick={handleEventClick} onRetime={retime} onToggleDaily={onToggleDaily} onJumpToDay={onJumpToDay} />
+                <MonthView monthDate={monthDate} focusedDay={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onDayClick={handleDayClick} onDayPeek={handleDayPeek} onEventClick={handleEventClick} onRetime={retime} onToggleDaily={onToggleDaily} onJumpToDay={onJumpToDay} />
             )}
             {view === 'week' && (
                 <WeekView anchor={anchor} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} onDismissConflict={designing ? onDismissConflict : undefined} />
@@ -212,6 +217,17 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
 
             {detail && (
                 <ItemDetailsModal item={detail} onClose={() => setDetail(null)} onOpenLink={handleOpenLink} />
+            )}
+
+            {dayPeek && (
+                <DayAgendaModal
+                    dateISO={dayPeek}
+                    items={itemsAt(dayPeek)}
+                    ephemeral={ephemeralAt(dayPeek)}
+                    onItemClick={(item) => { setDayPeek(null); handleEventClick(item) }}
+                    onAdd={() => { setDayPeek(null); handleDayClick(dayPeek) }}
+                    onClose={() => setDayPeek(null)}
+                />
             )}
 
             {applyOpen && (
