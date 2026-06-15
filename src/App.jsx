@@ -386,11 +386,13 @@ function App() {
       if (!o) { if (undatedSnapIds.has(t.id)) onTaskSchedule(t.id, t.due_date) }
       else if (o.due_date !== t.due_date) onTaskRetime(t.id, { due_date: t.due_date })
     }
+    // tasks: unschedule (was dated in the snapshot → now in the undated working copy)
+    for (const t of planUndated) if (tSnapById.has(t.id)) onTaskUnschedule(t.id)
     // ephemeral dailies: time set/cleared
     const ephSnapById = new Map(planEphSnap.map(d => [d.id, d]))
     for (const d of planEph) { const o = ephSnapById.get(d.id); if (o && (o.time || null) !== (d.time || null)) setDailyTime(d.id, d.time) }
     discardPlan()
-  }, [planSnapshot, planEvents, planTaskSnap, planTasks, planUndatedSnap, planEphSnap, planEph, addEvent, updateEvent, deleteEvent, onTaskRetime, onTaskSchedule, setDailyTime, discardPlan])
+  }, [planSnapshot, planEvents, planTaskSnap, planTasks, planUndated, planUndatedSnap, planEphSnap, planEph, addEvent, updateEvent, deleteEvent, onTaskRetime, onTaskSchedule, onTaskUnschedule, setDailyTime, discardPlan])
 
   // Staged mutations — used in place of the real ones while a session is active.
   const stagedAddEvent = useCallback((payload) => { const id = `plan-${planTempId.current++}`; setPlanEvents(prev => [...prev, { id, description: null, ...payload }]) }, [])
@@ -403,6 +405,12 @@ function App() {
     setPlanUndated(prev => prev.filter(t => t.id !== id))
     setPlanTasks(prev => [...prev, { ...moved, due_date: due }])
   }, [planUndated])
+  const stagedUnscheduleTask = useCallback((id) => {
+    const moved = planTasks.find(t => t.id === id)
+    if (!moved) return
+    setPlanTasks(prev => prev.filter(t => t.id !== id))
+    setPlanUndated(prev => [{ ...moved, due_date: null }, ...prev])
+  }, [planTasks])
   const stagedSetDailyTime = useCallback((id, time) => setPlanEph(prev => prev.map(d => d.id === id ? { ...d, time } : d)), [])
 
   // Working copies annotated with plan state (new/edited) for draft styling.
@@ -430,10 +438,11 @@ function App() {
     for (const e of planSnapshot) if (!evWorkIds.has(e.id)) n++
     const tSnapById = new Map(planTaskSnap.map(t => [t.id, t]))
     for (const t of planTasks) { const o = tSnapById.get(t.id); if (!o || o.due_date !== t.due_date) n++ }
+    for (const t of planUndated) if (tSnapById.has(t.id)) n++ // unscheduled (dated → undated)
     const ephSnapById = new Map(planEphSnap.map(d => [d.id, d]))
     for (const d of planEph) { const o = ephSnapById.get(d.id); if (o && (o.time || null) !== (d.time || null)) n++ }
     return { total: n }
-  }, [planning, planEvents, planSnapshot, planTasks, planTaskSnap, planEph, planEphSnap])
+  }, [planning, planEvents, planSnapshot, planTasks, planTaskSnap, planUndated, planEph, planEphSnap])
 
   // ---- Schedule Designer: a blank-canvas mode to design a weekly timetable, then stamp it across a
   // date range as a named "schedule" (a group of concrete blocks). While designing, the calendar shows
@@ -502,6 +511,7 @@ function App() {
   const effEphemeral = designing ? EMPTY_LIST : (planning ? planEphAnnotated : ephemeralDailies)
   const effOnTaskRetime = planning ? stagedRetimeTask : onTaskRetime
   const effOnTaskSchedule = planning ? stagedScheduleTask : onTaskSchedule
+  const effOnTaskUnschedule = planning ? stagedUnscheduleTask : onTaskUnschedule
   const effOnDailyTime = planning ? stagedSetDailyTime : setDailyTime
   // The peek is a glance at the REAL calendar — never the Designer's blank scratch plot.
   const peekEvents = designing ? calendarEvents : effEvents
@@ -547,7 +557,7 @@ function App() {
     onCreateDaily,
     tasks: effTasks,
     undated: effUndated,
-    onTaskRetime: effOnTaskRetime, onTaskSchedule: effOnTaskSchedule, onTaskUnschedule,
+    onTaskRetime: effOnTaskRetime, onTaskSchedule: effOnTaskSchedule, onTaskUnschedule: effOnTaskUnschedule,
     onActivate: activateCalendar,
   }
 
