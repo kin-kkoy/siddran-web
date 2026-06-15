@@ -105,6 +105,7 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
                 startTime: e.all_day ? '09:00' : timeOf(e.start_at),
                 endTime: e.end_at ? timeOf(e.end_at) : '',
                 color: e.color || null,
+                description: e.description || '',
                 ref_type: e.ref_type || null,
                 ref_id: e.ref_id || null,
             },
@@ -112,9 +113,10 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
     }, [])
 
     const handleSave = useCallback((payload) => {
+        // Edit persists but keeps the modal open — EventModal returns to its read-only details
+        // view after saving. Create adds and closes.
         if (modal?.mode === 'edit') updateEvent(modal.draft.id, payload)
-        else addEvent(payload)
-        setModal(null)
+        else { addEvent(payload); setModal(null) }
     }, [modal, addEvent, updateEvent])
 
     const handleDelete = useCallback((id) => { deleteEvent(id); setModal(null) }, [deleteEvent])

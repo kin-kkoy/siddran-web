@@ -1,17 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { HiOutlineTrash } from 'react-icons/hi'
 import styles from './EventModal.module.css'
 import { toISOFromParts } from './calendarDates'
 import { toast } from '../../utils/toast'
 import logger from '../../utils/logger'
 
-// Create / edit a standalone calendar block (a "sticky"/event). Linking a block to an existing
-// note/task/etc. is a later phase (P5); this P1 modal handles title / day / time / colour.
+// Create / view / edit a standalone calendar block (a "sticky"/event), optionally linked to an
+// existing note/task/etc. Opening from a click starts in a read-only DETAILS view with a toggle
+// to Edit and back; Create opens straight into the edit form. Saving an existing block returns
+// to the details view (parent keeps the modal open); creating closes it.
 //
 // Props:
 //   mode      — 'create' | 'edit'
-//   draft     — { id?, title, day (ISO), all_day, startTime, endTime, color }
-//   onSave    — (payload) => void   payload: { title, start_at, end_at, all_day, color }
+//   draft     — { id?, title, description, day (ISO), all_day, startTime, endTime, color, ref_type, ref_id }
+//   onSave    — (payload) => void   payload: { title, description, start_at, end_at, all_day, color, ref_type, ref_id }
 //   onDelete  — (id) => void        (edit mode only)
 //   onClose   — () => void
 
@@ -44,13 +46,38 @@ const PICKER = {
     sandbox: { path: 'sandboxes',            key: 'sandboxes' },
 }
 
+// Field values derived from the incoming draft (used to seed state + restore on Cancel).
+const seedFields = (draft) => ({
+    title: draft.title || '',
+    day: draft.day,
+    allDay: draft.all_day ?? true,
+    startTime: draft.startTime || '09:00',
+    endTime: draft.endTime || '',
+    color: draft.color || null,
+    description: draft.description || '',
+    refType: draft.ref_type || '',
+    refId: draft.ref_id != null ? String(draft.ref_id) : '',
+})
+
+const fmtDate = (iso) => {
+    if (!iso) return ''
+    try {
+        return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, {
+            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+        })
+    } catch { return iso }
+}
+
 export default function EventModal({ mode, draft, onSave, onDelete, onClose, onOpenLink, authFetch, API }) {
+    const [editMode, setEditMode] = useState(mode === 'create')
+
     const [title, setTitle] = useState(draft.title || '')
     const [day, setDay] = useState(draft.day)
     const [allDay, setAllDay] = useState(draft.all_day ?? true)
     const [startTime, setStartTime] = useState(draft.startTime || '09:00')
     const [endTime, setEndTime] = useState(draft.endTime || '')
     const [color, setColor] = useState(draft.color || null)
+    const [description, setDescription] = useState(draft.description || '')
 
     // Linking (P5b-2): a block can point at an existing note/task/daily/project/sandbox. refId is
     // kept as a string (DB ref_id is TEXT; sandbox ids are UUIDs).
@@ -60,8 +87,22 @@ export default function EventModal({ mode, draft, onSave, onDelete, onClose, onO
     const [pickerLoading, setPickerLoading] = useState(false)
     const [pickerFilter, setPickerFilter] = useState('')
 
-    // Fetch id+title candidates whenever a (non-empty) link type is selected.
+    // Last committed field values (seeded from draft, updated on Save). Cancel restores from here
+    // so discarding an in-progress edit returns to the most recently saved state, not the stale
+    // open-time draft.
+    const committed = useRef(null)
+    if (committed.current === null) committed.current = seedFields(draft)
+
+    const restore = (vals) => {
+        setTitle(vals.title); setDay(vals.day); setAllDay(vals.allDay)
+        setStartTime(vals.startTime); setEndTime(vals.endTime); setColor(vals.color)
+        setDescription(vals.description); setRefType(vals.refType); setRefId(vals.refId)
+        setPickerFilter('')
+    }
+
+    // Fetch id+title candidates whenever a (non-empty) link type is selected — only needed while editing.
     useEffect(() => {
+        if (!editMode) return
         const cfg = refType ? PICKER[refType] : null
         if (!cfg || !authFetch || !API) { setCandidates([]); return }
         let cancelled = false
@@ -80,7 +121,7 @@ export default function EventModal({ mode, draft, onSave, onDelete, onClose, onO
             }
         })()
         return () => { cancelled = true }
-    }, [refType, authFetch, API])
+    }, [editMode, refType, authFetch, API])
 
     const handleSave = () => {
         if (!title.trim()) {
@@ -99,126 +140,184 @@ export default function EventModal({ mode, draft, onSave, onDelete, onClose, onO
         const end_at = (!allDay && endTime) ? toISOFromParts(day, endTime) : null
         onSave({
             title: title.trim(),
+            description: description.trim() || null,
             start_at, end_at, all_day: allDay, color,
             ref_type: refType || null,
             ref_id: refType ? refId : null,
         })
+        // Remember what we just saved, then return to the details view (parent keeps an edited
+        // block's modal open; creating unmounts it).
+        committed.current = { title: title.trim(), day, allDay, startTime, endTime, color, description, refType, refId }
+        if (mode === 'edit') setEditMode(false)
+    }
+
+    const handleCancel = () => {
+        if (mode === 'create') { onClose(); return }
+        restore(committed.current)
+        setEditMode(false)
     }
 
     const handleBackdrop = (e) => {
         if (e.target === e.currentTarget) onClose()
     }
 
+    const linked = refType && refId
+    const headerTitle = mode === 'create' ? 'New Event' : editMode ? 'Edit Event' : (title.trim() || '(untitled)')
+
     return (
         <div className={styles.backdrop} onClick={handleBackdrop}>
             <div className={styles.modal}>
                 <div className={styles.header}>
-                    <h3 className={styles.title}>{mode === 'edit' ? 'Edit block' : 'New block'}</h3>
+                    <h3 className={styles.title}>{headerTitle}</h3>
                     <button className={styles.closeBtn} onClick={onClose} aria-label="Close">✕</button>
                 </div>
 
-                <div className={styles.body}>
-                    {draft.ref_type && draft.ref_id && (
-                        <button className={styles.openLink} onClick={() => onOpenLink?.(draft.ref_type, draft.ref_id)}>
-                            Open linked {REF_LABEL[draft.ref_type] || 'item'} →
-                        </button>
-                    )}
-
-                    <input
-                        className={styles.titleInput}
-                        type="text"
-                        value={title}
-                        autoFocus
-                        placeholder="Title…"
-                        onChange={e => setTitle(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
-                    />
-
-                    <div className={styles.row}>
-                        <label className={styles.label}>Date</label>
+                {editMode ? (
+                    <div className={styles.body}>
                         <input
-                            className={styles.field}
-                            type="date"
-                            value={day}
-                            onChange={e => setDay(e.target.value)}
+                            className={styles.titleInput}
+                            type="text"
+                            value={title}
+                            autoFocus
+                            placeholder="Title…"
+                            onChange={e => setTitle(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
                         />
-                    </div>
 
-                    <label className={styles.checkRow}>
-                        <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} />
-                        <span>All day</span>
-                    </label>
-
-                    {!allDay && (
                         <div className={styles.row}>
-                            <label className={styles.label}>Time</label>
-                            <div className={styles.timeGroup}>
-                                <input className={styles.field} type="time" step={900} value={startTime} onChange={e => setStartTime(e.target.value)} />
-                                <span className={styles.dash}>→</span>
-                                <input className={styles.field} type="time" step={900} value={endTime} onChange={e => setEndTime(e.target.value)} />
-                            </div>
-                        </div>
-                    )}
-
-                    <div className={styles.row}>
-                        <label className={styles.label}>Colour</label>
-                        <div className={styles.swatches}>
-                            <button
-                                className={`${styles.swatchNone} ${color == null ? styles.swatchOn : ''}`}
-                                title="Default"
-                                onClick={() => setColor(null)}
-                            >∅</button>
-                            {SWATCHES.map(s => (
-                                <button
-                                    key={s.value}
-                                    className={`${styles.swatch} ${color === s.value ? styles.swatchOn : ''}`}
-                                    style={{ background: s.value }}
-                                    title={s.name}
-                                    onClick={() => setColor(s.value)}
-                                />
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className={styles.row}>
-                        <label className={styles.label}>Link</label>
-                        <select
-                            className={styles.field}
-                            value={refType}
-                            onChange={e => { setRefType(e.target.value); setRefId(''); setPickerFilter('') }}
-                        >
-                            {REF_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
-                    </div>
-
-                    {refType && (
-                        <div className={styles.picker}>
+                            <label className={styles.label}>Date</label>
                             <input
                                 className={styles.field}
-                                type="text"
-                                value={pickerFilter}
-                                placeholder={pickerLoading ? 'Loading…' : `Search ${REF_LABEL[refType] || 'item'}s…`}
-                                onChange={e => setPickerFilter(e.target.value)}
+                                type="date"
+                                value={day}
+                                onChange={e => setDay(e.target.value)}
                             />
-                            <div className={styles.pickerList}>
-                                {candidates
-                                    .filter(c => !pickerFilter || c.title.toLowerCase().includes(pickerFilter.toLowerCase()))
-                                    .slice(0, 50)
-                                    .map(c => (
-                                        <button
-                                            key={c.id}
-                                            type="button"
-                                            className={`${styles.pickerItem} ${refId === c.id ? styles.pickerItemOn : ''}`}
-                                            onClick={() => setRefId(c.id)}
-                                        >{c.title}</button>
-                                    ))}
-                                {!pickerLoading && candidates.length === 0 && (
-                                    <div className={styles.pickerEmpty}>Nothing to link.</div>
-                                )}
+                            <label className={`${styles.checkRow} ${styles.checkRowInline}`}>
+                                <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} />
+                                <span>All day</span>
+                            </label>
+                        </div>
+
+                        {!allDay && (
+                            <div className={styles.row}>
+                                <label className={styles.label}>Time</label>
+                                <div className={styles.timeGroup}>
+                                    <input className={styles.field} type="time" step={900} value={startTime} onChange={e => setStartTime(e.target.value)} />
+                                    <span className={styles.dash}>→</span>
+                                    <input className={styles.field} type="time" step={900} value={endTime} onChange={e => setEndTime(e.target.value)} />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className={styles.fieldCol}>
+                            <label className={styles.label}>Description</label>
+                            <textarea
+                                className={styles.textarea}
+                                value={description}
+                                placeholder="Optional notes…"
+                                rows={3}
+                                onChange={e => setDescription(e.target.value)}
+                            />
+                        </div>
+
+                        <div className={styles.row}>
+                            <label className={styles.label}>Link</label>
+                            <select
+                                className={styles.field}
+                                value={refType}
+                                onChange={e => { setRefType(e.target.value); setRefId(''); setPickerFilter('') }}
+                            >
+                                {REF_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
+                        </div>
+
+                        {refType && (
+                            <div className={styles.picker}>
+                                <input
+                                    className={styles.field}
+                                    type="text"
+                                    value={pickerFilter}
+                                    placeholder={pickerLoading ? 'Loading…' : `Search ${REF_LABEL[refType] || 'item'}s…`}
+                                    onChange={e => setPickerFilter(e.target.value)}
+                                />
+                                <div className={styles.pickerList}>
+                                    {pickerLoading ? (
+                                        Array.from({ length: 4 }, (_, i) => (
+                                            <div key={i} className={styles.pickerSkeleton} style={{ width: `${85 - i * 12}%` }} />
+                                        ))
+                                    ) : (
+                                        <>
+                                            {candidates
+                                                .filter(c => !pickerFilter || c.title.toLowerCase().includes(pickerFilter.toLowerCase()))
+                                                .slice(0, 50)
+                                                .map(c => (
+                                                    <button
+                                                        key={c.id}
+                                                        type="button"
+                                                        className={`${styles.pickerItem} ${refId === c.id ? styles.pickerItemOn : ''}`}
+                                                        onClick={() => setRefId(c.id)}
+                                                    >{c.title}</button>
+                                                ))}
+                                            {candidates.length === 0 && (
+                                                <div className={styles.pickerEmpty}>Nothing to link.</div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className={styles.row}>
+                            <label className={styles.label}>Colour</label>
+                            <div className={styles.swatches}>
+                                <button
+                                    className={`${styles.swatchNone} ${color == null ? styles.swatchOn : ''}`}
+                                    title="Default"
+                                    onClick={() => setColor(null)}
+                                >∅</button>
+                                {SWATCHES.map(s => (
+                                    <button
+                                        key={s.value}
+                                        className={`${styles.swatch} ${color === s.value ? styles.swatchOn : ''}`}
+                                        style={{ background: s.value }}
+                                        title={s.name}
+                                        onClick={() => setColor(s.value)}
+                                    />
+                                ))}
                             </div>
                         </div>
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <div className={styles.body}>
+                        {linked && (
+                            <button className={styles.openLink} onClick={() => onOpenLink?.(refType, refId)}>
+                                Open linked {REF_LABEL[refType] || 'item'} →
+                            </button>
+                        )}
+
+                        <div className={styles.row}>
+                            <span className={styles.label}>When</span>
+                            <span className={styles.viewValue}>
+                                {fmtDate(day)}{allDay ? ' · All day' : ` · ${startTime}${endTime ? ` → ${endTime}` : ''}`}
+                            </span>
+                        </div>
+
+                        {description.trim() && (
+                            <div className={styles.fieldCol}>
+                                <span className={styles.label}>Description</span>
+                                <p className={styles.viewDesc}>{description}</p>
+                            </div>
+                        )}
+
+                        <div className={styles.row}>
+                            <span className={styles.label}>Colour</span>
+                            <span
+                                className={styles.viewDot}
+                                style={{ background: color || 'transparent', borderColor: color || 'var(--border-strong)' }}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 <div className={styles.footer}>
                     {mode === 'edit' ? (
@@ -227,10 +326,19 @@ export default function EventModal({ mode, draft, onSave, onDelete, onClose, onO
                         </button>
                     ) : <span />}
                     <div className={styles.footerRight}>
-                        <button className={styles.cancelBtn} onClick={onClose}>Cancel</button>
-                        <button className={styles.saveBtn} onClick={handleSave}>
-                            {mode === 'edit' ? 'Save' : 'Create'}
-                        </button>
+                        {editMode ? (
+                            <>
+                                <button className={styles.cancelBtn} onClick={handleCancel}>Cancel</button>
+                                <button className={styles.saveBtn} onClick={handleSave}>
+                                    {mode === 'edit' ? 'Save' : 'Create'}
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button className={styles.cancelBtn} onClick={onClose}>Close</button>
+                                <button className={styles.saveBtn} onClick={() => setEditMode(true)}>Edit</button>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
