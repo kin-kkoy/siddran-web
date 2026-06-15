@@ -26,9 +26,9 @@ export function useSchedules(authFetch, API, isAuthed) {
     }, [isAuthed, authFetch, API])
 
     // Create a named schedule + its stamped blocks (one transaction). Returns { schedule, events } | null.
-    const createSchedule = useCallback(async ({ name, color, events }) => {
+    const createSchedule = useCallback(async ({ name, color, events, template }) => {
         try {
-            const res = await authFetch(`${API}/schedules`, { method: 'POST', body: JSON.stringify({ name, color, events }) })
+            const res = await authFetch(`${API}/schedules`, { method: 'POST', body: JSON.stringify({ name, color, events, template }) })
             if (!res.ok) throw new Error('create failed')
             const data = await res.json()
             setSchedules(prev => [data.schedule, ...prev])
@@ -36,6 +36,21 @@ export function useSchedules(authFetch, API, isAuthed) {
         } catch (error) {
             logger.error('Error creating schedule:', error)
             toast.error('Could not apply that schedule.')
+            return null
+        }
+    }, [authFetch, API])
+
+    // Edit in place: replace a schedule's blocks + update name/colour/template. Returns { schedule, events } | null.
+    const restampSchedule = useCallback(async (id, { name, color, events, template }) => {
+        try {
+            const res = await authFetch(`${API}/schedules/${id}/restamp`, { method: 'PUT', body: JSON.stringify({ name, color, events, template }) })
+            if (!res.ok) throw new Error('restamp failed')
+            const data = await res.json()
+            setSchedules(prev => prev.map(s => s.id === id ? { ...s, ...data.schedule } : s))
+            return data
+        } catch (error) {
+            logger.error('Error updating schedule:', error)
+            toast.error('Could not update that schedule.')
             return null
         }
     }, [authFetch, API])
@@ -70,5 +85,5 @@ export function useSchedules(authFetch, API, isAuthed) {
         }
     }, [authFetch, API])
 
-    return { schedules, loading, createSchedule, deleteSchedule, updateSchedule }
+    return { schedules, loading, createSchedule, restampSchedule, deleteSchedule, updateSchedule }
 }

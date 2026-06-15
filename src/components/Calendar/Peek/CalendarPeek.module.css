@@ -53,7 +53,7 @@
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-elevated);
 }
-.headTitle { font-family: var(--font-heading); font-size: 16px; font-weight: 500; color: var(--text-primary); margin: 0; }
+.headTitle { font-family: var(--font-mono); font-size: 16px; font-weight: 500; color: var(--text-primary); margin: 0; }
 .accent { color: var(--accent-warning); }
 .badge { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em; color: var(--accent-warning); }
 .grow { flex: 1; }
@@ -93,7 +93,7 @@
 
 /* ── Mini calendar ── */
 .miniHead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
-.miniMonth { font-family: var(--font-heading); font-size: 14px; color: var(--text-primary); font-weight: 500; }
+.miniMonth { font-family: var(--font-mono); font-size: 14px; color: var(--text-primary); font-weight: 500; }
 .miniNav { display: flex; gap: 4px; }
 .miniNav button {
   width: 24px; height: 22px;
@@ -130,7 +130,7 @@
 .evt {
   display: flex; align-items: center; gap: 8px;
   background: var(--bg-surface); border-left: 2px solid var(--accent-warning); border-radius: 5px;
-  padding: 7px 10px; font-family: var(--font-body); font-size: 13px; color: var(--text-primary);
+  padding: 7px 10px; font-family: var(--font-mono); font-size: 13px; color: var(--text-primary);
 }
 .evtBody { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .evtTime { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); letter-spacing: 0.08em; }
@@ -158,7 +158,7 @@
 .srcBundle { border-left-color: var(--src-bundle); }
 .srcSandbox { border-left-color: var(--src-sandbox); }
 .srcEvent { border-left-color: var(--accent-warning); }
-.empty { font-family: var(--font-body); font-size: 12px; color: var(--text-muted); padding: 10px; text-align: center; font-style: italic; }
+.empty { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: 10px; text-align: center; font-style: italic; }
 
 /* ── Quick add ── */
 .quick { display: flex; flex-direction: column; gap: 8px; }
@@ -181,7 +181,7 @@
 .quickInput {
   width: 100%;
   background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px;
-  color: var(--text-primary); padding: 9px 11px; font-family: var(--font-body); font-size: 14px; outline: none;
+  color: var(--text-primary); padding: 9px 11px; font-family: var(--font-mono); font-size: 14px; outline: none;
   transition: border-color 0.15s;
 }
 .quickInput::placeholder { color: var(--text-faint); }

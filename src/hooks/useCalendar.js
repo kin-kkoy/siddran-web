@@ -97,6 +97,7 @@ export function useCalendar({
                     ref_type: e.ref_type || null,
                     ref_id: e.ref_id || null,
                     planState: e._planState || null, // 'new' | 'edited' | null (plan mode)
+                    conflict: e._conflict || false,  // designer: overlaps another plotted block
                     source: e,
                 });
             }

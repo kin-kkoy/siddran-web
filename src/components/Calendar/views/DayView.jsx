@@ -3,7 +3,7 @@ import UnscheduledDrawer from './UnscheduledDrawer.jsx'
 import styles from './DayView.module.css'
 
 // Day view = single-column TimeGrid + the unscheduled-tasks drawer beside it.
-export default function DayView({ dayISO, itemsAt, ephemeralAt, onSlotClick, onEventClick, onRetime, onResizeEvent, undated, onSchedule, onToggleDaily, onDailyTime, onDailyDone, onJumpToDay }) {
+export default function DayView({ dayISO, itemsAt, ephemeralAt, onSlotClick, onEventClick, onRetime, onResizeEvent, undated, onSchedule, onToggleDaily, onDailyTime, onDailyDone, onJumpToDay, onDismissConflict }) {
     return (
         <div className={styles.shell}>
             <div className={styles.grid}>
@@ -19,6 +19,7 @@ export default function DayView({ dayISO, itemsAt, ephemeralAt, onSlotClick, onE
                     onDailyTime={onDailyTime}
                     onDailyDone={onDailyDone}
                     onJumpToDay={onJumpToDay}
+                    onDismissConflict={onDismissConflict}
                 />
             </div>
             <UnscheduledDrawer tasks={undated} onSchedule={onSchedule} />

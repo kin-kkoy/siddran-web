@@ -1,5 +1,5 @@
 .card {
-    font-family: var(--font-body);
+    font-family: var(--font-mono);
     display: flex;
     align-items: flex-start;
     gap: 12px;
@@ -81,7 +81,7 @@
 }
 
 .title {
-    font-family: var(--font-heading);
+    font-family: var(--font-mono);
     font-size: 18px;
     color: var(--text-primary);
     margin: 0 0 8px 0;

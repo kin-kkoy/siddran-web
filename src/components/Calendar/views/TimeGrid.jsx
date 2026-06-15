@@ -42,7 +42,7 @@ function endMinutesOf(it, startMin) {
 // (HOUR_PX/hr); blocks are absolutely positioned (top = start, height = duration) and overlaps
 // pack into side-by-side lanes. Drag a block to move it (snap 15 min); drag its bottom edge to
 // resize (blocks only). Click empty space to create at that time. All-day items sit in the top row.
-export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEventClick, onRetime, onResizeEvent, onToggleDaily, onDailyTime, onDailyDone, onJumpToDay }) {
+export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEventClick, onRetime, onResizeEvent, onToggleDaily, onDailyTime, onDailyDone, onJumpToDay, onDismissConflict }) {
     const scrollRef = useRef(null)
     const sideBySide = days.length === 1 // Day view → render ephemeral dailies; Week → just a badge
     const ephAt = (iso) => (ephemeralAt ? ephemeralAt(iso) : [])
@@ -154,7 +154,7 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
         return (
             <div
                 key={it.key}
-                className={[styles.block, srcClass(it), it.ephemeral ? styles.volatile : '', it.planState === 'new' ? styles.draft : '', it.planState === 'edited' ? styles.modified : '', it.done ? styles.done : '', draggable ? styles.draggable : '', dim ? styles.dim : ''].filter(Boolean).join(' ')}
+                className={[styles.block, srcClass(it), it.ephemeral ? styles.volatile : '', it.planState === 'new' ? styles.draft : '', it.planState === 'edited' ? styles.modified : '', it.conflict ? styles.conflict : '', it.done ? styles.done : '', draggable ? styles.draggable : '', dim ? styles.dim : ''].filter(Boolean).join(' ')}
                 style={{ top, height, left: `calc(${leftPct}% + 1px)`, width: `calc(${widthPct}% - 2px)`, ...(it.color ? { borderLeftColor: it.color } : {}) }}
                 title={it.title}
                 onClick={(e) => e.stopPropagation()}
@@ -175,6 +175,9 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                     <span className={styles.bTime}>{it.time}</span>
                     <span className={styles.bTitle}>{it.title}</span>
                 </div>
+                {it.conflict && onDismissConflict && (
+                    <button className={styles.conflictBadge} title="Time conflict — click to dismiss" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onDismissConflict(it.id) }}>!</button>
+                )}
                 {resizable && <div className={styles.resizeHandle} data-resize="1" />}
             </div>
         )

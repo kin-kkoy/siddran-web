@@ -21,7 +21,7 @@ import { useCalendarEvents } from "./hooks/useCalendarEvents.js"
 import { useCalendarTasks } from "./hooks/useCalendarTasks.js"
 import { useCalendarDailies } from "./hooks/useCalendarDailies.js"
 import { useSchedules } from "./hooks/useSchedules.js"
-import { stampWeeklyPattern } from "./components/Calendar/calendarDates.js"
+import { stampWeeklyPattern, patternFromPlot, plotFromPattern } from "./components/Calendar/calendarDates.js"
 import { useCalendarView } from "./contexts/CalendarViewContext.jsx"
 import CalendarPeek from "./components/Calendar/Peek/CalendarPeek.jsx"
 import { SettingsProvider } from "./contexts/SettingsContext.jsx"
@@ -106,7 +106,7 @@ function App() {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]))
       return payload.username
-    } catch (error) {
+    } catch {
       return null
     }
   }
@@ -282,7 +282,7 @@ function App() {
   const {
     events: calendarEvents, addEvent, updateEvent, deleteEvent, addEvents, removeEventsBySchedule, recolorEventsBySchedule
   } = useCalendarEvents(authFetch, API, isAuthed && calendarActive)
-  const { schedules, createSchedule, deleteSchedule, updateSchedule } = useSchedules(authFetch, API, isAuthed && calendarActive)
+  const { schedules, createSchedule, restampSchedule, deleteSchedule, updateSchedule } = useSchedules(authFetch, API, isAuthed && calendarActive)
   const {
     tasks: calendarTasks, undated: calendarUndated, retimeTask, scheduleTask
   } = useCalendarTasks(authFetch, API, isAuthed && calendarActive)
@@ -411,20 +411,52 @@ function App() {
   // ONLY the plotted working set (real items hidden); Apply → POST /schedules; close → drop the plot.
   const [designing, setDesigning] = useState(false)
   const [plotEvents, setPlotEvents] = useState([])
+  const [editingSchedule, setEditingSchedule] = useState(null) // the schedule being edited in place (or null = new)
+  const [dismissedConflicts, setDismissedConflicts] = useState(() => new Set())
   const plotTempId = useRef(0)
-  const enterDesigner = useCallback(() => { setPlotEvents([]); setDesigning(true); calView.setView('week') }, [calView])
-  const exitDesigner = useCallback(() => { setDesigning(false); setPlotEvents([]) }, [])
+  const enterDesigner = useCallback((seed = [], editing = null) => { setPlotEvents(seed); setEditingSchedule(editing); setDismissedConflicts(new Set()); setDesigning(true); calView.setView('week') }, [calView])
+  const exitDesigner = useCallback(() => { setDesigning(false); setPlotEvents([]); setEditingSchedule(null); setDismissedConflicts(new Set()) }, [])
   const plotAddEvent = useCallback((payload) => { const id = `plot-${plotTempId.current++}`; setPlotEvents(prev => [...prev, { id, description: null, ...payload }]) }, [])
   const plotUpdateEvent = useCallback((id, patch) => setPlotEvents(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e)), [])
   const plotDeleteEvent = useCallback((id) => setPlotEvents(prev => prev.filter(e => e.id !== id)), [])
-  const plotAnnotated = useMemo(() => plotEvents.map(e => ({ ...e, _planState: 'new' })), [plotEvents]) // all plotted blocks render as drafts
-  const applyDesign = useCallback(async ({ name, color, from, to }) => {
-    const events = stampWeeklyPattern(plotEvents, from, to)
+  const dismissConflict = useCallback((id) => setDismissedConflicts(prev => new Set(prev).add(id)), [])
+  // Timed plotted blocks that overlap another on the same weekday → flagged as conflicts (dismissable).
+  const plotConflicts = useMemo(() => {
+    const ids = new Set()
+    const info = plotEvents.filter(e => !e.all_day && e.start_at).map(e => {
+      const s = new Date(e.start_at), en = e.end_at ? new Date(e.end_at) : null
+      const sm = s.getHours() * 60 + s.getMinutes()
+      const em = en ? en.getHours() * 60 + en.getMinutes() : sm + 60
+      return { id: e.id, wd: s.getDay(), sm, em: Math.max(em, sm + 1) }
+    })
+    for (let i = 0; i < info.length; i++) for (let j = i + 1; j < info.length; j++) {
+      const a = info[i], b = info[j]
+      if (a.wd === b.wd && a.sm < b.em && b.sm < a.em) { ids.add(a.id); ids.add(b.id) }
+    }
+    return ids
+  }, [plotEvents])
+  const plotAnnotated = useMemo(() => plotEvents.map(e => ({ ...e, _planState: 'new', _conflict: plotConflicts.has(e.id) && !dismissedConflicts.has(e.id) })), [plotEvents, plotConflicts, dismissedConflicts])
+  const applyDesign = useCallback(async ({ name, color, from, to, exclude }) => {
+    const events = stampWeeklyPattern(plotEvents, from, to, exclude || [])
     if (!events.length) return
     const colored = color ? events.map(e => ({ ...e, color: e.color || color })) : events
-    const result = await createSchedule({ name, color: color || null, events: colored })
-    if (result) { addEvents(result.events); exitDesigner() }
-  }, [plotEvents, createSchedule, addEvents, exitDesigner])
+    // Store the pattern AND the apply context (range + skips) so Edit can prefill From/To/Skip.
+    const template = { pattern: patternFromPlot(plotEvents), from, to, skip: exclude || [] }
+    if (editingSchedule) {
+      // Edit in place: replace this schedule's blocks with the freshly-stamped set.
+      const result = await restampSchedule(editingSchedule.id, { name, color: color || null, events: colored, template })
+      if (result) { removeEventsBySchedule(editingSchedule.id); addEvents(result.events); exitDesigner() }
+    } else {
+      const result = await createSchedule({ name, color: color || null, events: colored, template })
+      if (result) { addEvents(result.events); exitDesigner() }
+    }
+  }, [plotEvents, editingSchedule, createSchedule, restampSchedule, addEvents, removeEventsBySchedule, exitDesigner])
+  // template is { pattern, from, to, skip } (new) or a bare pattern array (legacy) — extract the pattern.
+  const patternOf = (tpl) => Array.isArray(tpl) ? tpl : (tpl?.pattern || [])
+  // Duplicate: load a saved schedule's pattern into the Designer to tweak + save as a NEW schedule.
+  const onReopenSchedule = useCallback((schedule) => { enterDesigner(plotFromPattern(patternOf(schedule.template), calView.focusedDay), null) }, [enterDesigner, calView])
+  // Edit in place: load the pattern AND remember which schedule we're updating (Apply replaces its blocks).
+  const onEditSchedule = useCallback((schedule) => { enterDesigner(plotFromPattern(patternOf(schedule.template), calView.focusedDay), schedule) }, [enterDesigner, calView])
 
   // Schedule management — reflect the DB op in the events cache.
   const onDeleteSchedule = useCallback(async (id) => { if (await deleteSchedule(id)) removeEventsBySchedule(id) }, [deleteSchedule, removeEventsBySchedule])
@@ -442,6 +474,9 @@ function App() {
   const effOnTaskRetime = planning ? stagedRetimeTask : onTaskRetime
   const effOnTaskSchedule = planning ? stagedScheduleTask : onTaskSchedule
   const effOnDailyTime = planning ? stagedSetDailyTime : setDailyTime
+  // The peek is a glance at the REAL calendar — never the Designer's blank scratch plot.
+  const peekEvents = designing ? calendarEvents : effEvents
+  const peekTasks = designing ? calendarTasks : effTasks
 
   // Global Cmd/Ctrl+; toggles the peek; Esc closes it (when not typing in a field).
   useEffect(() => {
@@ -472,8 +507,8 @@ function App() {
     events: effEvents,
     addEvent: effAddEvent, updateEvent: effUpdateEvent, deleteEvent: effDeleteEvent,
     planning, enterPlan, applyPlan, discardPlan, planPending,
-    designing, enterDesigner, exitDesigner, applyDesign,
-    schedules, onDeleteSchedule, onRecolorSchedule, onRenameSchedule,
+    designing, enterDesigner, exitDesigner, applyDesign, onDismissConflict: dismissConflict, editingSchedule,
+    schedules, onDeleteSchedule, onRecolorSchedule, onRenameSchedule, onReopenSchedule, onEditSchedule,
     dailyTasks: recurringDailies, // all recurring dailies (not useTasks' paginated first page)
     ephemeralDailies: effEphemeral, // active one-off "today's tasks" — Day view + Week/Month badge
     dailyCompletions,
@@ -744,8 +779,8 @@ function App() {
         {/* Calendar peek drawer (root-mounted so it persists across routes) */}
         {isAuthed && (
           <CalendarPeek
-            events={effEvents}
-            tasks={effTasks}
+            events={peekEvents}
+            tasks={peekTasks}
             dailyTasks={recurringDailies}
             dailyCompletions={dailyCompletions}
             onToggleDaily={toggleCompletion}

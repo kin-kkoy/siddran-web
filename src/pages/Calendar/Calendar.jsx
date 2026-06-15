@@ -20,7 +20,7 @@ const VIEWS = ['day', 'week', 'month']
 // Full-route Calendar (also rendered in the half-split pane via mode="half"). View + focused day
 // live in CalendarViewContext so the peek, the route, and the half pane all stay in sync. Calendar
 // data + task mutations are passed in from App (shared with the peek — single fetch).
-function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, planning, enterPlan, applyPlan, discardPlan, planPending, designing, enterDesigner, exitDesigner, applyDesign, schedules, onDeleteSchedule, onRecolorSchedule, onRenameSchedule, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
+function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, planning, enterPlan, applyPlan, discardPlan, planPending, designing, enterDesigner, exitDesigner, applyDesign, onDismissConflict, editingSchedule, schedules, onDeleteSchedule, onRecolorSchedule, onRenameSchedule, onReopenSchedule, onEditSchedule, dailyTasks, dailyCompletions, onToggleDaily, ephemeralDailies, onDailyTime, onDailyDone, tasks, undated, onTaskRetime, onTaskSchedule, onActivate, mode = 'full' }) {
     const { view, setView, focusedDay, setFocusedDay, unpin } = useCalendarView()
     const navigate = useNavigate()
     const [modal, setModal] = useState(null) // { mode, draft } | null
@@ -134,7 +134,7 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
                 <h1 className={styles.title}>Cal<span className={styles.accent}>endar</span></h1>
 
                 {designing ? (
-                    <span className={styles.planPill}><span className={styles.planDot} /> Designer · blank week</span>
+                    <span className={styles.planPill}><span className={styles.planDot} /> Designer · {editingSchedule ? `editing "${editingSchedule.name}"` : 'blank week'}</span>
                 ) : (
                     <div className={styles.monthNav}>
                         <button className={styles.navBtn} onClick={() => shift(-1)} aria-label="Previous"><FiChevronLeft /></button>
@@ -157,7 +157,7 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
                             {!planning ? (
                                 <>
                                     <button className={styles.planBtn} onClick={enterPlan} title="Plan tentatively — changes apply only when you save">✎ Plan</button>
-                                    <button className={styles.planBtn} onClick={enterDesigner} title="Design a weekly schedule on a blank canvas, then stamp it across a date range">⊞ Designer</button>
+                                    <button className={styles.planBtn} onClick={() => enterDesigner()} title="Design a weekly schedule on a blank canvas, then stamp it across a date range">⊞ Designer</button>
                                     <button className={styles.planBtn} onClick={() => setSchedulesOpen(true)} title="Manage saved schedules">≡ Schedules</button>
                                 </>
                             ) : (
@@ -186,10 +186,10 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
                 <MonthView monthDate={monthDate} focusedDay={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onDayClick={handleDayClick} onEventClick={handleEventClick} onRetime={retime} onToggleDaily={onToggleDaily} onJumpToDay={onJumpToDay} />
             )}
             {view === 'week' && (
-                <WeekView anchor={anchor} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} />
+                <WeekView anchor={anchor} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} onDismissConflict={designing ? onDismissConflict : undefined} />
             )}
             {view === 'day' && (
-                <DayView dayISO={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} undated={undated} onSchedule={handleSchedule} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} />
+                <DayView dayISO={focusedDay} itemsAt={itemsAt} ephemeralAt={ephemeralAt} onSlotClick={handleSlotClick} onEventClick={handleEventClick} onRetime={retime} onResizeEvent={handleResize} undated={undated} onSchedule={handleSchedule} onToggleDaily={onToggleDaily} onDailyTime={onDailyTime} onDailyDone={onDailyDone} onJumpToDay={onJumpToDay} onDismissConflict={designing ? onDismissConflict : undefined} />
             )}
 
             {modal && (
@@ -199,6 +199,7 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
             {applyOpen && (
                 <ApplyDesignDialog
                     blockCount={events.length}
+                    editing={editingSchedule}
                     onApply={async (args) => { await applyDesign(args); setApplyOpen(false) }}
                     onClose={() => setApplyOpen(false)}
                 />
@@ -209,6 +210,8 @@ function Calendar({ authFetch, API, events, addEvent, updateEvent, deleteEvent, 
                     onDelete={onDeleteSchedule}
                     onRecolor={onRecolorSchedule}
                     onRename={onRenameSchedule}
+                    onEdit={(s) => { setSchedulesOpen(false); onEditSchedule(s) }}
+                    onDuplicate={(s) => { setSchedulesOpen(false); onReopenSchedule(s) }}
                     onClose={() => setSchedulesOpen(false)}
                 />
             )}

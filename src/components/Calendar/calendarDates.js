@@ -116,9 +116,10 @@ export function timeOf(ts) {
 // Schedule Designer: repeat each plotted block (an event in a representative week) on every matching
 // weekday across the inclusive [fromISO, toISO] range → concrete event payloads. weekday + time-of-day
 // are extracted from each block; all-day blocks stamp as all-day.
-export function stampWeeklyPattern(blocks, fromISO, toISO) {
+export function stampWeeklyPattern(blocks, fromISO, toISO, exclude = []) {
     const from = parseISODate(fromISO), to = parseISODate(toISO);
     if (!from || !to || from > to) return [];
+    const skip = new Set(exclude); // 'YYYY-MM-DD' dates to skip (holidays / breaks)
     const specs = blocks.map(b => {
         const start = new Date(b.start_at);
         return {
@@ -133,6 +134,7 @@ export function stampWeeklyPattern(blocks, fromISO, toISO) {
     const out = [];
     for (let d = from; d <= to; d = addDays(d, 1)) {
         const wd = d.getDay(), dayISO = isoDate(d);
+        if (skip.has(dayISO)) continue;
         for (const s of specs) {
             if (s.weekday !== wd) continue;
             out.push({
@@ -145,4 +147,39 @@ export function stampWeeklyPattern(blocks, fromISO, toISO) {
         }
     }
     return out;
+}
+
+// Designer templates: extract the reusable weekly pattern from plotted blocks (weekday + times),
+// and rebuild plot blocks from a saved pattern onto the week containing refISO (to re-open & re-stamp).
+export function patternFromPlot(blocks) {
+    return blocks.map(b => {
+        const s = new Date(b.start_at);
+        return {
+            weekday: s.getDay(),
+            startTime: b.all_day ? null : timeOf(b.start_at),
+            endTime: (!b.all_day && b.end_at) ? timeOf(b.end_at) : null,
+            all_day: !!b.all_day,
+            title: b.title,
+            color: b.color || null,
+        };
+    });
+}
+
+export function plotFromPattern(pattern, refISO) {
+    if (!Array.isArray(pattern)) return [];
+    const byWeekday = {};
+    for (const d of weekDays(parseISODate(refISO))) byWeekday[d.getDay()] = isoDate(d);
+    const week0 = isoDate(mondayOf(parseISODate(refISO)));
+    return pattern.map((p, i) => {
+        const dayISO = byWeekday[p.weekday] ?? week0;
+        return {
+            id: `tpl-${i}`,
+            title: p.title,
+            start_at: toISOFromParts(dayISO, p.all_day ? null : p.startTime),
+            end_at: (!p.all_day && p.endTime) ? toISOFromParts(dayISO, p.endTime) : null,
+            all_day: !!p.all_day,
+            color: p.color || null,
+            description: null,
+        };
+    });
 }

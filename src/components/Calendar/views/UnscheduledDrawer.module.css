@@ -16,7 +16,7 @@
 }
 .empty {
   color: var(--text-muted);
-  font-family: var(--font-body);
+  font-family: var(--font-mono);
   font-size: 13px;
   text-align: center;
   padding: 16px 8px;
@@ -32,7 +32,7 @@
   border-left: 2px solid var(--src-task);
   padding: 7px 9px;
   margin-bottom: 5px;
-  font-family: var(--font-body);
+  font-family: var(--font-mono);
   font-size: 13px;
   color: var(--text-primary);
   cursor: grab;
@@ -55,7 +55,7 @@
   border: 1px solid var(--accent-warning);
   border-radius: 4px;
   padding: 2px 8px;
-  font-family: var(--font-body);
+  font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-primary);
   max-width: 220px;
