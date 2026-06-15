@@ -6,7 +6,7 @@ const DRAG_THRESHOLD = 4
 
 // Lists undated tasks. Drag one onto the time grid to schedule it (drop resolves to a day +
 // time via slotFromPoint, then onSchedule(taskId, day, time) sets its due_date).
-export default function UnscheduledDrawer({ tasks, onSchedule }) {
+export default function UnscheduledDrawer({ tasks, onSchedule, onDragPreview }) {
     const drag = useRef(null)
     const ghostRef = useRef(null)
     const [dragTitle, setDragTitle] = useState(null)
@@ -28,12 +28,28 @@ export default function UnscheduledDrawer({ tasks, onSchedule }) {
             setDragTitle(st.task.title)
         }
         positionGhost(e.clientX, e.clientY)
+        // Mirror the hover into TimeGrid's drop indicators (all-day cell, or a timeline ghost).
+        if (onDragPreview) {
+            const allDayCell = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-allday]')
+            if (allDayCell) {
+                onDragPreview({ type: 'allday', day: allDayCell.getAttribute('data-col'), label: st.task.title })
+            } else {
+                const pt = pointToDayTime(e.clientX, e.clientY)
+                if (pt) {
+                    const start = snap15(pt.minutes)
+                    onDragPreview({ type: 'timeline', day: pt.day, startMin: start, endMin: start + 60, label: st.task.title })
+                } else {
+                    onDragPreview(null)
+                }
+            }
+        }
     }
     const onPointerUp = (e) => {
         const st = drag.current
         drag.current = null
         try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* no-op */ }
         setDragTitle(null)
+        onDragPreview?.(null)
         if (st?.dragging) {
             // Drop on the all-day row → schedule all-day (no time) on that cell's day.
             const allDayCell = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-allday]')

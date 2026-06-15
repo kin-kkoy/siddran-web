@@ -1,7 +1,16 @@
+import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import styles from './ConfirmModal.module.css'
+import { modalPresence } from '../../utils/modalPresence'
 
 function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmText = 'Delete', cancelText = 'Cancel' }) {
+    // Count as an open modal (pauses StarCanvas) only while actually shown.
+    useEffect(() => {
+        if (!isOpen) return
+        modalPresence.push()
+        return () => modalPresence.pop()
+    }, [isOpen])
+
     if (!isOpen) return null
 
     const stop = (e) => e.stopPropagation()

@@ -5,11 +5,13 @@ import { toast } from '../../utils/toast'
 import logger from '../../utils/logger'
 import { FaCheck } from 'react-icons/fa'
 import { HiOutlineTrash } from 'react-icons/hi'
+import { useModalPresence } from '../../utils/modalPresence'
 
 
 function BundleDetailModal({
     bundle, onClose, updateBundle, deleteBundle, addBundleTasks, batchUpdateBundleTasks, batchDeleteBundleTasks, toggleBundleTaskCompletion
 }) {
+    useModalPresence()
     const [bundleTitle, setBundleTitle] = useState(bundle.title)
     const [bundleTasks, setBundleTasks] = useState(bundle.tasks || [])
 

@@ -42,7 +42,7 @@ function endMinutesOf(it, startMin) {
 // (HOUR_PX/hr); blocks are absolutely positioned (top = start, height = duration) and overlaps
 // pack into side-by-side lanes. Drag a block to move it (snap 15 min); drag its bottom edge to
 // resize (blocks only). Click empty space to create at that time. All-day items sit in the top row.
-export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEventClick, onRetime, onResizeEvent, onUnschedule, onToggleDaily, onDailyTime, onDailyDone, onJumpToDay, onDismissConflict }) {
+export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEventClick, onRetime, onResizeEvent, onUnschedule, onToggleDaily, onDailyTime, onDailyDone, onJumpToDay, onDismissConflict, externalPreview }) {
     const scrollRef = useRef(null)
     const sideBySide = days.length === 1 // Day view → render ephemeral dailies; Week → just a badge
     const ephAt = (iso) => (ephemeralAt ? ephemeralAt(iso) : [])
@@ -236,9 +236,9 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                     const ephUntimed = sideBySide ? ephAt(iso).filter(it => !it.time) : []
                     const ephCount = sideBySide ? 0 : ephAt(iso).length
                     return (
-                        <div key={iso} className={`${styles.allDayCell} ${allDayOver?.iso === iso ? styles.allDayCellOver : ''}`} data-col={iso} data-allday="1" onClick={() => onSlotClick(iso, null)}>
-                            {allDayOver?.iso === iso && (
-                                <div className={styles.allDayPreview}>{allDayOver.title || 'All day'}</div>
+                        <div key={iso} className={`${styles.allDayCell} ${(allDayOver?.iso === iso || (externalPreview?.type === 'allday' && externalPreview.day === iso)) ? styles.allDayCellOver : ''}`} data-col={iso} data-allday="1" onClick={() => onSlotClick(iso, null)}>
+                            {(allDayOver?.iso === iso || (externalPreview?.type === 'allday' && externalPreview.day === iso)) && (
+                                <div className={styles.allDayPreview}>{(allDayOver?.iso === iso ? allDayOver.title : externalPreview?.label) || 'All day'}</div>
                             )}
                             {allDayItems.map(it => {
                                 // Events + tasks can be dragged onto the timeline (set a time), to
@@ -311,7 +311,13 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
                     </div>
 
                     {/* Day columns */}
-                    {days.map(iso => (
+                    {days.map(iso => {
+                        // Preview ghost: our own block drag (dragInfo) takes precedence; otherwise a
+                        // timeline drag coming from the Unscheduled drawer (externalPreview).
+                        const colPreview = (dragInfo && dragInfo.day === iso) ? dragInfo
+                            : (externalPreview && externalPreview.type === 'timeline' && externalPreview.day === iso) ? externalPreview
+                            : null
+                        return (
                         <div
                             key={iso}
                             className={`${styles.col} ${isTodayISO(iso) ? styles.colToday : ''}`}
@@ -327,16 +333,17 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
 
                             {dayLayouts[iso].map(renderBlock)}
 
-                            {dragInfo && dragInfo.day === iso && (
+                            {colPreview && (
                                 <div
                                     className={styles.preview}
-                                    style={{ top: minutesToY(dragInfo.startMin), height: Math.max(MIN_BLOCK_PX, minutesToY(dragInfo.endMin) - minutesToY(dragInfo.startMin)) }}
+                                    style={{ top: minutesToY(colPreview.startMin), height: Math.max(MIN_BLOCK_PX, minutesToY(colPreview.endMin) - minutesToY(colPreview.startMin)) }}
                                 >
-                                    {minutesToTime(dragInfo.startMin)}{dragInfo.mode === 'resize' ? `–${minutesToTime(dragInfo.endMin)}` : ''}
+                                    {minutesToTime(colPreview.startMin)}{colPreview.mode === 'resize' ? `–${minutesToTime(colPreview.endMin)}` : ''}
                                 </div>
                             )}
                         </div>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
           </div>
