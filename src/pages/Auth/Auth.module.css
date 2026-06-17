@@ -72,6 +72,14 @@
   color: var(--text-muted);
 }
 
+/* Edge renders a native password-reveal eye (::-ms-reveal) inside password fields; on the dark
+   input it's a near-black glyph that blends into the background, so lighten it to stay visible. */
+.formInput::-ms-reveal,
+.formInput::-ms-clear {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+
 .authButton {
   background: linear-gradient(135deg, var(--accent-warning) 0%, #d4a030 100%);
   color: var(--bg-primary);
