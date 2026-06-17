@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import logger from '../utils/logger'
 
 // ── Theme definitions ──────────────────────────────────────────────
@@ -308,14 +308,18 @@ export function SettingsProvider({ children, authFetch, API, isAuthed }) {
     }
   }, [authFetch, API])
 
+  // Memoized so consumers don't re-render every time the provider re-renders (the handlers are
+  // already stable useCallbacks; only `settings`/`isSettingsOpen` actually change).
+  const value = useMemo(() => ({
+    settings,
+    updateSetting,
+    isSettingsOpen,
+    openSettings,
+    closeSettings,
+  }), [settings, updateSetting, isSettingsOpen, openSettings, closeSettings])
+
   return (
-    <SettingsContext.Provider value={{
-      settings,
-      updateSetting,
-      isSettingsOpen,
-      openSettings,
-      closeSettings,
-    }}>
+    <SettingsContext.Provider value={value}>
       {children}
     </SettingsContext.Provider>
   )

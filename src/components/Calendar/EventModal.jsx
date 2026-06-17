@@ -101,6 +101,10 @@ export default function EventModal({ mode, draft, hideDate, onSave, onDelete, on
     const committed = useRef(null)
     if (committed.current === null) committed.current = seedFields(draft)
 
+    // Cache picker candidates per refType for this modal's lifetime, so toggling link types back
+    // and forth doesn't refetch the same list each time.
+    const pickerCacheRef = useRef({})
+
     const restore = (vals) => {
         setTitle(vals.title); setDay(vals.day); setAllDay(vals.allDay)
         setStartTime(vals.startTime); setEndTime(vals.endTime); setColor(vals.color)
@@ -113,6 +117,8 @@ export default function EventModal({ mode, draft, hideDate, onSave, onDelete, on
         if (!editMode) return
         const cfg = refType ? PICKER[refType] : null
         if (!cfg || !authFetch || !API) { setCandidates([]); return }
+        // Already fetched this type during this edit session — reuse it, no network call.
+        if (pickerCacheRef.current[refType]) { setCandidates(pickerCacheRef.current[refType]); return }
         let cancelled = false
         setPickerLoading(true)
         ;(async () => {
@@ -120,7 +126,9 @@ export default function EventModal({ mode, draft, hideDate, onSave, onDelete, on
                 const res = await authFetch(`${API}/${cfg.path}`)
                 if (res.ok && !cancelled) {
                     const data = await res.json()
-                    setCandidates((data[cfg.key] || []).map(x => ({ id: String(x.id), title: x.title || '(untitled)' })))
+                    const list = (data[cfg.key] || []).map(x => ({ id: String(x.id), title: x.title || '(untitled)' }))
+                    pickerCacheRef.current[refType] = list
+                    setCandidates(list)
                 }
             } catch (error) {
                 logger.error('Error fetching link candidates:', error)
