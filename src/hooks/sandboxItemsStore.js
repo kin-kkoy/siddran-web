@@ -1,7 +1,7 @@
 import logger from '../utils/logger'
 import { toast } from '../utils/toast'
 import { readItems, writeItems, newItemId } from './sandboxCache'
-import { applyServerCount } from './sandboxStore'
+import { applyServerCount, ensureCreated } from './sandboxStore'
 
 // Module-level singleton for per-board ITEMS (mirrors cinder_sandbox_<id>). Tracks
 // dirty + deleted ids since the last flush and sends them as ONE debounced batch —
@@ -13,6 +13,7 @@ const NET_DEBOUNCE = 6000    // ms — flush ~6s after the user pauses (coalesce
 const MAX_WAIT = 25000       // ms — but never hold pending edits longer than this, even during
                             //      continuous drawing (bounds data-at-risk between flushes)
 const BACKOFF = [1000, 2000, 4000]
+const MAX_FLUSH_RETRIES = 6  // stop retrying a persistently-failing flush so it can't hammer the backend forever
 const BATCH_CHUNK = 200      // server caps a batch at 500
 const MAX_CHUNK_BYTES = 800 * 1024 // keep each request well under the server's 5mb body limit
 const EMPTY = []
@@ -83,35 +84,54 @@ async function request(path, options) {
 export const loadFromServer = async (id) => {
     const rec = ensure(id)
     if (!rec || !api.isAuthed) return
-    try {
-        const res = await request(`/sandboxes/${id}`, { method: 'GET' })
-        if (res.status === 404) return // not on server yet (local-only / pending create)
-        if (!res.ok) throw new Error(`GET /sandboxes/${id} ${res.status}`)
-        const data = await res.json()
-        const serverItems = data.items || []
-        // Server has nothing but we hold local items (e.g. a board whose items never
-        // finished syncing) — push the local copy up instead of wiping it.
-        if (serverItems.length === 0 && rec.items.length > 0) {
-            for (const it of rec.items) rec.dirty.add(it.id)
+    // De-dupe concurrent loads of the same board — e.g. the NotePage dock and the inner page both
+    // mount and call this. Share one in-flight GET instead of firing two identical requests.
+    if (rec.loadPromise) return rec.loadPromise
+    rec.loadPromise = (async () => {
+        try {
+            const res = await request(`/sandboxes/${id}`, { method: 'GET' })
+            if (res.status === 404) {
+                // Local-only board (its create never landed). Treat like an empty server: mark ALL
+                // local items dirty so the whole board syncs once ensureCreated() makes it —
+                // otherwise only later edits sync and the next GET-200 "replace local with server"
+                // wipes the rest.
+                if (rec.items.length > 0) {
+                    for (const it of rec.items) rec.dirty.add(it.id)
+                    scheduleFlush(id)
+                }
+                rec.loaded = true
+                return
+            }
+            if (!res.ok) throw new Error(`GET /sandboxes/${id} ${res.status}`)
+            const data = await res.json()
+            const serverItems = data.items || []
+            // Server has nothing but we hold local items (e.g. a board whose items never
+            // finished syncing) — push the local copy up instead of wiping it.
+            if (serverItems.length === 0 && rec.items.length > 0) {
+                for (const it of rec.items) rec.dirty.add(it.id)
+                rec.loaded = true
+                scheduleFlush(id)
+                return
+            }
+            if (rec.dirty.size === 0 && rec.deleted.size === 0) {
+                rec.items = serverItems
+            } else {
+                // Merge: server base, drop local deletes, re-apply local dirty so an
+                // offline edit isn't clobbered by a stale GET.
+                const byId = new Map(serverItems.map(it => [it.id, it]))
+                for (const did of rec.deleted) byId.delete(did)
+                for (const it of rec.items) if (rec.dirty.has(it.id)) byId.set(it.id, it)
+                rec.items = [...byId.values()]
+            }
             rec.loaded = true
-            scheduleFlush(id)
-            return
+            emit(id)
+        } catch (err) {
+            logger.error('sandboxItemsStore — load failed', err)
+        } finally {
+            rec.loadPromise = null
         }
-        if (rec.dirty.size === 0 && rec.deleted.size === 0) {
-            rec.items = serverItems
-        } else {
-            // Merge: server base, drop local deletes, re-apply local dirty so an
-            // offline edit isn't clobbered by a stale GET.
-            const byId = new Map(serverItems.map(it => [it.id, it]))
-            for (const did of rec.deleted) byId.delete(did)
-            for (const it of rec.items) if (rec.dirty.has(it.id)) byId.set(it.id, it)
-            rec.items = [...byId.values()]
-        }
-        rec.loaded = true
-        emit(id)
-    } catch (err) {
-        logger.error('sandboxItemsStore — load failed', err)
-    }
+    })()
+    return rec.loadPromise
 }
 
 // ---- mutations (optimistic, synchronous) ----
@@ -255,6 +275,20 @@ async function flush(id) {
         if (rec.failures === 0) toast.error('Sandbox changes saved locally — will retry.')
         rec.failures += 1
         rec.inFlight = false
+
+        // A 404 means the board doesn't exist server-side (its create never landed). Create it
+        // (idempotent) and retry once — never loop forever POSTing items to a missing board.
+        if (String(err?.message).includes('404')) {
+            if (rec.failures <= MAX_FLUSH_RETRIES) {
+                const created = await ensureCreated(id)
+                if (created) { rec.failures = 0; scheduleFlush(id) }
+            }
+            return
+        }
+
+        // Cap retries so a persistently-failing flush stops hammering the backend; queued edits
+        // stay in localStorage and flush again on the next edit or an 'online' event.
+        if (rec.failures >= MAX_FLUSH_RETRIES) return
         const delay = BACKOFF[Math.min(rec.failures - 1, BACKOFF.length - 1)]
         if (rec.netTimer) clearTimeout(rec.netTimer)
         rec.netTimer = setTimeout(() => { rec.netTimer = null; flush(id) }, delay)

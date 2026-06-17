@@ -116,6 +116,27 @@ async function pushCreate(sandbox, attempt = 0) {
     }
 }
 
+// Ensure a board exists server-side. Used when an items flush 404s because the board's create
+// never landed (e.g. it was created while offline/unauthed, or its 3 create retries were
+// exhausted). POST /sandboxes is idempotent (returns the existing row), so this is safe to call
+// repeatedly. Returns true if the board is present on the server afterwards.
+export const ensureCreated = async (id) => {
+    if (!api.isAuthed) return false
+    const board = list.find(s => s.id === id)
+    if (!board) return false
+    try {
+        const res = await request('/sandboxes', {
+            method: 'POST',
+            body: JSON.stringify({ id: board.id, title: board.title || 'Untitled Sandbox' }),
+        })
+        if (res.ok) { pendingCreates.delete(id); return true }
+        return false
+    } catch (err) {
+        logger.error('sandboxStore — ensureCreated failed', err)
+        return false
+    }
+}
+
 export const rename = (id, title) => {
     const trimmed = (title || '').trim()
     setList(list.map(s => s.id === id
