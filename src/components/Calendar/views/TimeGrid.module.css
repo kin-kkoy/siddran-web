@@ -118,6 +118,11 @@
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
+  /* Shrink-wrap to the timeline's full width (56px gutter + N day columns) instead of stretching
+     to the viewport. Without this, on a narrow screen .body clipped its grid at the viewport edge,
+     so day columns revealed by the horizontal scroll rendered blank while the header/all-day rows
+     (which size to content) showed fine. */
+  min-width: max-content;
 }
 .grid { display: grid; background: var(--bg-primary); }
 

@@ -136,6 +136,21 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hidden, days.join('|'), itemsAt, ephemeralAt, sideBySide])
 
+    // All-day items per day, memoized so the per-minute now-tick (and drag-state changes) don't
+    // re-filter every column's items on every render.
+    const allDayByDay = useMemo(() => {
+        const map = {}
+        for (const iso of days) {
+            map[iso] = {
+                allDayItems: itemsAt(iso).filter(it => !it.time),
+                ephUntimed: sideBySide ? ephAt(iso).filter(it => !it.time) : [],
+                ephCount: sideBySide ? 0 : ephAt(iso).length,
+            }
+        }
+        return map
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [days.join('|'), itemsAt, ephemeralAt, sideBySide])
+
     // Drag/resize bookkeeping. `dragInfo` drives the live preview (and dims the source block).
     const drag = useRef(null)
     const [dragInfo, setDragInfo] = useState(null) // { key, mode, day, startMin, endMin }
@@ -289,9 +304,7 @@ export default function TimeGrid({ days, itemsAt, ephemeralAt, onSlotClick, onEv
             <div className={styles.allDayRow} style={gridStyle}>
                 <div className={styles.gutterLabel}>all-day</div>
                 {days.map(iso => {
-                    const allDayItems = itemsAt(iso).filter(it => !it.time)
-                    const ephUntimed = sideBySide ? ephAt(iso).filter(it => !it.time) : []
-                    const ephCount = sideBySide ? 0 : ephAt(iso).length
+                    const { allDayItems, ephUntimed, ephCount } = allDayByDay[iso]
                     return (
                         <div key={iso} className={`${styles.allDayCell} ${(allDayOver?.iso === iso || (externalPreview?.type === 'allday' && externalPreview.day === iso)) ? styles.allDayCellOver : ''}`} data-col={iso} data-allday="1" onClick={() => onSlotClick(iso, null)}>
                             {(allDayOver?.iso === iso || (externalPreview?.type === 'allday' && externalPreview.day === iso)) && (
