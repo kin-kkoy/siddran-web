@@ -610,7 +610,7 @@ export const useTasks = (authFetch, API, isAuthed) => {
             if(res.ok){
                 const updatedBundle = await res.json()
                 toast.success(whatMessage("created"));
-                setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: updatedBundle.tasks } : p ));
+                setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: updatedBundle.tasks, priority: updatedBundle.priority } : p ));
             }
 
         } catch (error) {
@@ -638,7 +638,7 @@ export const useTasks = (authFetch, API, isAuthed) => {
             if(res.ok){
                 const data = await res.json()
                 toast.success(whatMessage("updated"));
-                setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: data.allTasks } : p ))
+                setBundles(bundle => bundle.map( p => p.id === bundleId ? { ...p, tasks: data.allTasks, priority: data.priority } : p ))
             }
 
         } catch (error) {
