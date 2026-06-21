@@ -17,15 +17,19 @@ import { $createSpoilerNode } from '../nodes/SpoilerNode';
 import { $createImageNode } from '../nodes/ImageNode';
 import { $createHorizontalRuleNode } from '@lexical/react/LexicalHorizontalRuleNode';
 
+// Build detached top-level Lexical nodes from an mdast root tree. Must run
+// inside an editor.update() (it creates nodes). Used for inserting parsed
+// markdown at a selection (e.g. markdown-aware paste).
+export function mdastToLexicalNodes(tree) {
+  if (!tree || !Array.isArray(tree.children)) return [];
+  return tree.children.map(convertBlock).filter(Boolean);
+}
+
 // Convert an mdast root tree into Lexical nodes appended to the given root.
 // Caller is responsible for being inside an editor.update() and for clearing
 // the root beforehand if desired.
 export function mdastToLexical(tree, root) {
-  if (!tree || !Array.isArray(tree.children)) return;
-  for (const child of tree.children) {
-    const node = convertBlock(child);
-    if (node) root.append(node);
-  }
+  for (const node of mdastToLexicalNodes(tree)) root.append(node);
 }
 
 // ---------- Block-level conversion ----------
@@ -149,6 +153,12 @@ function convertList(listNode) {
     list.setStart(listNode.start);
   }
 
+  // Mirrors lexicalToMdast's orphan guard: a lone indented bullet (Lexical
+  // "orphan wrapper" — a list item with no real parent) is serialized as a
+  // leading empty list item carrying the nested list. Without this flag we'd
+  // recreate that empty item as a visible phantom bullet on reload.
+  let hasRealItemBefore = false;
+
   for (const item of items) {
     // Separate inline content (paragraphs) from nested lists. mdast nests
     // lists inside the parent listItem; Lexical models nested lists as a
@@ -159,6 +169,23 @@ function convertList(listNode) {
       if (child.type === 'list') nestedLists.push(child);
       else paragraphChildren.push(child);
     }
+
+    const hasText = paragraphChildren.some(
+      p => p.type === 'paragraph' && Array.isArray(p.children) && p.children.length > 0
+    );
+
+    // Orphan placeholder: a leading empty item that exists only to host a
+    // nested list. Reproduce the wrapper-only structure (no visible bullet) so
+    // the indented-without-parent layout round-trips exactly as authored.
+    if (!hasText && nestedLists.length > 0 && !hasRealItemBefore) {
+      for (const nested of nestedLists) {
+        const wrapper = $createListItemNode();
+        wrapper.append(convertList(nested));
+        list.append(wrapper);
+      }
+      continue;
+    }
+    hasRealItemBefore = true;
 
     const itemNode = $createListItemNode();
     if (listType === 'check' && item.checked !== null && item.checked !== undefined) {

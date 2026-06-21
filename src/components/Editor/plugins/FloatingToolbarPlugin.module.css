@@ -45,3 +45,11 @@
 .btn.active {
   color: var(--accent-blue);
 }
+
+.divider {
+  width: 1px;
+  height: 18px;
+  background-color: var(--border-strong);
+  margin: 0 4px;
+  flex-shrink: 0;
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import styles from './NotePage.module.css'
 import { IoMdArrowRoundBack } from "react-icons/io"
@@ -123,9 +123,14 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
     return await editBody(note.id, markdownContent)
   }, [note?.id, editBody])
 
-  // Draft recovery: check if localStorage has a newer draft than the server
-  const getInitialContent = useCallback(() => {
-    if (!note) return ''
+  // Draft recovery: decide the editor's initial content once per note. The
+  // decision (is there a localStorage draft newer than the server copy?) is
+  // computed purely here, keyed on note.id so it tracks the editor's remount
+  // and never re-runs on incidental re-renders. The side effects (consuming the
+  // draft + toasting) live in the effect below — running them inline on every
+  // render is what caused the toast to fire repeatedly while editing.
+  const initialContentInfo = useMemo(() => {
+    if (!note) return { content: '' }
     const draftKey = `cinder_draft_${note.id}`
     try {
       const draft = localStorage.getItem(draftKey)
@@ -133,17 +138,25 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
         const { content, savedAt } = JSON.parse(draft)
         const noteUpdated = new Date(note.updated_at).getTime()
         if (savedAt > noteUpdated) {
-          localStorage.removeItem(draftKey) // consume — don't re-trigger on re-render
-          // Defer: getInitialContent runs during render, so calling toast
-          // synchronously here would setState in ToastContainer mid-render
-          queueMicrotask(() => toast.warning('Recovered unsaved changes from local backup'))
-          return content
+          return { content, recoveredKey: draftKey }
         }
-        localStorage.removeItem(draftKey) // stale draft, clean up
+        return { content: note.body || '', staleKey: draftKey } // stale draft, clean up
       }
     } catch { /* ignore malformed draft */ }
-    return note.body || ''
-  }, [note])
+    return { content: note.body || '' }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note?.id])
+
+  // Consume the draft (and toast once) after mount. Stable per note.id, so this
+  // runs exactly once per note — not on every re-render.
+  useEffect(() => {
+    if (initialContentInfo.recoveredKey) {
+      localStorage.removeItem(initialContentInfo.recoveredKey)
+      toast.warning('Recovered unsaved changes from local backup')
+    } else if (initialContentInfo.staleKey) {
+      localStorage.removeItem(initialContentInfo.staleKey)
+    }
+  }, [initialContentInfo])
 
   // Skeleton shown while loading notes from server, or while a freshly-created
   // optimistic note is still syncing with the backend
@@ -372,7 +385,7 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
 
         <LexicalEditor
           key={note.id}
-          initialContent={getInitialContent()}
+          initialContent={initialContentInfo.content}
           onSave={handleEditorSave}
           noteId={note.id}
           onDirtyChange={handleDirtyChange}

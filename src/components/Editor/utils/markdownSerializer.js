@@ -33,3 +33,14 @@ export function serializeEditorState(editorState) {
   // match the prior serializer's no-trailing-newline output.
   return processor.stringify(tree).replace(/\n$/, '');
 }
+
+// Serialize an arbitrary list of top-level block nodes to markdown, reusing the
+// exact serializer (and output style) notes are saved with. `lexicalToMdast`
+// only reads `getChildren()`, so we hand it a lightweight shim instead of a
+// real root — no cloning needed. Caller must invoke inside an editor.read()/
+// update() so the nodes are live. Used by "Copy as Markdown".
+export function serializeNodesToMarkdown(blockNodes) {
+  if (!Array.isArray(blockNodes) || blockNodes.length === 0) return '';
+  const tree = lexicalToMdast({ getChildren: () => blockNodes });
+  return processor.stringify(tree).replace(/\n$/, '');
+}

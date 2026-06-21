@@ -192,13 +192,29 @@ function ToolbarPlugin({ isReadMode }) {
     };
   }, [updateDockLayout]);
 
-  // Handle editor focus/blur
+  // Handle editor focus/blur.
+  // Rather than trusting the FOCUS/BLUR command edges directly (checkbox clicks
+  // and other in-editor interactions fire a transient blur/refocus that would
+  // leave the dock stuck visible), we recompute visibility from where focus
+  // actually landed, after a short delay so the browser has settled activeEl.
   useEffect(() => {
+    const recomputeDockVisibility = () => {
+      setTimeout(() => {
+        const activeElement = document.activeElement;
+        const editorRoot = editor.getRootElement();
+        const isInEditor = !!editorRoot && editorRoot.contains(activeElement);
+        const isDockFocused = !!dockRef.current?.contains(activeElement);
+        // Hidden while editing in the editor or interacting with the dock;
+        // shown only when focus has genuinely left both.
+        setIsDockVisible(!(isInEditor || isDockFocused));
+      }, 10);
+    };
+
     return mergeRegister(
       editor.registerCommand(
         FOCUS_COMMAND,
         () => {
-          setIsDockVisible(false); // Hide when editor gains focus
+          recomputeDockVisibility();
           return false;
         },
         COMMAND_PRIORITY_LOW
@@ -206,14 +222,7 @@ function ToolbarPlugin({ isReadMode }) {
       editor.registerCommand(
         BLUR_COMMAND,
         () => {
-          // Small delay to check if focus moved to dock
-          setTimeout(() => {
-            const activeElement = document.activeElement;
-            const isDockFocused = dockRef.current?.contains(activeElement);
-            if (!isDockFocused) {
-              setIsDockVisible(true); // Show when editor loses focus
-            }
-          }, 10);
+          recomputeDockVisibility();
           return false;
         },
         COMMAND_PRIORITY_LOW

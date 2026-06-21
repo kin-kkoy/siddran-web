@@ -13,7 +13,7 @@ const MANAGED_ID_RE = /^(?:h[1-6]:|l:|p:)/;
 // Delay between an anchor mouseleave and clearing the hover state. Lets the
 // cursor traverse the gap from the heading text to the chevron in the gutter
 // without the chevron disappearing mid-motion.
-const HOVER_LINGER_MS = 150;
+const HOVER_LINGER_MS = 350;
 
 // Lucide-style right-pointing chevron. CSS rotates it to point down when
 // expanded (default) or right when collapsed.
@@ -332,6 +332,14 @@ function CollapsiblePlugin({ noteId }) {
       const pl = parseFloat(style.paddingLeft) || 0;
       const ml = parseFloat(style.marginLeft) || 0;
 
+      // Vertically center the chevron on the anchor's FIRST text line. A fixed
+      // nudge can't do this across block kinds — a heading's line is far taller
+      // than a list item's, so the same offset that centers a bullet leaves a
+      // heading's chevron floating near the top. Use the computed line height
+      // (falling back to font-size * 1.2 when it reports 'normal').
+      const fontSize = parseFloat(style.fontSize) || 16;
+      const lineHeight = parseFloat(style.lineHeight) || fontSize * 1.2;
+
       const textLeft = rect.left - originRect.left + pl + ml;
       // Lists draw markers outside the bounding box; the marker width varies
       // by list type, so each gets its own gutter.
@@ -345,8 +353,13 @@ function CollapsiblePlugin({ noteId }) {
       chevronItems.push({
         id: fp.stableId,
         kind: fp.kind,
-        top: rect.top - originRect.top + pt + 6, // nudge down to align with text baseline
+        // Glyph box is 1rem (16px) tall; align its center to the first line's
+        // center so it tracks text size on headings, lists and paragraphs alike.
+        top: rect.top - originRect.top + pt + lineHeight / 2 - 8,
         left: textLeft - gutter,
+        // Box spans the gutter (glyph left-aligned) so its right edge meets the
+        // text — no gap for the cursor to fall through on the way to the chevron.
+        width: gutter,
         isCollapsed: collapsed.has(fp.stableId),
       });
     }
@@ -465,6 +478,7 @@ function CollapsiblePlugin({ noteId }) {
             style={{
               top: `${item.top}px`,
               left: `${item.left}px`,
+              width: `${item.width}px`,
               opacity: visible ? 0.7 : 0,
               pointerEvents: visible ? 'auto' : 'none',
             }}
