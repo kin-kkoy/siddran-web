@@ -34,10 +34,13 @@ export const obsidianSyntax = {
       before: 'Link',
       parse(cx, next, pos) {
         if (next !== 35) return -1
-        // Must start a word (preceded by whitespace or line start) so `a#b` and
-        // `#fff` mid-word / colour codes don't match.
+        // Must start a word (preceded by whitespace or line/block start) so `a#b`
+        // and `#fff` mid-word / colour codes don't match. At the very start of an
+        // inline block cx.char(pos-1) is out of range — it returns -1 OR NaN
+        // (charCodeAt of a negative index), and both mean "line start", so allow them.
         const prev = cx.char(pos - 1)
-        if (prev !== -1 && prev !== 32 && prev !== 9 && prev !== 10) return -1
+        const atStart = prev === -1 || Number.isNaN(prev)
+        if (!atStart && prev !== 32 && prev !== 9 && prev !== 10) return -1
         const letter = (c) => (c >= 65 && c <= 90) || (c >= 97 && c <= 122)
         if (!letter(cx.char(pos + 1))) return -1
         const word = (c) => (c >= 48 && c <= 57) || letter(c) || c === 95 || c === 45 || c === 47
