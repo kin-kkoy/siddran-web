@@ -4,7 +4,7 @@
 .reading {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
   font-size: 16px;
-  line-height: 1.75;
+  line-height: 1.9;
   color: var(--text-primary);
   word-wrap: break-word;
   padding: 4px 0 40px;

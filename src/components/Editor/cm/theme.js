@@ -215,12 +215,16 @@ export const cinderTheme = EditorView.theme({
   '.cm-line.cm-callout-head': { fontWeight: '600' },
 
   // Fold gutter (heading + list outline fold) — custom chevron on foldable lines.
-  '.cm-gutters': { background: 'transparent', border: 'none', color: 'var(--text-faint)' },
+  // Negative left margin pulls the whole gutter into the surface's left padding so
+  // the editor TEXT lines up with the reading view (no gutter), and the chevron
+  // sits clear of the text in the margin instead of crowding it.
+  '.cm-gutters': { background: 'transparent', border: 'none', color: 'var(--text-faint)', marginLeft: '-22px' },
   '.cm-foldGutter .cm-gutterElement': {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '0 1px',
+    padding: '0',
+    minWidth: '18px',
   },
   '.cm-fold-chevron': {
     display: 'inline-flex',
