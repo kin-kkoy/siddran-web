@@ -125,10 +125,12 @@ function wikilinkComplete(context) {
 // links open the note (or confirm-create it when unresolved).
 const clickHandler = EditorView.domEventHandlers({
   mousedown: (event, view) => {
+    const cfg = view.state.facet(wikilinkConfig)
+    const tag = event.target?.closest?.('.cm-hashtag')
+    if (tag) { event.preventDefault(); cfg.searchTag?.(tag.getAttribute('data-tag')); return true }
     const el = event.target?.closest?.('.cm-internal-link')
     if (!el) return false
     event.preventDefault()
-    const cfg = view.state.facet(wikilinkConfig)
     const kind = el.getAttribute('data-link-kind')
     if (kind === 'task') { cfg.openTask?.(el.getAttribute('data-link-id')); return true }
     if (kind === 'sandbox') { cfg.openSandbox?.(el.getAttribute('data-link-id')); return true }

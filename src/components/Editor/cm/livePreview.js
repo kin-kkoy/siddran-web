@@ -119,6 +119,20 @@ function buildDeco(state) {
           mk(showFrom, nt - 2, cls, { 'data-target': parsed.target })
           return false
         }
+        case 'Highlight': {
+          // ==text== → highlighted; caret on it keeps the whole thing visible.
+          if (over(nf, nt)) { mk(nf, nt, 'cm-highlight'); return false }
+          mk(nf + 2, nt - 2, 'cm-highlight')
+          hide(nf, nf + 2)
+          hide(nt - 2, nt)
+          return false
+        }
+        case 'Hashtag': {
+          // Caret on it → plain editable text; off → clickable pill.
+          if (over(nf, nt)) break
+          mk(nf, nt, 'cm-hashtag', { 'data-tag': doc.sliceString(nf + 1, nt) })
+          return false
+        }
         case 'Link': {
           const marks = node.node.getChildren('LinkMark')
           const url = node.node.getChild('URL')

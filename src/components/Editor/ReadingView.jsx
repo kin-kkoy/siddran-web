@@ -7,9 +7,14 @@ import styles from './ReadingView.module.css'
 // Read-only rendered view of a note — the "reading mode" the read/edit toggle
 // switches to in the new editor. Renders note markdown to HTML once per content
 // change and decorates each <pre> with a Copy button.
-function ReadingView({ markdown }) {
+function ReadingView({ markdown, onSearchTag }) {
   const ref = useRef(null)
   const html = useMemo(() => markdownToHtml(markdown || ''), [markdown])
+
+  const handleClick = (e) => {
+    const tag = e.target.closest?.('.rv-hashtag')
+    if (tag && onSearchTag) onSearchTag(tag.getAttribute('data-tag'))
+  }
 
   useEffect(() => {
     const root = ref.current
@@ -34,7 +39,7 @@ function ReadingView({ markdown }) {
     return () => cleanups.forEach((fn) => fn())
   }, [html])
 
-  return <div ref={ref} className={styles.reading} dangerouslySetInnerHTML={{ __html: html }} />
+  return <div ref={ref} className={styles.reading} onClick={handleClick} dangerouslySetInnerHTML={{ __html: html }} />
 }
 
 export default ReadingView

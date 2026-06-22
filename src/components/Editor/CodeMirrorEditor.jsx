@@ -10,6 +10,7 @@ import { domVerticalMotion } from './cm/verticalMotion'
 import { codeCopy } from './cm/codeCopy'
 import { imageExtensions } from './cm/imagePaste'
 import { wikilinks, wikilinkMarkdownExtension, resolveNote } from './cm/wikilinks'
+import { obsidianSyntax } from './cm/syntaxNodes'
 import { cinderHighlightStyle } from './cm/highlight'
 import { cinderTheme } from './cm/theme'
 import { useApi } from '../../contexts/ApiContext'
@@ -45,6 +46,7 @@ function CodeMirrorEditor({
   onOpenTask,
   onOpenSandbox,
   onOpenBundle,
+  onSearchTag,
   tasks = [],
   bundles = [],
   sandboxes = [],
@@ -68,6 +70,7 @@ function CodeMirrorEditor({
   const onOpenTaskRef = useRef(onOpenTask)
   const onOpenSandboxRef = useRef(onOpenSandbox)
   const onOpenBundleRef = useRef(onOpenBundle)
+  const onSearchTagRef = useRef(onSearchTag)
   const tasksRef = useRef(tasks)
   const bundlesRef = useRef(bundles)
   const sandboxesRef = useRef(sandboxes)
@@ -77,6 +80,7 @@ function CodeMirrorEditor({
   useEffect(() => { onOpenTaskRef.current = onOpenTask }, [onOpenTask])
   useEffect(() => { onOpenSandboxRef.current = onOpenSandbox }, [onOpenSandbox])
   useEffect(() => { onOpenBundleRef.current = onOpenBundle }, [onOpenBundle])
+  useEffect(() => { onSearchTagRef.current = onSearchTag }, [onSearchTag])
   useEffect(() => { tasksRef.current = tasks }, [tasks])
   useEffect(() => { bundlesRef.current = bundles }, [bundles])
   useEffect(() => { sandboxesRef.current = sandboxes }, [sandboxes])
@@ -176,7 +180,7 @@ function CodeMirrorEditor({
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           drawSelection(),
           EditorView.lineWrapping,
-          markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [wikilinkMarkdownExtension] }),
+          markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [wikilinkMarkdownExtension, obsidianSyntax] }),
           syntaxHighlighting(cinderHighlightStyle),
           livePreviewField,
           codeCopy,
@@ -189,6 +193,7 @@ function CodeMirrorEditor({
             openTask: (id) => onOpenTaskRef.current?.(id),
             openSandbox: (id) => onOpenSandboxRef.current?.(id),
             openBundle: (id) => onOpenBundleRef.current?.(id),
+            searchTag: (tag) => onSearchTagRef.current?.(tag),
             tasks: () => tasksRef.current,
             bundles: () => bundlesRef.current,
             sandboxes: () => sandboxesRef.current,

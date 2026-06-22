@@ -181,6 +181,11 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
     }
   }, [sandboxes, navigate])
 
+  // Clicking a #hashtag opens the notes list filtered by that term.
+  const handleSearchTag = useCallback((tag) => {
+    if (tag) navigate(`/notes?q=${encodeURIComponent(tag)}`)
+  }, [navigate])
+
   // Draft recovery: decide the editor's initial content once per note. The
   // decision (is there a localStorage draft newer than the server copy?) is
   // computed purely here, keyed on note.id so it tracks the editor's remount
@@ -445,7 +450,7 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
           // New editor: read mode renders a fully-rendered HTML reading view;
           // edit mode is the CodeMirror live-preview editor.
           viewMode ? (
-            <ReadingView key={`read-${note.id}`} markdown={note.body || ''} />
+            <ReadingView key={`read-${note.id}`} markdown={note.body || ''} onSearchTag={handleSearchTag} />
           ) : (
             <CodeMirrorEditor
               key={note.id}
@@ -461,6 +466,7 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
               onOpenTask={handleOpenTask}
               onOpenSandbox={handleOpenSandbox}
               onOpenBundle={(id) => navigate(`/tasks?bundle=${id}`)}
+              onSearchTag={handleSearchTag}
               tasks={tasks}
               bundles={bundles}
               sandboxes={sandboxes}

@@ -7,6 +7,8 @@ import rehypeStringify from 'rehype-stringify'
 import { visit } from 'unist-util-visit'
 import { remarkSpoiler } from './remarkSpoiler'
 import { remarkUnderline } from './remarkUnderline'
+import { remarkHighlight } from './remarkHighlight'
+import { remarkHashtag } from './remarkHashtag'
 import { resolveImageUrl } from '../../../utils/imageUpload'
 
 // Markdown → HTML for the reading view. Reuses the same remark plugins the
@@ -22,6 +24,17 @@ const handlers = {
   },
   underline(state, node) {
     return { type: 'element', tagName: 'u', properties: {}, children: state.all(node) }
+  },
+  highlight(state, node) {
+    return { type: 'element', tagName: 'mark', properties: {}, children: state.all(node) }
+  },
+  hashtag(state, node) {
+    return {
+      type: 'element',
+      tagName: 'span',
+      properties: { className: ['rv-hashtag'], 'data-tag': node.tag },
+      children: state.all(node),
+    }
   },
 }
 
@@ -48,6 +61,8 @@ const processor = unified()
   .use(remarkGfm)
   .use(remarkSpoiler)
   .use(remarkUnderline)
+  .use(remarkHighlight)
+  .use(remarkHashtag)
   .use(remarkRehype, { handlers })
   .use(rehypeCinderImages)
   .use(rehypeHighlight, { ignoreMissing: true })

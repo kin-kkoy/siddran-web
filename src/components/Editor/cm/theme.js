@@ -169,6 +169,21 @@ export const cinderTheme = EditorView.theme({
   '.cm-bundle-link': { color: 'var(--src-bundle)' },
   '.cm-bundle-link::before': { content: "'⊞ '", opacity: '0.85' },
 
+  // ==highlight==
+  '.cm-highlight': { background: 'rgba(240, 184, 64, 0.22)', borderRadius: '3px', padding: '0 2px' },
+
+  // #hashtags — clickable pill (searches notes).
+  '.cm-hashtag': {
+    color: '#c084fc',
+    background: 'rgba(192, 132, 252, 0.15)',
+    borderRadius: '20px',
+    padding: '1px 8px',
+    fontSize: '0.85em',
+    fontWeight: '500',
+    cursor: 'pointer',
+  },
+  '.cm-hashtag:hover': { background: 'rgba(192, 132, 252, 0.28)' },
+
   // Autocomplete option detail (the task/bundle/sandbox/note tag).
   '.cm-tooltip-autocomplete .cm-completionDetail': {
     marginLeft: '8px',

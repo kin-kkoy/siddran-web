@@ -71,6 +71,18 @@
 .reading th { background: var(--bg-surface-alt); font-weight: 600 }
 
 .reading u { text-decoration: underline }
+.reading mark { background: rgba(240, 184, 64, 0.22); color: inherit; border-radius: 3px; padding: 0 2px }
+
+:global(.rv-hashtag) {
+  color: #c084fc;
+  background: rgba(192, 132, 252, 0.15);
+  border-radius: 20px;
+  padding: 1px 8px;
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+}
+:global(.rv-hashtag):hover { background: rgba(192, 132, 252, 0.28) }
 
 :global(.rv-spoiler) {
   background: var(--text-faint);
