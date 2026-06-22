@@ -13,6 +13,7 @@ import ReadingView from '../../components/Editor/ReadingView'
 import ConfirmModal from '../../components/Common/ConfirmModal'
 import TaskDetailsModal from '../../components/Common/TaskDetailsModal'
 import { useApi } from '../../contexts/ApiContext'
+import { useSandboxes } from '../../hooks/useSandboxes'
 import { useSettings } from '../../contexts/SettingsContext'
 import { toast } from '../../utils/toast'
 import Skeleton from '../../components/Common/Skeleton'
@@ -21,11 +22,12 @@ import NoteSettingsPopup from '../../components/Settings/NoteSettingsPopup'
 import SandboxDock from '../../components/Sandbox/Dock/SandboxDock'
 import { useSandboxView } from '../../contexts/SandboxViewContext'
 
-function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction, tasks, toggleTaskCompletion, addNote, updateTask }) {
+function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction, tasks, toggleTaskCompletion, addNote, updateTask, bundles }) {
 
   const sandboxView = useSandboxView()
   const { settings } = useSettings()
   const { authFetch, API } = useApi()
+  const { sandboxes } = useSandboxes()
 
   // Auto-collapse the sidebar when the sandbox dock expands to half mode so the
   // editor + sandbox columns have room to breathe.
@@ -64,6 +66,8 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   // [[task:id]] cross-link → task details modal hosted here.
   const [openTask, setOpenTask] = useState(null)
   const openingTaskRef = useRef(false)
+  // [[sandbox:id]] that resolves to no known board → "not found" notice modal.
+  const [sandboxNotFound, setSandboxNotFound] = useState(false)
 
   // re-renders if note changes (parent changes)
   useEffect(() => {
@@ -165,6 +169,17 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
       openingTaskRef.current = false
     }
   }, [tasks, authFetch, API])
+
+  // Open a [[sandbox:id]] link, or show a "not found" modal if no such board.
+  // If the list hasn't hydrated yet (empty), fall through to navigation rather
+  // than false-flag a valid board as missing.
+  const handleOpenSandbox = useCallback((id) => {
+    if (sandboxes.length === 0 || sandboxes.some(s => String(s.id) === String(id))) {
+      navigate(`/sandboxes/${id}`)
+    } else {
+      setSandboxNotFound(true)
+    }
+  }, [sandboxes, navigate])
 
   // Draft recovery: decide the editor's initial content once per note. The
   // decision (is there a localStorage draft newer than the server copy?) is
@@ -444,7 +459,11 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
               onNavigateNote={(noteId) => navigate(`/notes/${noteId}`)}
               onCreateNote={(title) => setLinkModalTitle(title)}
               onOpenTask={handleOpenTask}
-              onOpenSandbox={(id) => navigate(`/sandboxes/${id}`)}
+              onOpenSandbox={handleOpenSandbox}
+              onOpenBundle={(id) => navigate(`/tasks?bundle=${id}`)}
+              tasks={tasks}
+              bundles={bundles}
+              sandboxes={sandboxes}
             />
           )
         ) : (
@@ -494,6 +513,18 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
           onOpenInHub={() => { navigate(`/tasks?task=${openTask.id}`); setOpenTask(null) }}
         />
       )}
+
+      <ConfirmModal
+        isOpen={sandboxNotFound}
+        title='Sandbox not found'
+        message="This sandbox doesn't exist anymore (it may have been deleted)."
+        confirmText='OK'
+        confirmVariant='primary'
+        hideCancel
+        glow='danger'
+        onConfirm={() => setSandboxNotFound(false)}
+        onClose={() => setSandboxNotFound(false)}
+      />
     </div>
   )
 

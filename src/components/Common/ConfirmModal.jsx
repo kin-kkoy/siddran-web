@@ -19,6 +19,8 @@ function ConfirmModal({
     busyText = 'Working…',
     busyContent = null,
     confirmVariant = 'danger',
+    hideCancel = false,
+    glow = null,
 }) {
     // Count as an open modal (pauses StarCanvas) only while actually shown.
     useEffect(() => {
@@ -43,7 +45,7 @@ function ConfirmModal({
 
     return createPortal(
         <div className={styles.backdrop} onClick={handleBackdropClick} onMouseDown={stop}>
-            <div className={styles.modal} onClick={stop}>
+            <div className={`${styles.modal} ${glow === 'danger' ? styles.glowDanger : ''}`} onClick={stop}>
                 <div className={styles.header}>
                     <h2>{title}</h2>
                     <button onClick={requestClose} className={styles.closeBtn} disabled={busy}>×</button>
@@ -61,9 +63,11 @@ function ConfirmModal({
                         </button>
                     ) : (
                         <>
-                            <button onClick={onClose} className={styles.cancelBtn}>
-                                {cancelText}
-                            </button>
+                            {!hideCancel && (
+                                <button onClick={onClose} className={styles.cancelBtn}>
+                                    {cancelText}
+                                </button>
+                            )}
                             <button onClick={onConfirm} className={confirmClass}>
                                 {confirmText}
                             </button>

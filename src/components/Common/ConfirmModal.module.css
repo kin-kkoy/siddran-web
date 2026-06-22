@@ -138,6 +138,12 @@
     background-color: var(--accent-blue);
 }
 
+/* Soft danger glow on the modal edges (e.g. "sandbox not found"). */
+.glowDanger {
+    border-color: var(--accent-danger);
+    box-shadow: 0 8px 32px var(--shadow-color), 0 0 16px rgba(224, 92, 92, 0.4);
+}
+
 /* Busy state: disabled buttons + inline spinner. */
 .confirmBtn:disabled,
 .closeBtn:disabled {

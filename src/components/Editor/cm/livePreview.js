@@ -106,9 +106,11 @@ function buildDeco(state) {
           const showFrom = parsed.pipe >= 0 ? nf + 2 + parsed.pipe + 1 : nf + 2
           if (parsed.pipe >= 0) hide(nf + 2, showFrom)
 
-          if (parsed.kind === 'task' || parsed.kind === 'sandbox') {
-            const cls = 'cm-internal-link ' + (parsed.kind === 'task' ? 'cm-task-link' : 'cm-sandbox-link')
-            mk(showFrom, nt - 2, cls, { 'data-link-kind': parsed.kind, 'data-link-id': parsed.id })
+          if (parsed.kind !== 'note') {
+            const kindClass = parsed.kind === 'task' ? 'cm-task-link'
+              : parsed.kind === 'sandbox' ? 'cm-sandbox-link'
+                : 'cm-bundle-link'
+            mk(showFrom, nt - 2, 'cm-internal-link ' + kindClass, { 'data-link-kind': parsed.kind, 'data-link-id': parsed.id })
             return false
           }
           const cfg = state.facet(wikilinkConfig)

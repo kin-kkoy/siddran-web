@@ -56,31 +56,69 @@ export function parseTypedLink(inner) {
   const pipe = inner.indexOf('|')
   const head = (pipe >= 0 ? inner.slice(0, pipe) : inner).trim()
   const label = pipe >= 0 ? inner.slice(pipe + 1).trim() : ''
-  const typed = /^(task|sandbox):(.+)$/i.exec(head)
+  const typed = /^(task|sandbox|bundle):(.+)$/i.exec(head)
   if (typed) return { kind: typed[1].toLowerCase(), id: typed[2].trim(), label, pipe }
   return { kind: 'note', target: head.split('#')[0].trim(), label, pipe }
 }
 
-// Autocomplete source — fires after `[[`, suggests existing note titles only.
+// Autocomplete source. After `[[` it suggests notes; after a typed prefix
+// (`[[task:` / `[[sandbox:`) it suggests that kind — tasks (+ bundle tasks, which
+// insert a `bundle:` link since bundle tasks open the whole bundle) or sandboxes.
 function wikilinkComplete(context) {
   const before = context.matchBefore(/\[\[[^\]\n]*/)
   if (!before) return null
   const cfg = context.state.facet(wikilinkConfig)
-  const notes = (cfg.notes ? cfg.notes() : []) || []
-  const options = notes.map((n) => {
-    const title = n.title || 'Untitled'
-    return {
-      label: title,
-      type: 'text',
-      apply: (view, _completion, from, to) => {
-        view.dispatch({
-          changes: { from, to, insert: `${title}]]` },
-          selection: { anchor: from + title.length + 2 },
-        })
-      },
-    }
+  const from = before.from + 2
+  const after = before.text.slice(2)
+
+  // Build an option whose `apply` replaces the inner text with `<inner>]]`.
+  const opt = (inner, label, detail) => ({
+    label,
+    detail,
+    type: 'text',
+    apply: (view, _c, f, t) => view.dispatch({
+      changes: { from: f, to: t, insert: `${inner}]]` },
+      selection: { anchor: f + inner.length + 2 },
+    }),
   })
-  return { from: before.from + 2, to: context.pos, options, filter: true, validFor: /[^\]\n]*/ }
+
+  const taskM = /^task:(.*)$/i.exec(after)
+  if (taskM) {
+    const q = taskM[1].trim().toLowerCase()
+    const options = []
+    for (const t of (cfg.tasks?.() || [])) {
+      const title = t.title || 'Untitled'
+      if (!q || title.toLowerCase().includes(q)) options.push(opt(`task:${t.id}|${title}`, title, 'task'))
+    }
+    for (const b of (cfg.bundles?.() || [])) {
+      const bundleTitle = b.title || 'bundle'
+      for (const bt of (b.tasks || [])) {
+        const title = bt.title || 'Untitled'
+        if (!q || title.toLowerCase().includes(q) || bundleTitle.toLowerCase().includes(q)) {
+          options.push(opt(`bundle:${b.id}|${title}`, `${title}  (in ${bundleTitle})`, 'bundle'))
+        }
+      }
+    }
+    return { from, to: context.pos, options, filter: false, validFor: /[^\]\n]*/ }
+  }
+
+  const sbM = /^sandbox:(.*)$/i.exec(after)
+  if (sbM) {
+    const q = sbM[1].trim().toLowerCase()
+    const options = []
+    for (const s of (cfg.sandboxes?.() || [])) {
+      const title = s.title || 'Untitled'
+      if (!q || title.toLowerCase().includes(q)) options.push(opt(`sandbox:${s.id}|${title}`, title, 'sandbox'))
+    }
+    return { from, to: context.pos, options, filter: false, validFor: /[^\]\n]*/ }
+  }
+
+  // Plain note titles.
+  const options = (cfg.notes?.() || []).map((n) => {
+    const title = n.title || 'Untitled'
+    return opt(title, title, 'note')
+  })
+  return { from, to: context.pos, options, filter: true, validFor: /[^\]\n]*/ }
 }
 
 // Click a rendered link → typed links open the task modal / sandbox board; note
@@ -94,6 +132,7 @@ const clickHandler = EditorView.domEventHandlers({
     const kind = el.getAttribute('data-link-kind')
     if (kind === 'task') { cfg.openTask?.(el.getAttribute('data-link-id')); return true }
     if (kind === 'sandbox') { cfg.openSandbox?.(el.getAttribute('data-link-id')); return true }
+    if (kind === 'bundle') { cfg.openBundle?.(el.getAttribute('data-link-id')); return true }
     const target = el.getAttribute('data-target') || ''
     const note = cfg.resolve ? cfg.resolve(target) : null
     if (note) cfg.navigate?.(note.id)

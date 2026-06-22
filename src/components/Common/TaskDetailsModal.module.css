@@ -72,11 +72,13 @@
     color: var(--text-primary);
 }
 
-/* Header action group — keeps the optional "open in hub" button beside close. */
+/* Header action group — keeps the optional "open in hub" button beside close.
+   margin-left spaces the hover box off the title input. */
 .headerActions {
     display: flex;
     align-items: center;
     gap: 6px;
+    margin-left: 12px;
 }
 
 .hubBtn {

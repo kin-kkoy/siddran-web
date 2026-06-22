@@ -58,14 +58,14 @@ function SandBoxPageWrapper({ notes, tasks, toggleTaskCompletion }) {
 }
 
 // Wrapper component to get the ID from route parameters
-function NotePageWrapper({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, onNoteChange, setSidebarCollapsed, lessDistraction, setLessDistraction, tasks, toggleTaskCompletion, addNote, updateTask}){
+function NotePageWrapper({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, onNoteChange, setSidebarCollapsed, lessDistraction, setLessDistraction, tasks, toggleTaskCompletion, addNote, updateTask, bundles}){
   const { id } = useParams()
 
   useEffect(() => {
     onNoteChange(id)
   }, [id, onNoteChange])
 
-  return <NotePage notes={notes} notesLoading={notesLoading} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} exportNote={exportNote} setSidebarCollapsed={setSidebarCollapsed} lessDistraction={lessDistraction} setLessDistraction={setLessDistraction} tasks={tasks} toggleTaskCompletion={toggleTaskCompletion} addNote={addNote} updateTask={updateTask} />
+  return <NotePage notes={notes} notesLoading={notesLoading} editTitle={editTitle} editBody={editBody} updateTags={updateTags} toggleFavorite={toggleFavorite} updateColor={updateColor} exportNote={exportNote} setSidebarCollapsed={setSidebarCollapsed} lessDistraction={lessDistraction} setLessDistraction={setLessDistraction} tasks={tasks} toggleTaskCompletion={toggleTaskCompletion} addNote={addNote} updateTask={updateTask} bundles={bundles} />
 }
 
 function App() {
@@ -758,6 +758,7 @@ function App() {
                     <NotePageWrapper notes={notes}
                       addNote={addNote}
                       updateTask={updateTask}
+                      bundles={bundles}
                       notesLoading={notesLoading}
                       editTitle={editTitle}
                       editBody={editBody}

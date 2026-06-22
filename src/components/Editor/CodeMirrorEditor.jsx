@@ -44,6 +44,10 @@ function CodeMirrorEditor({
   onCreateNote,
   onOpenTask,
   onOpenSandbox,
+  onOpenBundle,
+  tasks = [],
+  bundles = [],
+  sandboxes = [],
 }) {
   const hostRef = useRef(null)
   const viewRef = useRef(null)
@@ -63,11 +67,19 @@ function CodeMirrorEditor({
   const onCreateRef = useRef(onCreateNote)
   const onOpenTaskRef = useRef(onOpenTask)
   const onOpenSandboxRef = useRef(onOpenSandbox)
+  const onOpenBundleRef = useRef(onOpenBundle)
+  const tasksRef = useRef(tasks)
+  const bundlesRef = useRef(bundles)
+  const sandboxesRef = useRef(sandboxes)
   useEffect(() => { notesRef.current = notes }, [notes])
   useEffect(() => { onNavigateRef.current = onNavigateNote }, [onNavigateNote])
   useEffect(() => { onCreateRef.current = onCreateNote }, [onCreateNote])
   useEffect(() => { onOpenTaskRef.current = onOpenTask }, [onOpenTask])
   useEffect(() => { onOpenSandboxRef.current = onOpenSandbox }, [onOpenSandbox])
+  useEffect(() => { onOpenBundleRef.current = onOpenBundle }, [onOpenBundle])
+  useEffect(() => { tasksRef.current = tasks }, [tasks])
+  useEffect(() => { bundlesRef.current = bundles }, [bundles])
+  useEffect(() => { sandboxesRef.current = sandboxes }, [sandboxes])
 
   // Keep the latest callbacks reachable from the long-lived EditorView without
   // rebuilding it on every parent render.
@@ -176,6 +188,10 @@ function CodeMirrorEditor({
             create: (t) => onCreateRef.current?.(t),
             openTask: (id) => onOpenTaskRef.current?.(id),
             openSandbox: (id) => onOpenSandboxRef.current?.(id),
+            openBundle: (id) => onOpenBundleRef.current?.(id),
+            tasks: () => tasksRef.current,
+            bundles: () => bundlesRef.current,
+            sandboxes: () => sandboxesRef.current,
           }),
           cinderTheme,
           cmPlaceholder(placeholder),

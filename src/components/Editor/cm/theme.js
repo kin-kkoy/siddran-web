@@ -164,6 +164,16 @@ export const cinderTheme = EditorView.theme({
   '.cm-task-link::before': { content: "'◷ '", opacity: '0.85' },
   '.cm-sandbox-link': { color: 'var(--src-sandbox)' },
   '.cm-sandbox-link::before': { content: "'▦ '", opacity: '0.85' },
+  '.cm-bundle-link': { color: 'var(--src-bundle)' },
+  '.cm-bundle-link::before': { content: "'⊞ '", opacity: '0.85' },
+
+  // Autocomplete option detail (the task/bundle/sandbox/note tag).
+  '.cm-tooltip-autocomplete .cm-completionDetail': {
+    marginLeft: '8px',
+    fontStyle: 'normal',
+    fontSize: '11px',
+    color: 'var(--text-faint)',
+  },
 
   // Autocomplete dropdown (wikilink titles), themed for dark.
   '.cm-tooltip.cm-tooltip-autocomplete': {
