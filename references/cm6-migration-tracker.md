@@ -19,14 +19,17 @@ Branch: `cm6-editor`. Reference clone: `~/Downloads/garb2/obsidian-notes-clone.h
 - [x] `CodeMirrorEditor.jsx` — prop-compatible wrapper (save-on-blur + debounce,
       checkbox toggle handler, read-only reconfigure)
 - [x] `NotePage.jsx` — flag-gated editor switch
-- [ ] Manual verification pass (see plan's verification section)
+- [x] Manual verification pass — incl. caret-motion fix (browser hit-testing for
+      Arrow-Up/Down + clicks; see verticalMotion.js / migration memory)
 
-## Phase 2 — parity
-- [ ] Full autosave-timer + localStorage draft parity (match AutosavePlugin)
-- [ ] Image upload wired to the R2 presign uploader (`utils/imageUpload.js`),
-      replacing the reference's base64
-- [ ] Code-block copy button
-- [ ] Reading-mode toggle (fully-rendered HTML view)
+## Phase 2 — parity  ✅ (in review)
+- [x] (A) Full autosave-timer + localStorage draft parity (2min/5s, blur, unmount)
+- [x] (B) Image upload via the R2 presign uploader (`utils/imageUpload.js`):
+      paste/drop, inline render, drag-resize (`#w=NNN`)
+- [x] (D) Fenced-code syntax highlighting (editor + reading view) + copy button
+- [x] (C) Reading mode — read toggle now renders a fully-rendered HTML view
+      (`markdownToHtml.js` + `ReadingView.jsx`); Lexical read mode unchanged
+- [ ] Manual verification pass (see plan's verification section)
 
 ## Phase 3 — wikilinks
 - [ ] `ObsidianMD` Lezer nodes (Wikilink, Embed, Highlight, Hashtag)

@@ -9,6 +9,7 @@ import { HiOutlineDownload, HiOutlineCog } from "react-icons/hi";
 import { LuMaximize, LuMinimize } from "react-icons/lu";
 import LexicalEditor from '../../components/Editor/LexicalEditor'
 import CodeMirrorEditor from '../../components/Editor/CodeMirrorEditor'
+import ReadingView from '../../components/Editor/ReadingView'
 import { useSettings } from '../../contexts/SettingsContext'
 import { toast } from '../../utils/toast'
 import Skeleton from '../../components/Common/Skeleton'
@@ -387,15 +388,21 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
         />
 
         {settings.experimentalEditor ? (
-          <CodeMirrorEditor
-            key={note.id}
-            initialContent={initialContentInfo.content}
-            onSave={handleEditorSave}
-            noteId={note.id}
-            onDirtyChange={handleDirtyChange}
-            placeholder='Start typing here...'
-            interfaceMode={viewMode}
-          />
+          // New editor: read mode renders a fully-rendered HTML reading view;
+          // edit mode is the CodeMirror live-preview editor.
+          viewMode ? (
+            <ReadingView key={`read-${note.id}`} markdown={note.body || ''} />
+          ) : (
+            <CodeMirrorEditor
+              key={note.id}
+              initialContent={initialContentInfo.content}
+              onSave={handleEditorSave}
+              noteId={note.id}
+              onDirtyChange={handleDirtyChange}
+              placeholder='Start typing here...'
+              interfaceMode={false}
+            />
+          )
         ) : (
           <LexicalEditor
             key={note.id}
