@@ -73,6 +73,7 @@ export const cinderTheme = EditorView.theme({
 
   // ── Fenced code (line decorations) ──
   '.cm-line.cm-codeblock': {
+    position: 'relative', // anchors the absolutely-positioned copy button
     background: 'var(--bg-surface-alt)',
     fontFamily: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
     fontSize: '13.5px',
@@ -80,6 +81,26 @@ export const cinderTheme = EditorView.theme({
     paddingLeft: '15px !important',
     paddingRight: '15px !important',
   },
+
+  // Code-block "Copy" button (cm/codeCopy.js): floated top-right, out of flow.
+  '.cm-code-copy-btn': {
+    position: 'absolute',
+    top: '4px',
+    right: '8px',
+    zIndex: '3',
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
+    fontSize: '11px',
+    lineHeight: '1',
+    padding: '3px 8px',
+    color: 'var(--text-secondary)',
+    background: 'var(--bg-elevated)',
+    border: '1px solid var(--border-strong)',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    opacity: '0.5',
+    transition: 'opacity 120ms ease, color 120ms ease',
+  },
+  '.cm-code-copy-btn:hover': { opacity: '1', color: 'var(--text-primary)' },
   '.cm-line.cm-codeblock-top': {
     borderTopLeftRadius: '8px',
     borderTopRightRadius: '8px',

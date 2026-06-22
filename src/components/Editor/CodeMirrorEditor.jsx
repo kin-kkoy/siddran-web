@@ -3,8 +3,12 @@ import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, keymap, drawSelection, placeholder as cmPlaceholder } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
+import { syntaxHighlighting } from '@codemirror/language'
+import { languages } from '@codemirror/language-data'
 import { livePreviewField } from './cm/livePreview'
 import { domVerticalMotion } from './cm/verticalMotion'
+import { codeCopy } from './cm/codeCopy'
+import { cinderHighlightStyle } from './cm/highlight'
 import { cinderTheme } from './cm/theme'
 import styles from './CodeMirrorEditor.module.css'
 
@@ -132,8 +136,10 @@ function CodeMirrorEditor({
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           drawSelection(),
           EditorView.lineWrapping,
-          markdown({ base: markdownLanguage }),
+          markdown({ base: markdownLanguage, codeLanguages: languages }),
+          syntaxHighlighting(cinderHighlightStyle),
           livePreviewField,
+          codeCopy,
           cinderTheme,
           cmPlaceholder(placeholder),
           editableRef.current.of(editableExt(interfaceMode)),
