@@ -107,13 +107,19 @@ function enterList(view) {
   const pos = caret(view)
   if (pos == null) return false
   const { state } = view
-  const line = state.doc.lineAt(pos)
+  const doc = state.doc
+  const line = doc.lineAt(pos)
   const item = parseItem(line.text)
   if (!item) return false
   if (pos < line.from + item.prefixLen) return false // caret inside the marker → plain newline
 
-  // Empty item → exit the list (clear the marker, leaving a blank line).
+  // Empty item → step OUT of the list, in place (no new line). Indented items
+  // outdent one level per Enter; a top-level item is cleared (marker removed).
   if (item.content.trim() === '') {
+    if (item.indent > 0) {
+      const o = computeOutdent(doc, line, item, pos)
+      return commit(view, o.changes, o.caret)
+    }
     return commit(view, [{ from: line.from, to: line.to, insert: '' }], line.from)
   }
 
@@ -149,12 +155,33 @@ function indentList(view) {
   if (!parent) return true
   if (itemDepth(doc, line.number, item.indent) >= MAX_DEPTH) return true // cap nesting
 
-  const newIndent = ' '.repeat(parent.contentCol)
+  // Indent at least one parent-content-column (so the reading-view parser nests it)
+  // but use a roomier step so nesting reads as clearly indented in the editor.
+  const step = Math.max(4, parent.contentCol - parent.indent)
+  const newIndent = ' '.repeat(parent.indent + step)
   const newMarker = item.ordered ? '1' + item.delim : item.marker // nested ordered restarts at 1
   const oldLen = item.indent + item.marker.length
   const insert = newIndent + newMarker
   const caretAt = pos + (insert.length - oldLen)
   return commit(view, [{ from: line.from, to: line.from + oldLen, insert }], caretAt)
+}
+
+// Compute the change + caret for outdenting `item` on `line` to its parent's indent.
+function computeOutdent(doc, line, item, pos) {
+  let parentIndent = 0
+  for (let n = line.number - 1; n >= 1; n--) {
+    const t = doc.line(n).text
+    if (isBlank(t)) break
+    const it = parseItem(t)
+    if (!it) break
+    if (it.indent < item.indent) { parentIndent = it.indent; break }
+  }
+  const newIndent = ' '.repeat(parentIndent)
+  // Only the indentation whitespace changes; renumber fixes the marker number.
+  return {
+    changes: [{ from: line.from, to: line.from + item.indent, insert: newIndent }],
+    caret: pos - (item.indent - parentIndent),
+  }
 }
 
 function outdentList(view) {
@@ -166,20 +193,8 @@ function outdentList(view) {
   const item = parseItem(line.text)
   if (!item) return false
   if (item.indent === 0) return true // already top level → nothing to outdent, swallow
-
-  // Drop to the parent's indent (become its sibling).
-  let parentIndent = 0
-  for (let n = line.number - 1; n >= 1; n--) {
-    const t = doc.line(n).text
-    if (isBlank(t)) break
-    const it = parseItem(t)
-    if (!it) break
-    if (it.indent < item.indent) { parentIndent = it.indent; break }
-  }
-  const newIndent = ' '.repeat(parentIndent)
-  const caretAt = pos - (item.indent - parentIndent)
-  // Only the indentation whitespace changes; renumber fixes the marker number.
-  return commit(view, [{ from: line.from, to: line.from + item.indent, insert: newIndent }], caretAt)
+  const o = computeOutdent(doc, line, item, pos)
+  return commit(view, o.changes, o.caret)
 }
 
 export const listEditingKeymap = [
