@@ -7,7 +7,7 @@
   line-height: 1.75;
   color: var(--text-primary);
   word-wrap: break-word;
-  padding: 4px 0 20vh;
+  padding: 4px 0 40px;
 }
 
 .reading h1, .reading h2, .reading h3, .reading h4, .reading h5, .reading h6 {

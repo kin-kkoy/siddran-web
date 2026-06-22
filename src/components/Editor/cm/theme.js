@@ -21,7 +21,9 @@ export const cinderTheme = EditorView.theme({
   '&.cm-focused': { outline: 'none' },
   '.cm-content': {
     fontFamily: 'inherit',
-    padding: '4px 0 30vh 0',
+    // Small bottom padding only — a large value shows as dead space below the
+    // last line on long notes (the editor grows with content / page-scrolls).
+    padding: '4px 0 40px 0',
     lineHeight: '1.75',
     caretColor: 'var(--text-primary)',
   },
