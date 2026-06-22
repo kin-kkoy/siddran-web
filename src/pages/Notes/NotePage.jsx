@@ -9,7 +9,6 @@ import { HiOutlineDownload, HiOutlineCog } from "react-icons/hi";
 import { LuMaximize, LuMinimize } from "react-icons/lu";
 import LexicalEditor from '../../components/Editor/LexicalEditor'
 import CodeMirrorEditor from '../../components/Editor/CodeMirrorEditor'
-import ReadingView from '../../components/Editor/ReadingView'
 import ConfirmModal from '../../components/Common/ConfirmModal'
 import TaskDetailsModal from '../../components/Common/TaskDetailsModal'
 import { useApi } from '../../contexts/ApiContext'
@@ -459,31 +458,30 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
         />
 
         {settings.experimentalEditor ? (
-          // New editor: read mode renders a fully-rendered HTML reading view;
-          // edit mode is the CodeMirror live-preview editor.
-          viewMode ? (
-            <ReadingView key={`read-${note.id}`} markdown={note.body || ''} onSearchTag={handleSearchTag} onOpenLink={handleOpenLink} />
-          ) : (
-            <CodeMirrorEditor
-              key={note.id}
-              initialContent={initialContentInfo.content}
-              onSave={handleEditorSave}
-              noteId={note.id}
-              onDirtyChange={handleDirtyChange}
-              placeholder='Start typing here...'
-              interfaceMode={false}
-              notes={notes}
-              onNavigateNote={(noteId) => navigate(`/notes/${noteId}`)}
-              onCreateNote={(title) => setLinkModalTitle(title)}
-              onOpenTask={handleOpenTask}
-              onOpenSandbox={handleOpenSandbox}
-              onOpenBundle={(id) => navigate(`/tasks?bundle=${id}`)}
-              onSearchTag={handleSearchTag}
-              tasks={tasks}
-              bundles={bundles}
-              sandboxes={sandboxes}
-            />
-          )
+          // New editor stays mounted across the read/edit toggle (readMode prop) so
+          // unsaved edits are never lost; in read mode it renders its own reading
+          // view from the live doc.
+          <CodeMirrorEditor
+            key={note.id}
+            readMode={viewMode}
+            initialContent={initialContentInfo.content}
+            onSave={handleEditorSave}
+            noteId={note.id}
+            onDirtyChange={handleDirtyChange}
+            placeholder='Start typing here...'
+            interfaceMode={false}
+            notes={notes}
+            onNavigateNote={(noteId) => navigate(`/notes/${noteId}`)}
+            onCreateNote={(title) => setLinkModalTitle(title)}
+            onOpenTask={handleOpenTask}
+            onOpenSandbox={handleOpenSandbox}
+            onOpenBundle={(id) => navigate(`/tasks?bundle=${id}`)}
+            onSearchTag={handleSearchTag}
+            onOpenLink={handleOpenLink}
+            tasks={tasks}
+            bundles={bundles}
+            sandboxes={sandboxes}
+          />
         ) : (
           <LexicalEditor
             key={note.id}

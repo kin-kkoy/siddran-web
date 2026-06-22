@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, keymap, drawSelection, placeholder as cmPlaceholder } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
@@ -15,6 +15,7 @@ import { headingFold } from './cm/fold'
 import { listEditingKeymap } from './cm/listEditing'
 import { cinderHighlightStyle } from './cm/highlight'
 import { cinderTheme } from './cm/theme'
+import ReadingView from './ReadingView'
 import { useApi } from '../../contexts/ApiContext'
 import styles from './CodeMirrorEditor.module.css'
 
@@ -42,6 +43,7 @@ function CodeMirrorEditor({
   noteId,
   placeholder = 'Start typing here...',
   interfaceMode = false,
+  readMode = false,
   notes = [],
   onNavigateNote,
   onCreateNote,
@@ -49,6 +51,7 @@ function CodeMirrorEditor({
   onOpenSandbox,
   onOpenBundle,
   onSearchTag,
+  onOpenLink,
   tasks = [],
   bundles = [],
   sandboxes = [],
@@ -56,6 +59,11 @@ function CodeMirrorEditor({
   const hostRef = useRef(null)
   const viewRef = useRef(null)
   const editableRef = useRef(new Compartment())
+
+  // Read mode renders a fully-rendered HTML view from the editor's LIVE doc while
+  // keeping the CodeMirror instance mounted (just hidden). Toggling read/edit no
+  // longer unmounts the editor, so in-flight unsaved edits are never lost.
+  const [readSnapshot, setReadSnapshot] = useState(initialContent)
 
   // Auth for image upload — kept in refs so the mount-once view handlers always
   // read the current authFetch/API.
@@ -249,7 +257,21 @@ function CodeMirrorEditor({
     })
   }, [interfaceMode])
 
-  return <div ref={hostRef} className={styles.editorRoot} />
+  // Entering read mode: snapshot the live doc so the reading view reflects unsaved
+  // edits. Leaving it: the hidden editor needs a re-measure to lay out correctly.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    if (readMode) setReadSnapshot(view.state.doc.toString())
+    else view.requestMeasure()
+  }, [readMode])
+
+  return (
+    <>
+      <div ref={hostRef} className={styles.editorRoot} style={readMode ? { display: 'none' } : undefined} />
+      {readMode && <ReadingView markdown={readSnapshot} onSearchTag={onSearchTag} onOpenLink={onOpenLink} />}
+    </>
+  )
 }
 
 export default CodeMirrorEditor
