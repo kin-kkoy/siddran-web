@@ -48,7 +48,17 @@ Branch: `cm6-editor`. Reference clone: `~/Downloads/garb2/obsidian-notes-clone.h
 - [ ] Manual verification pass
 - Deferred: `[[daily:id]]`, typed-link autocomplete, typed links in reading mode
 
-## Phase 5 — finish + retire Lexical
-- [ ] `==highlight==`, `#hashtags`, `> [!note]` callouts
-- [ ] spoilers `||…||`, collapsible fold
-- [ ] make CM6 default, remove Lexical + the flag
+## Phase 5 — remaining syntaxes + fold  ✅ (in review)
+- [x] `==highlight==` (editor + reading view `<mark>`)
+- [x] `#hashtags` — clickable pill → `/notes?q=tag` (NotesHub reads `?q=`)
+- [x] `> [!callouts]` — coloured block (editor) + titled card (reading view)
+- [x] spoilers `||…||` — blur + hover-reveal
+- [x] collapsible heading fold (foldGutter + heading foldService; in-session)
+- [ ] Manual verification pass
+- Deferred: typed-link & legacy `<spoiler>` rendering in editor, fold persistence
+
+## Phase 6 — graduation (separate, explicitly confirmed step)
+- [ ] Make CM6 the default + remove the `experimentalEditor` flag
+- [ ] Delete Lexical (LexicalEditor + plugins/ + nodes/ + themes/editorTheme +
+      lexicalToMdast/mdastToLexical/markdownTransformers) and `@lexical/*` deps.
+      KEEP: cm/, ReadingView, markdownToHtml, remark* plugins, CodeMirrorEditor.

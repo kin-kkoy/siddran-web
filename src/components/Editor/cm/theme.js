@@ -214,6 +214,19 @@ export const cinderTheme = EditorView.theme({
   },
   '.cm-line.cm-callout-head': { fontWeight: '600' },
 
+  // Fold gutter (heading outline fold).
+  '.cm-gutters': { background: 'transparent', border: 'none', color: 'var(--text-faint)' },
+  '.cm-foldGutter .cm-gutterElement': { cursor: 'pointer', padding: '0 2px', color: 'var(--text-faint)' },
+  '.cm-foldGutter .cm-gutterElement:hover': { color: 'var(--text-primary)' },
+  '.cm-foldPlaceholder': {
+    background: 'var(--bg-hover)',
+    color: 'var(--text-muted)',
+    border: 'none',
+    borderRadius: '3px',
+    margin: '0 4px',
+    padding: '0 6px',
+  },
+
   // Autocomplete option detail (the task/bundle/sandbox/note tag).
   '.cm-tooltip-autocomplete .cm-completionDetail': {
     marginLeft: '8px',

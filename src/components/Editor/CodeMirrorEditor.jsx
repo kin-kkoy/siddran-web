@@ -11,6 +11,7 @@ import { codeCopy } from './cm/codeCopy'
 import { imageExtensions } from './cm/imagePaste'
 import { wikilinks, wikilinkMarkdownExtension, resolveNote } from './cm/wikilinks'
 import { obsidianSyntax } from './cm/syntaxNodes'
+import { headingFold } from './cm/fold'
 import { cinderHighlightStyle } from './cm/highlight'
 import { cinderTheme } from './cm/theme'
 import { useApi } from '../../contexts/ApiContext'
@@ -180,6 +181,7 @@ function CodeMirrorEditor({
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           drawSelection(),
           EditorView.lineWrapping,
+          headingFold,
           markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [wikilinkMarkdownExtension, obsidianSyntax] }),
           syntaxHighlighting(cinderHighlightStyle),
           livePreviewField,
