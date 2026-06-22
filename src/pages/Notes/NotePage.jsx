@@ -10,6 +10,7 @@ import { LuMaximize, LuMinimize } from "react-icons/lu";
 import LexicalEditor from '../../components/Editor/LexicalEditor'
 import CodeMirrorEditor from '../../components/Editor/CodeMirrorEditor'
 import ReadingView from '../../components/Editor/ReadingView'
+import ConfirmModal from '../../components/Common/ConfirmModal'
 import { useSettings } from '../../contexts/SettingsContext'
 import { toast } from '../../utils/toast'
 import Skeleton from '../../components/Common/Skeleton'
@@ -54,6 +55,9 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   const headerRowRef = useRef(null)
   const [headerVisible, setHeaderVisible] = useState(true)
   const [noteSettingsOpen, setNoteSettingsOpen] = useState(false)
+  // Wikilink "create note?" confirm flow: holds the clicked unresolved title.
+  const [linkModalTitle, setLinkModalTitle] = useState(null)
+  const [creatingLink, setCreatingLink] = useState(false)
 
   // re-renders if note changes (parent changes)
   useEffect(() => {
@@ -126,6 +130,18 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
     if (!note) return false
     return await editBody(note.id, markdownContent)
   }, [note?.id, editBody])
+
+  // Confirm-creating a note from an unresolved [[wikilink]]: create it (awaiting
+  // the synced note so we land on its real id), then navigate.
+  const handleCreateLinkedNote = useCallback(async () => {
+    const title = linkModalTitle
+    if (!title || creatingLink || !addNote) return
+    setCreatingLink(true)
+    const newNote = await addNote(title)
+    setCreatingLink(false)
+    setLinkModalTitle(null)
+    if (newNote) navigate(`/notes/${newNote.id}`)
+  }, [linkModalTitle, creatingLink, addNote, navigate])
 
   // Draft recovery: decide the editor's initial content once per note. The
   // decision (is there a localStorage draft newer than the server copy?) is
@@ -403,7 +419,7 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
               interfaceMode={false}
               notes={notes}
               onNavigateNote={(noteId) => navigate(`/notes/${noteId}`)}
-              onCreateNote={(title) => addNote?.(title, (opt) => navigate(`/notes/${opt.id}`))}
+              onCreateNote={(title) => setLinkModalTitle(title)}
             />
           )
         ) : (
@@ -422,6 +438,27 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
       <NoteSettingsPopup
         isOpen={noteSettingsOpen}
         onClose={() => setNoteSettingsOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={linkModalTitle !== null}
+        title='Create note?'
+        message={`"${linkModalTitle}" doesn't exist yet. Create it and go there?`}
+        confirmText='Create & open'
+        cancelText='No'
+        confirmVariant='primary'
+        busy={creatingLink}
+        busyText='Creating…'
+        busyContent={
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Skeleton height={18} width='55%' />
+            <Skeleton height={12} width='90%' />
+            <Skeleton height={12} width='80%' />
+            <Skeleton height={12} width='70%' />
+          </div>
+        }
+        onClose={() => { if (!creatingLink) setLinkModalTitle(null) }}
+        onConfirm={handleCreateLinkedNote}
       />
     </div>
   )

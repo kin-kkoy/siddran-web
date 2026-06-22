@@ -132,3 +132,36 @@
     filter: brightness(1.1);
     box-shadow: 0 4px 12px var(--shadow-color);
 }
+
+/* Constructive (non-delete) confirm — e.g. "Create & open". */
+.confirmPrimary {
+    background-color: var(--accent-blue);
+}
+
+/* Busy state: disabled buttons + inline spinner. */
+.confirmBtn:disabled,
+.closeBtn:disabled {
+    cursor: default;
+    opacity: 0.75;
+    filter: none;
+    box-shadow: none;
+}
+
+.confirmBtn:disabled {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

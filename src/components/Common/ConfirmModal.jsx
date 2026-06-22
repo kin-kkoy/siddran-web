@@ -3,7 +3,23 @@ import { createPortal } from 'react-dom'
 import styles from './ConfirmModal.module.css'
 import { modalPresence } from '../../utils/modalPresence'
 
-function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmText = 'Delete', cancelText = 'Cancel' }) {
+// Reusable confirm dialog. Optional `busy` mode shows a spinner + `busyText`
+// (and any `busyContent`, e.g. skeletons) while an async action runs, and blocks
+// closing until it finishes. `confirmVariant` switches the confirm button colour
+// ('danger' default for deletes, 'primary' for constructive actions).
+function ConfirmModal({
+    isOpen,
+    onClose,
+    onConfirm,
+    title,
+    message,
+    confirmText = 'Delete',
+    cancelText = 'Cancel',
+    busy = false,
+    busyText = 'Working…',
+    busyContent = null,
+    confirmVariant = 'danger',
+}) {
     // Count as an open modal (pauses StarCanvas) only while actually shown.
     useEffect(() => {
         if (!isOpen) return
@@ -15,30 +31,44 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmText 
 
     const stop = (e) => e.stopPropagation()
 
+    // Don't allow closing while a busy action is in flight.
+    const requestClose = () => { if (!busy) onClose() }
+
     const handleBackdropClick = (e) => {
         e.stopPropagation()
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget) requestClose()
     }
+
+    const confirmClass = `${styles.confirmBtn} ${confirmVariant === 'primary' ? styles.confirmPrimary : ''}`
 
     return createPortal(
         <div className={styles.backdrop} onClick={handleBackdropClick} onMouseDown={stop}>
             <div className={styles.modal} onClick={stop}>
                 <div className={styles.header}>
                     <h2>{title}</h2>
-                    <button onClick={onClose} className={styles.closeBtn}>×</button>
+                    <button onClick={requestClose} className={styles.closeBtn} disabled={busy}>×</button>
                 </div>
 
                 <div className={styles.content}>
-                    <p>{message}</p>
+                    {busy && busyContent ? busyContent : <p>{message}</p>}
                 </div>
 
                 <div className={styles.actions}>
-                    <button onClick={onClose} className={styles.cancelBtn}>
-                        {cancelText}
-                    </button>
-                    <button onClick={onConfirm} className={styles.confirmBtn}>
-                        {confirmText}
-                    </button>
+                    {busy ? (
+                        <button className={confirmClass} disabled>
+                            <span className={styles.spinner} aria-hidden="true" />
+                            {busyText}
+                        </button>
+                    ) : (
+                        <>
+                            <button onClick={onClose} className={styles.cancelBtn}>
+                                {cancelText}
+                            </button>
+                            <button onClick={onConfirm} className={confirmClass}>
+                                {confirmText}
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         </div>,
