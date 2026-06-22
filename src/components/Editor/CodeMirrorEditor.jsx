@@ -42,6 +42,8 @@ function CodeMirrorEditor({
   notes = [],
   onNavigateNote,
   onCreateNote,
+  onOpenTask,
+  onOpenSandbox,
 }) {
   const hostRef = useRef(null)
   const viewRef = useRef(null)
@@ -59,9 +61,13 @@ function CodeMirrorEditor({
   const notesRef = useRef(notes)
   const onNavigateRef = useRef(onNavigateNote)
   const onCreateRef = useRef(onCreateNote)
+  const onOpenTaskRef = useRef(onOpenTask)
+  const onOpenSandboxRef = useRef(onOpenSandbox)
   useEffect(() => { notesRef.current = notes }, [notes])
   useEffect(() => { onNavigateRef.current = onNavigateNote }, [onNavigateNote])
   useEffect(() => { onCreateRef.current = onCreateNote }, [onCreateNote])
+  useEffect(() => { onOpenTaskRef.current = onOpenTask }, [onOpenTask])
+  useEffect(() => { onOpenSandboxRef.current = onOpenSandbox }, [onOpenSandbox])
 
   // Keep the latest callbacks reachable from the long-lived EditorView without
   // rebuilding it on every parent render.
@@ -168,6 +174,8 @@ function CodeMirrorEditor({
             resolve: (t) => resolveNote(notesRef.current, t),
             navigate: (id) => onNavigateRef.current?.(id),
             create: (t) => onCreateRef.current?.(t),
+            openTask: (id) => onOpenTaskRef.current?.(id),
+            openSandbox: (id) => onOpenSandboxRef.current?.(id),
           }),
           cinderTheme,
           cmPlaceholder(placeholder),

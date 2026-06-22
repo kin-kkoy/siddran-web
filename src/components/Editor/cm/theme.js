@@ -158,6 +158,13 @@ export const cinderTheme = EditorView.theme({
   },
   '.cm-wikilink-src': { color: 'var(--accent-blue)' },
 
+  // Typed cross-links (cm/wikilinks.js): task = clock glyph + task colour,
+  // sandbox = grid glyph + sandbox colour. Both also carry .cm-internal-link.
+  '.cm-task-link': { color: 'var(--src-task)' },
+  '.cm-task-link::before': { content: "'◷ '", opacity: '0.85' },
+  '.cm-sandbox-link': { color: 'var(--src-sandbox)' },
+  '.cm-sandbox-link::before': { content: "'▦ '", opacity: '0.85' },
+
   // Autocomplete dropdown (wikilink titles), themed for dark.
   '.cm-tooltip.cm-tooltip-autocomplete': {
     background: 'var(--bg-elevated)',

@@ -2,7 +2,7 @@ import { Decoration, EditorView } from '@codemirror/view'
 import { StateField, RangeSet } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import { HrWidget, BulletWidget, CheckWidget, ImageWidget } from './widgets'
-import { wikilinkConfig, parseWikilink } from './wikilinks'
+import { wikilinkConfig, parseTypedLink } from './wikilinks'
 
 // Live-preview decorations — a Phase 1 subset of the reference clone's
 // buildDeco (garb2/obsidian-notes-clone.html). The principle: walk the markdown
@@ -94,22 +94,27 @@ function buildDeco(state) {
         }
         case 'Wikilink': {
           // Caret on the link → editable `[[ ]]` source; off → rendered link with
-          // brackets hidden. data-target drives click navigation (cm/wikilinks.js).
+          // brackets hidden. A `task:`/`sandbox:` prefix makes it a typed link
+          // (handled by cm/wikilinks.js click via data-link-kind/id); otherwise a
+          // note link (data-target → resolve/navigate/create).
           const inner = doc.sliceString(nf + 2, nt - 2)
           if (over(nf, nt)) { mk(nf, nt, 'cm-wikilink-src'); return false }
-          const { target, pipe } = parseWikilink(inner)
-          const cfg = state.facet(wikilinkConfig)
-          const resolved = cfg && cfg.resolve ? !!cfg.resolve(target) : false
-          const cls = 'cm-internal-link' + (resolved ? '' : ' is-unresolved')
-          const at = { 'data-target': target }
+          const parsed = parseTypedLink(inner)
           hide(nf, nf + 2)
           hide(nt - 2, nt)
-          if (pipe >= 0) {
-            hide(nf + 2, nf + 2 + pipe + 1) // hide `target|`, keep the alias
-            mk(nf + 2 + pipe + 1, nt - 2, cls, at)
-          } else {
-            mk(nf + 2, nt - 2, cls, at)
+          // With an alias, hide the `head|` part and render only the alias.
+          const showFrom = parsed.pipe >= 0 ? nf + 2 + parsed.pipe + 1 : nf + 2
+          if (parsed.pipe >= 0) hide(nf + 2, showFrom)
+
+          if (parsed.kind === 'task' || parsed.kind === 'sandbox') {
+            const cls = 'cm-internal-link ' + (parsed.kind === 'task' ? 'cm-task-link' : 'cm-sandbox-link')
+            mk(showFrom, nt - 2, cls, { 'data-link-kind': parsed.kind, 'data-link-id': parsed.id })
+            return false
           }
+          const cfg = state.facet(wikilinkConfig)
+          const resolved = cfg && cfg.resolve ? !!cfg.resolve(parsed.target) : false
+          const cls = 'cm-internal-link' + (resolved ? '' : ' is-unresolved')
+          mk(showFrom, nt - 2, cls, { 'data-target': parsed.target })
           return false
         }
         case 'Link': {

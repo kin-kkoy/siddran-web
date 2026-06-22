@@ -40,10 +40,13 @@ Branch: `cm6-editor`. Reference clone: `~/Downloads/garb2/obsidian-notes-clone.h
 - [ ] Manual verification pass
 - Deferred: note embeds `![[ ]]`, `#heading` anchors, wikilinks inside reading mode
 
-## Phase 4 — typed cross-links
-- [ ] `[[task:<id>|label]]` → open existing `TaskDetailsModal`
-      (+ new "open in TasksHub" icon button left of its close ✕)
-- [ ] `[[sandbox:<id>|label]]` → `navigate('/sandboxes/:id')`
+## Phase 4 — typed cross-links  ✅ (in review)
+- [x] `[[task:<id>|label]]` → fetch + open `TaskDetailsModal` in the note
+      (+ "open in TasksHub" icon button left of its close ✕ → `/tasks?task=id`)
+- [x] `[[sandbox:<id>|label]]` → `navigate('/sandboxes/:id')`
+- [x] typed-link rendering (green `◷` task / red `▦` sandbox) reusing the Wikilink node
+- [ ] Manual verification pass
+- Deferred: `[[daily:id]]`, typed-link autocomplete, typed links in reading mode
 
 ## Phase 5 — finish + retire Lexical
 - [ ] `==highlight==`, `#hashtags`, `> [!note]` callouts

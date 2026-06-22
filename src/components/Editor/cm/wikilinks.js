@@ -49,6 +49,18 @@ export function parseWikilink(inner) {
   return { target, alias, pipe }
 }
 
+// Classify a `[[ … ]]` inner string: a `task:`/`sandbox:` prefix makes it a typed
+// cross-link, otherwise it's a note link. `pipe` is the alias separator index in
+// the inner text (or -1) so the decoration can hide the `head|` part.
+export function parseTypedLink(inner) {
+  const pipe = inner.indexOf('|')
+  const head = (pipe >= 0 ? inner.slice(0, pipe) : inner).trim()
+  const label = pipe >= 0 ? inner.slice(pipe + 1).trim() : ''
+  const typed = /^(task|sandbox):(.+)$/i.exec(head)
+  if (typed) return { kind: typed[1].toLowerCase(), id: typed[2].trim(), label, pipe }
+  return { kind: 'note', target: head.split('#')[0].trim(), label, pipe }
+}
+
 // Autocomplete source — fires after `[[`, suggests existing note titles only.
 function wikilinkComplete(context) {
   const before = context.matchBefore(/\[\[[^\]\n]*/)
@@ -71,14 +83,18 @@ function wikilinkComplete(context) {
   return { from: before.from + 2, to: context.pos, options, filter: true, validFor: /[^\]\n]*/ }
 }
 
-// Click a rendered link → open the note, or create it then open when unresolved.
+// Click a rendered link → typed links open the task modal / sandbox board; note
+// links open the note (or confirm-create it when unresolved).
 const clickHandler = EditorView.domEventHandlers({
   mousedown: (event, view) => {
     const el = event.target?.closest?.('.cm-internal-link')
     if (!el) return false
     event.preventDefault()
-    const target = el.getAttribute('data-target') || ''
     const cfg = view.state.facet(wikilinkConfig)
+    const kind = el.getAttribute('data-link-kind')
+    if (kind === 'task') { cfg.openTask?.(el.getAttribute('data-link-id')); return true }
+    if (kind === 'sandbox') { cfg.openSandbox?.(el.getAttribute('data-link-id')); return true }
+    const target = el.getAttribute('data-target') || ''
     const note = cfg.resolve ? cfg.resolve(target) : null
     if (note) cfg.navigate?.(note.id)
     else if (target) cfg.create?.(target)

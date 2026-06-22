@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { FiXCircle } from 'react-icons/fi'
+import { FiXCircle, FiExternalLink } from 'react-icons/fi'
 import styles from './TaskDetailsModal.module.css'
 import { useModalPresence } from '../../utils/modalPresence'
 
-function TaskDetailsModal({onClose, task, updateTask, isDailyTask}) {
+function TaskDetailsModal({onClose, task, updateTask, isDailyTask, onOpenInHub}) {
     useModalPresence()
 
     const [titleData, setTitleData] = useState(task.title)
@@ -68,7 +68,20 @@ function TaskDetailsModal({onClose, task, updateTask, isDailyTask}) {
                         onChange={e => { setTitleData(e.target.value); isDirtyRef.current = true; }}
                         placeholder="Task title..."
                     />
-                    <button type="button" className={styles.closeBtn} onClick={handleClose}>✕</button>
+                    <div className={styles.headerActions}>
+                        {onOpenInHub && (
+                            <button
+                                type="button"
+                                className={styles.hubBtn}
+                                onClick={onOpenInHub}
+                                title="Open in Tasks Hub"
+                                aria-label="Open in Tasks Hub"
+                            >
+                                <FiExternalLink />
+                            </button>
+                        )}
+                        <button type="button" className={styles.closeBtn} onClick={handleClose}>✕</button>
+                    </div>
                 </div>
 
                 {/* Body */}

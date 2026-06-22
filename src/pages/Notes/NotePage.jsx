@@ -11,6 +11,8 @@ import LexicalEditor from '../../components/Editor/LexicalEditor'
 import CodeMirrorEditor from '../../components/Editor/CodeMirrorEditor'
 import ReadingView from '../../components/Editor/ReadingView'
 import ConfirmModal from '../../components/Common/ConfirmModal'
+import TaskDetailsModal from '../../components/Common/TaskDetailsModal'
+import { useApi } from '../../contexts/ApiContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import { toast } from '../../utils/toast'
 import Skeleton from '../../components/Common/Skeleton'
@@ -19,10 +21,11 @@ import NoteSettingsPopup from '../../components/Settings/NoteSettingsPopup'
 import SandboxDock from '../../components/Sandbox/Dock/SandboxDock'
 import { useSandboxView } from '../../contexts/SandboxViewContext'
 
-function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction, tasks, toggleTaskCompletion, addNote }) {
+function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction, tasks, toggleTaskCompletion, addNote, updateTask }) {
 
   const sandboxView = useSandboxView()
   const { settings } = useSettings()
+  const { authFetch, API } = useApi()
 
   // Auto-collapse the sidebar when the sandbox dock expands to half mode so the
   // editor + sandbox columns have room to breathe.
@@ -58,6 +61,9 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   // Wikilink "create note?" confirm flow: holds the clicked unresolved title.
   const [linkModalTitle, setLinkModalTitle] = useState(null)
   const [creatingLink, setCreatingLink] = useState(false)
+  // [[task:id]] cross-link → task details modal hosted here.
+  const [openTask, setOpenTask] = useState(null)
+  const openingTaskRef = useRef(false)
 
   // re-renders if note changes (parent changes)
   useEffect(() => {
@@ -142,6 +148,23 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
     setLinkModalTitle(null)
     if (newNote) navigate(`/notes/${newNote.id}`)
   }, [linkModalTitle, creatingLink, addNote, navigate])
+
+  // Open a [[task:id]] link: prefer the already-loaded task, else fetch by id.
+  const handleOpenTask = useCallback(async (id) => {
+    if (openingTaskRef.current) return
+    const local = (tasks || []).find(t => String(t.id) === String(id))
+    if (local) { setOpenTask(local); return }
+    openingTaskRef.current = true
+    try {
+      const res = await authFetch(`${API}/tasks/${id}`)
+      if (!res.ok) { toast.error('That linked item no longer exists.'); return }
+      setOpenTask(await res.json())
+    } catch {
+      toast.error('Could not open that linked item.')
+    } finally {
+      openingTaskRef.current = false
+    }
+  }, [tasks, authFetch, API])
 
   // Draft recovery: decide the editor's initial content once per note. The
   // decision (is there a localStorage draft newer than the server copy?) is
@@ -420,6 +443,8 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
               notes={notes}
               onNavigateNote={(noteId) => navigate(`/notes/${noteId}`)}
               onCreateNote={(title) => setLinkModalTitle(title)}
+              onOpenTask={handleOpenTask}
+              onOpenSandbox={(id) => navigate(`/sandboxes/${id}`)}
             />
           )
         ) : (
@@ -460,6 +485,15 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
         onClose={() => { if (!creatingLink) setLinkModalTitle(null) }}
         onConfirm={handleCreateLinkedNote}
       />
+
+      {openTask && (
+        <TaskDetailsModal
+          task={openTask}
+          updateTask={updateTask}
+          onClose={() => setOpenTask(null)}
+          onOpenInHub={() => { navigate(`/tasks?task=${openTask.id}`); setOpenTask(null) }}
+        />
+      )}
     </div>
   )
 
