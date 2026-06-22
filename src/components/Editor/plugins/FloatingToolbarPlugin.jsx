@@ -12,11 +12,13 @@ import { TOGGLE_LINK_COMMAND, $isLinkNode } from '@lexical/link';
 import { mergeRegister } from '@lexical/utils';
 import { INSERT_HORIZONTAL_RULE_COMMAND } from '@lexical/react/LexicalHorizontalRuleNode';
 
-import { FaBold, FaItalic, FaUnderline, FaStrikethrough, FaLink, FaCode, FaEyeSlash, FaMinus } from 'react-icons/fa';
+import { FaBold, FaItalic, FaUnderline, FaStrikethrough, FaLink, FaCode, FaEyeSlash, FaMinus, FaCopy, FaMarkdown } from 'react-icons/fa';
 
 import styles from './FloatingToolbarPlugin.module.css';
 import LinkPopover from './LinkPopover';
 import { $createSpoilerNode, $isSpoilerNode } from '../nodes/SpoilerNode';
+import { serializeNodesToMarkdown } from '../utils/markdownSerializer';
+import { toast } from '../../../utils/toast';
 
 function FloatingToolbar({ editor, isReadMode }) {
   const toolbarRef = useRef(null);
@@ -274,6 +276,40 @@ function FloatingToolbar({ editor, isReadMode }) {
     editor.dispatchCommand(INSERT_HORIZONTAL_RULE_COMMAND, undefined);
   };
 
+  // Plain copy — character-exact selected text, the current Ctrl+C behavior.
+  const copyPlain = (e) => {
+    e.preventDefault();
+    const text = editor.read(() => {
+      const selection = $getSelection();
+      return $isRangeSelection(selection) ? selection.getTextContent() : '';
+    });
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(
+      () => toast.success('Copied'),
+      () => toast.error('Copy failed'),
+    );
+  };
+
+  // Copy as Markdown — serialize the top-level blocks the selection touches
+  // with the same serializer notes are saved with, so `*`, `**`, lists, etc.
+  // are preserved.
+  const copyAsMarkdown = (e) => {
+    e.preventDefault();
+    const md = editor.read(() => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return '';
+      const blocks = [...new Set(
+        selection.getNodes().map(n => n.getTopLevelElement()).filter(Boolean)
+      )];
+      return serializeNodesToMarkdown(blocks);
+    });
+    if (!md) return;
+    navigator.clipboard.writeText(md).then(
+      () => toast.success('Copied as Markdown'),
+      () => toast.error('Copy failed'),
+    );
+  };
+
   const insertLink = useCallback(
     (e) => {
       e.preventDefault();
@@ -400,6 +436,21 @@ function FloatingToolbar({ editor, isReadMode }) {
             title="Horizontal rule"
           >
             <FaMinus />
+          </button>
+          <div className={styles.divider} />
+          <button
+            onMouseDown={copyPlain}
+            className={styles.btn}
+            title="Copy"
+          >
+            <FaCopy />
+          </button>
+          <button
+            onMouseDown={copyAsMarkdown}
+            className={styles.btn}
+            title="Copy as Markdown"
+          >
+            <FaMarkdown />
           </button>
         </div>
       )}

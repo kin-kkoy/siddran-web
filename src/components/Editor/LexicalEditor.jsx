@@ -40,6 +40,7 @@ import TableHoverActionsPlugin from './plugins/TableHoverActionsPlugin';
 import TableContextMenuPlugin from './plugins/TableContextMenuPlugin';
 import TableCellResizerPlugin from './plugins/TableCellResizerPlugin';
 import ImagePlugin from './plugins/ImagePlugin';
+import MarkdownPastePlugin from './plugins/MarkdownPastePlugin';
 
 // Theme and utils
 import editorTheme from './themes/editorTheme';
@@ -151,6 +152,7 @@ function LexicalEditor({ initialContent, onSave, noteId, onDirtyChange, placehol
           <TableContextMenuPlugin />
           <TableCellResizerPlugin />
           <ImagePlugin />
+          <MarkdownPastePlugin />
 
           {/* Read mode or not */}
           <ReadModeListener isReadMode={interfaceMode} />
