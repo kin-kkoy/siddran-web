@@ -256,6 +256,14 @@ function buildDeco(state) {
     if (bm) {
       const f = line.from + bm[1].length
       deco.push(Decoration.replace({ widget: new BulletWidget() }).range(f, f + 1))
+      continue
+    }
+    // Ordered-list number: tint it so it matches the bullet colour (and the
+    // reading view's coloured markers). The number text stays editable.
+    const om = /^(\s*)(\d+[.)])(\s+)\S/.exec(txt)
+    if (om) {
+      const f = line.from + om[1].length
+      deco.push(Decoration.mark({ class: 'cm-ordered-mark' }).range(f, f + om[2].length))
     }
   }
 

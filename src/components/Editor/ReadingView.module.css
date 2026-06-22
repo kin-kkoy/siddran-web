@@ -30,6 +30,8 @@
 
 .reading ul, .reading ol { margin: 0.6em 0; padding-left: 1.6em }
 .reading li { margin: 0.2em 0 }
+/* Match the editor's blue bullets / ordered numbers. */
+.reading li::marker { color: var(--accent-blue) }
 .reading li > input[type='checkbox'] { margin-right: 6px; accent-color: var(--accent-blue) }
 
 .reading blockquote {
