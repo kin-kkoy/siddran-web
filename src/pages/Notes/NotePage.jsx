@@ -8,6 +8,8 @@ import { HiPencilSquare } from "react-icons/hi2";
 import { HiOutlineDownload, HiOutlineCog } from "react-icons/hi";
 import { LuMaximize, LuMinimize } from "react-icons/lu";
 import LexicalEditor from '../../components/Editor/LexicalEditor'
+import CodeMirrorEditor from '../../components/Editor/CodeMirrorEditor'
+import { useSettings } from '../../contexts/SettingsContext'
 import { toast } from '../../utils/toast'
 import Skeleton from '../../components/Common/Skeleton'
 import { NOTE_COLORS } from '../../components/Notes/noteColors'
@@ -18,6 +20,7 @@ import { useSandboxView } from '../../contexts/SandboxViewContext'
 function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction, tasks, toggleTaskCompletion }) {
 
   const sandboxView = useSandboxView()
+  const { settings } = useSettings()
 
   // Auto-collapse the sidebar when the sandbox dock expands to half mode so the
   // editor + sandbox columns have room to breathe.
@@ -383,15 +386,27 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
           readOnly={viewMode}
         />
 
-        <LexicalEditor
-          key={note.id}
-          initialContent={initialContentInfo.content}
-          onSave={handleEditorSave}
-          noteId={note.id}
-          onDirtyChange={handleDirtyChange}
-          placeholder='Start typing here...'
-          interfaceMode={viewMode}
-        />
+        {settings.experimentalEditor ? (
+          <CodeMirrorEditor
+            key={note.id}
+            initialContent={initialContentInfo.content}
+            onSave={handleEditorSave}
+            noteId={note.id}
+            onDirtyChange={handleDirtyChange}
+            placeholder='Start typing here...'
+            interfaceMode={viewMode}
+          />
+        ) : (
+          <LexicalEditor
+            key={note.id}
+            initialContent={initialContentInfo.content}
+            onSave={handleEditorSave}
+            noteId={note.id}
+            onDirtyChange={handleDirtyChange}
+            placeholder='Start typing here...'
+            interfaceMode={viewMode}
+          />
+        )}
       </div>
 
       <NoteSettingsPopup

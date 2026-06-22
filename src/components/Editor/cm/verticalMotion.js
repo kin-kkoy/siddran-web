@@ -1,0 +1,104 @@
+import { EditorView, keymap } from '@codemirror/view'
+import { EditorSelection, Annotation, Prec } from '@codemirror/state'
+
+// CodeMirror's built-in vertical caret motion (Arrow-Up/Down) maps the caret's
+// screen-Y back to a document position through its *estimated* height model
+// (heightmap). In this app the editor is virtualized inside a scroll container,
+// so off-screen line heights (tall headings, wrapped paragraphs) are estimated
+// and the model drifts shorter than the real DOM — making Arrow-Up/Down jump
+// many lines. Mouse clicks are unaffected because they use the browser's real
+// coordinate hit-testing.
+//
+// Fix: rebind Arrow-Up/Down (and the Shift-selecting variants) to compute the
+// target with that same real hit-testing (caretPositionFromPoint), bypassing the
+// faulty height model. A module-level goal column keeps the caret in the same
+// visual column across consecutive vertical moves, reset on any other movement.
+
+const verticalMove = Annotation.define()
+let goalX = null
+
+// Resolve a viewport (x, y) point to a document position via the browser's
+// caret hit-testing — the same path the editor uses for mouse clicks.
+function pointToPos(view, x, y) {
+  const dom = view.contentDOM.ownerDocument
+  let node = null, offset = 0
+  if (dom.caretPositionFromPoint) {
+    const p = dom.caretPositionFromPoint(x, y)
+    if (p) { node = p.offsetNode; offset = p.offset }
+  } else if (dom.caretRangeFromPoint) {
+    const r = dom.caretRangeFromPoint(x, y)
+    if (r) { node = r.startContainer; offset = r.startOffset }
+  }
+  if (!node || !view.contentDOM.contains(node)) return null
+  try { return view.posAtDOM(node, offset) } catch { return null }
+}
+
+function moveVertical(view, forward, extend) {
+  const main = view.state.selection.main
+  const head = main.head
+  const coords = view.coordsAtPos(head)
+  if (!coords) return false
+  if (goalX == null) goalX = coords.left
+
+  const lh = view.defaultLineHeight || 18
+  const step = Math.max(4, lh * 0.5)
+  const cRect = view.contentDOM.getBoundingClientRect()
+  let target = null
+
+  // Walk outward from the current line box until we land on a different visual
+  // row (different y), not just a different x on the same row.
+  let y = forward ? coords.bottom + 1 : coords.top - 1
+  for (let i = 0; i < 80; i++) {
+    if (y < cRect.top || y > cRect.bottom) break
+    const p = pointToPos(view, goalX, y)
+    if (p != null && p !== head) {
+      const pc = view.coordsAtPos(p)
+      if (pc && (forward ? pc.top > coords.top + 1 : pc.bottom < coords.bottom - 1)) { target = p; break }
+    }
+    y += forward ? step : -step
+  }
+
+  if (target == null) {
+    // Hit the top/bottom edge of the content — snap to the document boundary.
+    const edge = forward ? view.state.doc.length : 0
+    if (edge === head) return true
+    target = edge
+  }
+
+  const selection = extend ? EditorSelection.range(main.anchor, target) : EditorSelection.cursor(target)
+  view.dispatch({ selection, scrollIntoView: true, annotations: verticalMove.of(true) })
+  return true
+}
+
+// Drop the goal column whenever the selection moves for any non-vertical reason
+// (typing, horizontal arrows, click) so the next Up/Down re-anchors the column.
+const goalReset = EditorView.updateListener.of((u) => {
+  if (!u.selectionSet) return
+  if (!u.transactions.some(tr => tr.annotation(verticalMove))) goalX = null
+})
+
+// Clicks suffer the same height-model drift: CM resolves the click point to a
+// doc position via posAtCoords (heightmap), landing the caret a line off. After
+// a plain single click we re-resolve with the browser's real hit-testing and
+// correct it. Drag-selections, shift-clicks and double/triple clicks are left to
+// CM (event.detail > 1 / non-empty selection).
+const clickFix = EditorView.domEventHandlers({
+  click: (event, view) => {
+    if (event.button !== 0 || event.detail > 1 || event.shiftKey) return false
+    const sel = view.state.selection.main
+    if (!sel.empty) return false
+    const pos = pointToPos(view, event.clientX, event.clientY)
+    if (pos != null && pos !== sel.head) view.dispatch({ selection: EditorSelection.cursor(pos) })
+    return false
+  },
+})
+
+// Prec.highest so these win over defaultKeymap's Arrow-Up/Down bindings.
+export const domVerticalMotion = [
+  goalReset,
+  clickFix,
+  Prec.highest(keymap.of([
+    { key: 'ArrowUp', run: v => moveVertical(v, false, false), shift: v => moveVertical(v, false, true) },
+    { key: 'ArrowDown', run: v => moveVertical(v, true, false), shift: v => moveVertical(v, true, true) },
+  ])),
+]
