@@ -133,6 +133,14 @@ function buildDeco(state) {
           mk(nf, nt, 'cm-hashtag', { 'data-tag': doc.sliceString(nf + 1, nt) })
           return false
         }
+        case 'Spoiler': {
+          // ||text|| → blurred (CSS hover reveals); caret on it shows source.
+          if (over(nf, nt)) break
+          mk(nf + 2, nt - 2, 'cm-spoiler')
+          hide(nf, nf + 2)
+          hide(nt - 2, nt)
+          return false
+        }
         case 'Link': {
           const marks = node.node.getChildren('LinkMark')
           const url = node.node.getChild('URL')
@@ -197,7 +205,16 @@ function buildDeco(state) {
         }
         case 'Blockquote': {
           const sl = doc.lineAt(nf), el = doc.lineAt(nt)
-          for (let n = sl.number; n <= el.number; n++) lineCls(doc.line(n).from, 'cm-quote')
+          // `> [!type]` first line → coloured callout block; else a plain quote.
+          const co = /^\s*>\s*\[!(\w+)\]/.exec(sl.text)
+          if (co) {
+            const cls = 'cm-callout cm-callout-' + co[1].toLowerCase()
+            for (let n = sl.number; n <= el.number; n++) {
+              lineCls(doc.line(n).from, cls + (n === sl.number ? ' cm-callout-head' : ''))
+            }
+          } else {
+            for (let n = sl.number; n <= el.number; n++) lineCls(doc.line(n).from, 'cm-quote')
+          }
           node.node.getChildren('QuoteMark').forEach(q => {
             if (!lact(q.from, q.to)) {
               let t = q.to

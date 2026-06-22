@@ -56,6 +56,27 @@ function rehypeCinderImages() {
   }
 }
 
+// Turn a blockquote whose first line is `[!type] …` into a callout card.
+function rehypeCallouts() {
+  return (tree) => {
+    visit(tree, 'element', (node) => {
+      if (node.tagName !== 'blockquote') return
+      const firstP = node.children.find(c => c.type === 'element' && c.tagName === 'p')
+      const firstText = firstP?.children?.[0]
+      if (!firstText || firstText.type !== 'text') return
+      const m = /^\[!(\w+)\]\s*(.*)$/.exec(firstText.value)
+      if (!m) return
+      const prev = node.properties?.className || []
+      node.properties = node.properties || {}
+      node.properties.className = [
+        ...(Array.isArray(prev) ? prev : [prev]).filter(Boolean),
+        'rv-callout', 'rv-callout-' + m[1].toLowerCase(),
+      ]
+      firstText.value = m[2] // drop the [!type] marker, keep the title text
+    })
+  }
+}
+
 const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
@@ -64,6 +85,7 @@ const processor = unified()
   .use(remarkHighlight)
   .use(remarkHashtag)
   .use(remarkRehype, { handlers })
+  .use(rehypeCallouts)
   .use(rehypeCinderImages)
   .use(rehypeHighlight, { ignoreMissing: true })
   .use(rehypeStringify)

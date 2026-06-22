@@ -184,6 +184,36 @@ export const cinderTheme = EditorView.theme({
   },
   '.cm-hashtag:hover': { background: 'rgba(192, 132, 252, 0.28)' },
 
+  // ||spoiler|| — blocked out, hover reveals.
+  '.cm-spoiler': {
+    color: 'transparent',
+    background: 'var(--text-faint)',
+    borderRadius: '3px',
+    cursor: 'pointer',
+    transition: 'color 0.1s ease, background 0.1s ease',
+  },
+  '.cm-spoiler:hover': { color: 'var(--text-primary)', background: 'var(--bg-hover)' },
+
+  // > [!type] callouts — coloured block by type (line decorations).
+  '.cm-line.cm-callout': {
+    borderLeft: '3px solid var(--accent-blue)',
+    paddingLeft: '14px',
+    background: 'rgba(90, 156, 240, 0.06)',
+  },
+  '.cm-line.cm-callout-warning, .cm-line.cm-callout-question, .cm-line.cm-callout-caution': {
+    borderLeftColor: 'var(--accent-warning)',
+    background: 'rgba(240, 184, 64, 0.06)',
+  },
+  '.cm-line.cm-callout-danger, .cm-line.cm-callout-error, .cm-line.cm-callout-bug, .cm-line.cm-callout-failure': {
+    borderLeftColor: 'var(--accent-danger)',
+    background: 'rgba(224, 92, 92, 0.06)',
+  },
+  '.cm-line.cm-callout-tip, .cm-line.cm-callout-success, .cm-line.cm-callout-hint, .cm-line.cm-callout-done': {
+    borderLeftColor: 'var(--accent-success)',
+    background: 'rgba(82, 196, 122, 0.06)',
+  },
+  '.cm-line.cm-callout-head': { fontWeight: '600' },
+
   // Autocomplete option detail (the task/bundle/sandbox/note tag).
   '.cm-tooltip-autocomplete .cm-completionDetail': {
     marginLeft: '8px',

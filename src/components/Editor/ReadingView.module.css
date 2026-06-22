@@ -84,6 +84,26 @@
 }
 :global(.rv-hashtag):hover { background: rgba(192, 132, 252, 0.28) }
 
+/* Callouts (scoped under .reading so they beat the base blockquote rule). */
+.reading :global(.rv-callout) {
+  border-left: 3px solid var(--accent-blue);
+  background: rgba(90, 156, 240, 0.07);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 0.8em 0;
+  color: var(--text-primary);
+}
+.reading :global(.rv-callout) > p:first-child { font-weight: 600; margin-top: 0 }
+.reading :global(.rv-callout-warning), .reading :global(.rv-callout-question), .reading :global(.rv-callout-caution) {
+  border-left-color: var(--accent-warning); background: rgba(240, 184, 64, 0.07);
+}
+.reading :global(.rv-callout-danger), .reading :global(.rv-callout-error), .reading :global(.rv-callout-bug), .reading :global(.rv-callout-failure) {
+  border-left-color: var(--accent-danger); background: rgba(224, 92, 92, 0.07);
+}
+.reading :global(.rv-callout-tip), .reading :global(.rv-callout-success), .reading :global(.rv-callout-hint), .reading :global(.rv-callout-done) {
+  border-left-color: var(--accent-success); background: rgba(82, 196, 122, 0.07);
+}
+
 :global(.rv-spoiler) {
   background: var(--text-faint);
   color: transparent;
