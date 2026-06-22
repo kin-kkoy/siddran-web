@@ -214,17 +214,40 @@ export const cinderTheme = EditorView.theme({
   },
   '.cm-line.cm-callout-head': { fontWeight: '600' },
 
-  // Fold gutter (heading outline fold) — custom chevron on heading lines only.
+  // Fold gutter (heading + list outline fold) — custom chevron on foldable lines.
   '.cm-gutters': { background: 'transparent', border: 'none', color: 'var(--text-faint)' },
-  '.cm-foldGutter .cm-gutterElement': { padding: '0 2px' },
-  '.cm-fold-chevron': {
-    cursor: 'pointer',
-    fontSize: '10px',
-    color: 'var(--text-faint)',
-    opacity: '0.55',
-    transition: 'opacity 0.1s ease, color 0.1s ease',
+  '.cm-foldGutter .cm-gutterElement': {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0 1px',
   },
-  '.cm-fold-chevron:hover': { color: 'var(--text-primary)', opacity: '1' },
+  '.cm-fold-chevron': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '18px',
+    height: '18px',
+    borderRadius: '4px',
+    color: 'var(--text-muted)',
+    opacity: '0.7',
+    cursor: 'pointer',
+    transition: 'background 0.12s ease, color 0.12s ease, opacity 0.12s ease',
+  },
+  '.cm-fold-chevron svg': {
+    width: '13px',
+    height: '13px',
+    display: 'block',
+    transform: 'rotate(90deg)', // open: points down
+    transformOrigin: '50% 50%',
+    transition: 'transform 0.12s ease',
+  },
+  '.cm-fold-chevron.is-folded svg': { transform: 'rotate(0deg)' }, // folded: points right
+  '.cm-fold-chevron:hover': {
+    color: 'var(--text-primary)',
+    background: 'var(--bg-hover)',
+    opacity: '1',
+  },
   '.cm-foldPlaceholder': {
     background: 'var(--bg-hover)',
     color: 'var(--text-muted)',
