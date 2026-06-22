@@ -11,6 +11,7 @@ import { remarkUnderline } from './remarkUnderline'
 import { remarkHighlight } from './remarkHighlight'
 import { remarkHashtag } from './remarkHashtag'
 import { remarkWikilinks } from './remarkWikilinks'
+import { normalizeCalloutSource } from './calloutBlocks'
 import { resolveImageUrl } from '../../../utils/imageUpload'
 
 // Markdown → HTML for the reading view. Reuses the same remark plugins the
@@ -65,7 +66,9 @@ function rehypeCinderImages() {
   }
 }
 
-// Turn a blockquote whose first line is `[!type] …` into a callout card.
+// Turn a blockquote whose first line is `[!type] …` into a callout card. Callout
+// boundaries are already correct here because normalizeCalloutSource() split the
+// source so each callout is its own blockquote (no merges, no absorbed lazy lines).
 function rehypeCallouts() {
   return (tree) => {
     visit(tree, 'element', (node) => {
@@ -73,7 +76,6 @@ function rehypeCallouts() {
       const firstP = node.children.find(c => c.type === 'element' && c.tagName === 'p')
       const firstText = firstP?.children?.[0]
       if (!firstText || firstText.type !== 'text') return
-      // Match only the [!type] marker — the value may span multiple lines.
       const m = /^\[!(\w+)\]/.exec(firstText.value)
       if (!m) return
       const prev = node.properties?.className || []
@@ -106,5 +108,5 @@ const processor = unified()
 
 export function markdownToHtml(md) {
   if (!md) return ''
-  return String(processor.processSync(md))
+  return String(processor.processSync(normalizeCalloutSource(md)))
 }
