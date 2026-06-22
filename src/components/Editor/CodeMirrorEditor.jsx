@@ -8,8 +8,10 @@ import { languages } from '@codemirror/language-data'
 import { livePreviewField } from './cm/livePreview'
 import { domVerticalMotion } from './cm/verticalMotion'
 import { codeCopy } from './cm/codeCopy'
+import { imageExtensions } from './cm/imagePaste'
 import { cinderHighlightStyle } from './cm/highlight'
 import { cinderTheme } from './cm/theme'
+import { useApi } from '../../contexts/ApiContext'
 import styles from './CodeMirrorEditor.module.css'
 
 // Autosave cadence — mirrors Lexical's AutosavePlugin so the new editor is as
@@ -40,6 +42,14 @@ function CodeMirrorEditor({
   const hostRef = useRef(null)
   const viewRef = useRef(null)
   const editableRef = useRef(new Compartment())
+
+  // Auth for image upload — kept in refs so the mount-once view handlers always
+  // read the current authFetch/API.
+  const { authFetch, API } = useApi()
+  const authFetchRef = useRef(authFetch)
+  const apiRef = useRef(API)
+  useEffect(() => { authFetchRef.current = authFetch }, [authFetch])
+  useEffect(() => { apiRef.current = API }, [API])
 
   // Keep the latest callbacks reachable from the long-lived EditorView without
   // rebuilding it on every parent render.
@@ -140,6 +150,7 @@ function CodeMirrorEditor({
           syntaxHighlighting(cinderHighlightStyle),
           livePreviewField,
           codeCopy,
+          imageExtensions(() => ({ authFetch: authFetchRef.current, API: apiRef.current })),
           cinderTheme,
           cmPlaceholder(placeholder),
           editableRef.current.of(editableExt(interfaceMode)),

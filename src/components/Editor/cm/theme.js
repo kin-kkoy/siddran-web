@@ -101,6 +101,24 @@ export const cinderTheme = EditorView.theme({
     transition: 'opacity 120ms ease, color 120ms ease',
   },
   '.cm-code-copy-btn:hover': { opacity: '1', color: 'var(--text-primary)' },
+
+  // Inline images (cm/widgets.js ImageWidget) + drag-resize handle.
+  '.cm-img-wrap': { position: 'relative', display: 'inline-block', maxWidth: '100%', margin: '0.2em 0' },
+  '.cm-img': { maxWidth: '100%', borderRadius: '6px', display: 'block' },
+  '.cm-img-resize': {
+    position: 'absolute',
+    right: '6px',
+    bottom: '8px',
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    background: 'var(--accent-blue)',
+    border: '2px solid var(--bg-primary)',
+    cursor: 'ew-resize',
+    opacity: '0',
+    transition: 'opacity 120ms ease',
+  },
+  '.cm-img-wrap:hover .cm-img-resize': { opacity: '1' },
   '.cm-line.cm-codeblock-top': {
     borderTopLeftRadius: '8px',
     borderTopRightRadius: '8px',

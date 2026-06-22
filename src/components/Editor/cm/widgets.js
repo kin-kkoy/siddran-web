@@ -1,4 +1,5 @@
 import { WidgetType } from '@codemirror/view'
+import { resolveImageUrl } from '../../../utils/imageUpload'
 
 // Phase 1 live-preview widgets — ports of the reference clone's HrWidget /
 // BulletWidget / CheckWidget (garb2/obsidian-notes-clone.html). Richer widgets
@@ -57,4 +58,35 @@ export class CheckWidget extends WidgetType {
     return s
   }
   ignoreEvent() { return false }
+}
+
+// Renders a markdown image `![alt](path#w=NNN)` as an actual <img> (path
+// resolved through the R2 helper) with an optional pixel width and a drag handle.
+// The drag itself is handled by a domEventHandler in cm/imagePaste.js (which
+// rewrites the markdown width); this widget is otherwise presentational.
+export class ImageWidget extends WidgetType {
+  constructor(src, width) {
+    super()
+    this.src = src
+    this.width = width
+  }
+  eq(o) { return o.src === this.src && o.width === this.width }
+  toDOM() {
+    const wrap = document.createElement('span')
+    wrap.className = 'cm-img-wrap'
+    wrap.setAttribute('contenteditable', 'false')
+    const img = document.createElement('img')
+    img.className = 'cm-img'
+    img.src = resolveImageUrl(this.src)
+    img.alt = ''
+    img.loading = 'lazy'
+    if (this.width) img.style.width = this.width + 'px'
+    const handle = document.createElement('span')
+    handle.className = 'cm-img-resize'
+    handle.title = 'Drag to resize'
+    wrap.appendChild(img)
+    wrap.appendChild(handle)
+    return wrap
+  }
+  ignoreEvent() { return true }
 }

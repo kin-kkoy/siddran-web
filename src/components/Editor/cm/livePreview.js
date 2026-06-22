@@ -1,7 +1,7 @@
 import { Decoration, EditorView } from '@codemirror/view'
 import { StateField, RangeSet } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
-import { HrWidget, BulletWidget, CheckWidget } from './widgets'
+import { HrWidget, BulletWidget, CheckWidget, ImageWidget } from './widgets'
 
 // Live-preview decorations — a Phase 1 subset of the reference clone's
 // buildDeco (garb2/obsidian-notes-clone.html). The principle: walk the markdown
@@ -132,6 +132,25 @@ function buildDeco(state) {
         case 'HorizontalRule': {
           const line = doc.lineAt(nf)
           if (!lact(nf, nt)) deco.push(Decoration.replace({ widget: new HrWidget(), block: true }).range(line.from, line.to))
+          return false
+        }
+        case 'Image': {
+          // `![alt](path)` → real image when the caret isn't on it. Width travels
+          // in the URL fragment `#w=NNN`; `uploading:` URLs are transient upload
+          // placeholders and stay as source text.
+          const raw = doc.sliceString(nf, nt)
+          const m = /^!\[([^\]]*)\]\(([^)\s]*)\)$/.exec(raw)
+          if (!m) break
+          const fullUrl = m[2]
+          if (fullUrl.startsWith('uploading:')) break
+          const line = doc.lineAt(nf)
+          const whole = line.from === nf && line.to === nt
+          const active = whole ? lact(nf, nt) : over(nf, nt)
+          if (active) break
+          const wm = /#w=(\d+)$/.exec(fullUrl)
+          const width = wm ? parseInt(wm[1], 10) : null
+          const src = wm ? fullUrl.slice(0, wm.index) : fullUrl
+          deco.push(Decoration.replace({ widget: new ImageWidget(src, width), block: whole }).range(nf, nt))
           return false
         }
         case 'Blockquote': {
