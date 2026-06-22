@@ -31,10 +31,14 @@ Branch: `cm6-editor`. Reference clone: `~/Downloads/garb2/obsidian-notes-clone.h
       (`markdownToHtml.js` + `ReadingView.jsx`); Lexical read mode unchanged
 - [ ] Manual verification pass (see plan's verification section)
 
-## Phase 3 — wikilinks
-- [ ] `ObsidianMD` Lezer nodes (Wikilink, Embed, Highlight, Hashtag)
-- [ ] `[[ ]]` decorations + `wikilinkComplete` autocomplete
-- [ ] note↔note navigation
+## Phase 3 — wikilinks  ✅ (in review)
+- [x] Wikilink Lezer node (`cm/wikilinks.js`); Embed/Highlight/Hashtag deferred
+- [x] `[[ ]]` live-preview decorations (resolved vs unresolved) + `[[`-autocomplete
+      over existing note titles
+- [x] note↔note navigation (click → `/notes/:id`) + create-on-click for unresolved
+      links (`addNote` → navigate); `[[Target|alias]]` supported
+- [ ] Manual verification pass
+- Deferred: note embeds `![[ ]]`, `#heading` anchors, wikilinks inside reading mode
 
 ## Phase 4 — typed cross-links
 - [ ] `[[task:<id>|label]]` → open existing `TaskDetailsModal`

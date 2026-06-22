@@ -142,4 +142,36 @@ export const cinderTheme = EditorView.theme({
     cursor: 'pointer',
     accentColor: 'var(--accent-blue)',
   },
+
+  // Wikilinks (cm/wikilinks.js): rendered internal link, unresolved variant, and
+  // the revealed `[[ ]]` source when the caret is on it.
+  '.cm-internal-link': {
+    color: 'var(--accent-blue)',
+    cursor: 'pointer',
+    textDecoration: 'none',
+    borderBottom: '1px solid transparent',
+  },
+  '.cm-internal-link:hover': { textDecoration: 'underline' },
+  '.cm-internal-link.is-unresolved': {
+    color: 'var(--text-muted)',
+    borderBottom: '1px dashed var(--text-faint)',
+  },
+  '.cm-wikilink-src': { color: 'var(--accent-blue)' },
+
+  // Autocomplete dropdown (wikilink titles), themed for dark.
+  '.cm-tooltip.cm-tooltip-autocomplete': {
+    background: 'var(--bg-elevated)',
+    border: '1px solid var(--border-strong)',
+    borderRadius: '8px',
+    boxShadow: '0 6px 18px var(--shadow-color)',
+    padding: '4px',
+  },
+  '.cm-tooltip-autocomplete ul li': {
+    fontFamily: 'inherit',
+    fontSize: '13.5px',
+    padding: '5px 10px',
+    borderRadius: '5px',
+    color: 'var(--text-primary)',
+  },
+  '.cm-tooltip-autocomplete ul li[aria-selected]': { background: 'var(--accent-blue)', color: '#fff' },
 }, { dark: true })

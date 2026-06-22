@@ -97,7 +97,9 @@ const clickFix = EditorView.domEventHandlers({
 export const domVerticalMotion = [
   goalReset,
   clickFix,
-  Prec.highest(keymap.of([
+  // Prec.high (not highest) so the autocomplete completionKeymap — registered at
+  // Prec.highest in cm/wikilinks.js — owns Arrow/Enter while a completion is open.
+  Prec.high(keymap.of([
     { key: 'ArrowUp', run: v => moveVertical(v, false, false), shift: v => moveVertical(v, false, true) },
     { key: 'ArrowDown', run: v => moveVertical(v, true, false), shift: v => moveVertical(v, true, true) },
   ])),

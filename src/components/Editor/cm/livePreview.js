@@ -2,6 +2,7 @@ import { Decoration, EditorView } from '@codemirror/view'
 import { StateField, RangeSet } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import { HrWidget, BulletWidget, CheckWidget, ImageWidget } from './widgets'
+import { wikilinkConfig, parseWikilink } from './wikilinks'
 
 // Live-preview decorations — a Phase 1 subset of the reference clone's
 // buildDeco (garb2/obsidian-notes-clone.html). The principle: walk the markdown
@@ -90,6 +91,26 @@ function buildDeco(state) {
             })
           }
           break
+        }
+        case 'Wikilink': {
+          // Caret on the link → editable `[[ ]]` source; off → rendered link with
+          // brackets hidden. data-target drives click navigation (cm/wikilinks.js).
+          const inner = doc.sliceString(nf + 2, nt - 2)
+          if (over(nf, nt)) { mk(nf, nt, 'cm-wikilink-src'); return false }
+          const { target, pipe } = parseWikilink(inner)
+          const cfg = state.facet(wikilinkConfig)
+          const resolved = cfg && cfg.resolve ? !!cfg.resolve(target) : false
+          const cls = 'cm-internal-link' + (resolved ? '' : ' is-unresolved')
+          const at = { 'data-target': target }
+          hide(nf, nf + 2)
+          hide(nt - 2, nt)
+          if (pipe >= 0) {
+            hide(nf + 2, nf + 2 + pipe + 1) // hide `target|`, keep the alias
+            mk(nf + 2 + pipe + 1, nt - 2, cls, at)
+          } else {
+            mk(nf + 2, nt - 2, cls, at)
+          }
+          return false
         }
         case 'Link': {
           const marks = node.node.getChildren('LinkMark')

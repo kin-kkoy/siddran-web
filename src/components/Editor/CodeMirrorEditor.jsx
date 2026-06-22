@@ -9,6 +9,7 @@ import { livePreviewField } from './cm/livePreview'
 import { domVerticalMotion } from './cm/verticalMotion'
 import { codeCopy } from './cm/codeCopy'
 import { imageExtensions } from './cm/imagePaste'
+import { wikilinks, wikilinkMarkdownExtension, resolveNote } from './cm/wikilinks'
 import { cinderHighlightStyle } from './cm/highlight'
 import { cinderTheme } from './cm/theme'
 import { useApi } from '../../contexts/ApiContext'
@@ -38,6 +39,9 @@ function CodeMirrorEditor({
   noteId,
   placeholder = 'Start typing here...',
   interfaceMode = false,
+  notes = [],
+  onNavigateNote,
+  onCreateNote,
 }) {
   const hostRef = useRef(null)
   const viewRef = useRef(null)
@@ -50,6 +54,14 @@ function CodeMirrorEditor({
   const apiRef = useRef(API)
   useEffect(() => { authFetchRef.current = authFetch }, [authFetch])
   useEffect(() => { apiRef.current = API }, [API])
+
+  // Wikilink data/callbacks — refs so the mount-once view always reads current.
+  const notesRef = useRef(notes)
+  const onNavigateRef = useRef(onNavigateNote)
+  const onCreateRef = useRef(onCreateNote)
+  useEffect(() => { notesRef.current = notes }, [notes])
+  useEffect(() => { onNavigateRef.current = onNavigateNote }, [onNavigateNote])
+  useEffect(() => { onCreateRef.current = onCreateNote }, [onCreateNote])
 
   // Keep the latest callbacks reachable from the long-lived EditorView without
   // rebuilding it on every parent render.
@@ -146,11 +158,17 @@ function CodeMirrorEditor({
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           drawSelection(),
           EditorView.lineWrapping,
-          markdown({ base: markdownLanguage, codeLanguages: languages }),
+          markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [wikilinkMarkdownExtension] }),
           syntaxHighlighting(cinderHighlightStyle),
           livePreviewField,
           codeCopy,
           imageExtensions(() => ({ authFetch: authFetchRef.current, API: apiRef.current })),
+          wikilinks({
+            notes: () => notesRef.current,
+            resolve: (t) => resolveNote(notesRef.current, t),
+            navigate: (id) => onNavigateRef.current?.(id),
+            create: (t) => onCreateRef.current?.(t),
+          }),
           cinderTheme,
           cmPlaceholder(placeholder),
           editableRef.current.of(editableExt(interfaceMode)),

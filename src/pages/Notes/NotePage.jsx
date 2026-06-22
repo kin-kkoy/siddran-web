@@ -18,7 +18,7 @@ import NoteSettingsPopup from '../../components/Settings/NoteSettingsPopup'
 import SandboxDock from '../../components/Sandbox/Dock/SandboxDock'
 import { useSandboxView } from '../../contexts/SandboxViewContext'
 
-function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction, tasks, toggleTaskCompletion }) {
+function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction, tasks, toggleTaskCompletion, addNote }) {
 
   const sandboxView = useSandboxView()
   const { settings } = useSettings()
@@ -401,6 +401,9 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
               onDirtyChange={handleDirtyChange}
               placeholder='Start typing here...'
               interfaceMode={false}
+              notes={notes}
+              onNavigateNote={(noteId) => navigate(`/notes/${noteId}`)}
+              onCreateNote={(title) => addNote?.(title, (opt) => navigate(`/notes/${opt.id}`))}
             />
           )
         ) : (
