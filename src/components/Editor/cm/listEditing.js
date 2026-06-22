@@ -1,4 +1,6 @@
 import { ChangeSet, EditorSelection } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
+import { syntaxTree } from '@codemirror/language'
 
 // Lexical-like list editing for the raw-markdown CM6 editor. Markdown lists are
 // just text here, so without help the user would hand-type every marker. These
@@ -202,3 +204,43 @@ export const listEditingKeymap = [
   { key: 'Tab', run: indentList },
   { key: 'Shift-Tab', run: outdentList },
 ]
+
+// The valid indent for a hand-typed list item: align it to the list item above
+// (sibling), allow a single clean nest (one step deeper) if it reached that far,
+// but never a stray in-between indent. Tab stays the only way to nest.
+function validIndentFor(doc, lineNum, indent) {
+  let prev = null
+  for (let n = lineNum - 1; n >= 1; n--) {
+    const t = doc.line(n).text
+    if (!t.trim()) break // blank line ends the list context
+    const it = parseItem(t)
+    if (it) { prev = it; break } // nearest list item above (skip continuation lines)
+  }
+  if (!prev) return 0 // no list above → top level
+  const step = Math.max(4, prev.contentCol - prev.indent)
+  if (indent >= prev.indent + step) return prev.indent + step // a full clean nest
+  if (indent > prev.indent) return prev.indent // stray partial nest → snap to sibling
+  return indent // sibling or shallower — leave as-is
+}
+
+// Live-normalize a hand-typed list item's leading indent (e.g. typing " - x" after
+// "- x" no longer silently makes it a child). Runs after the user's own input only;
+// our Enter/Tab commands already produce clean indents, so this is a no-op for them.
+export const listIndentNormalizer = EditorView.updateListener.of((u) => {
+  if (!u.docChanged) return
+  if (!u.transactions.some(tr => tr.isUserEvent('input'))) return
+  const view = u.view, state = view.state
+  const sel = state.selection
+  if (sel.ranges.length !== 1 || !sel.main.empty) return
+  const line = state.doc.lineAt(sel.main.head)
+  const item = parseItem(line.text)
+  // Only act on an indented, fully-formed list marker (a trailing space after it).
+  if (!item || item.indent === 0) return
+  if (!/^\s+(?:[-*+]|\d+[.)])\s/.test(line.text)) return
+  const target = validIndentFor(state.doc, line.number, item.indent)
+  if (target === item.indent) return // already a valid level (incl. Tab-made nests) → nothing to do
+  for (let n = syntaxTree(state).resolveInner(line.from, 1); n; n = n.parent) {
+    if (/Code/.test(n.name)) return // never touch indentation inside code blocks
+  }
+  view.dispatch({ changes: { from: line.from, to: line.from + item.indent, insert: ' '.repeat(target) } })
+})

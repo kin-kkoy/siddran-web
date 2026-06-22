@@ -12,7 +12,7 @@ import { imageExtensions } from './cm/imagePaste'
 import { wikilinks, wikilinkMarkdownExtension, resolveNote } from './cm/wikilinks'
 import { obsidianSyntax } from './cm/syntaxNodes'
 import { headingFold } from './cm/fold'
-import { listEditingKeymap } from './cm/listEditing'
+import { listEditingKeymap, listIndentNormalizer } from './cm/listEditing'
 import { cinderHighlightStyle } from './cm/highlight'
 import { cinderTheme } from './cm/theme'
 import ReadingView from './ReadingView'
@@ -194,6 +194,7 @@ function CodeMirrorEditor({
           // The [[ ]] completionKeymap (Prec.highest) still owns Enter while open.
           keymap.of([...listEditingKeymap, { key: 'Backspace', run: deleteMarkupBackward }]),
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+          listIndentNormalizer, // snap stray hand-typed list indents to a sibling level
           drawSelection(),
           EditorView.lineWrapping,
           headingFold,
