@@ -12,6 +12,7 @@ import { imageExtensions } from './cm/imagePaste'
 import { wikilinks, wikilinkMarkdownExtension, resolveNote } from './cm/wikilinks'
 import { obsidianSyntax } from './cm/syntaxNodes'
 import { headingFold } from './cm/fold'
+import { listEditingKeymap } from './cm/listEditing'
 import { cinderHighlightStyle } from './cm/highlight'
 import { cinderTheme } from './cm/theme'
 import { useApi } from '../../contexts/ApiContext'
@@ -178,6 +179,9 @@ function CodeMirrorEditor({
         extensions: [
           history(),
           domVerticalMotion, // must precede defaultKeymap's Arrow-Up/Down
+          // List editing (Enter/Tab/Shift-Tab) must win over defaultKeymap + indentWithTab,
+          // but the [[ ]] completionKeymap (Prec.highest) still owns Enter while open.
+          keymap.of(listEditingKeymap),
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           drawSelection(),
           EditorView.lineWrapping,
