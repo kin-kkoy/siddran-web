@@ -1,6 +1,7 @@
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 import remarkRehype from 'remark-rehype'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeStringify from 'rehype-stringify'
@@ -89,6 +90,9 @@ function rehypeCallouts() {
 const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
+  // Render a single newline as a hard line break (<br>), matching how the editor
+  // shows each line separately. Two newlines still make a new paragraph.
+  .use(remarkBreaks)
   .use(remarkSpoiler)
   .use(remarkUnderline)
   .use(remarkWikilinks)
