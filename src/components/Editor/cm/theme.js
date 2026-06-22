@@ -214,10 +214,17 @@ export const cinderTheme = EditorView.theme({
   },
   '.cm-line.cm-callout-head': { fontWeight: '600' },
 
-  // Fold gutter (heading outline fold).
+  // Fold gutter (heading outline fold) — custom chevron on heading lines only.
   '.cm-gutters': { background: 'transparent', border: 'none', color: 'var(--text-faint)' },
-  '.cm-foldGutter .cm-gutterElement': { cursor: 'pointer', padding: '0 2px', color: 'var(--text-faint)' },
-  '.cm-foldGutter .cm-gutterElement:hover': { color: 'var(--text-primary)' },
+  '.cm-foldGutter .cm-gutterElement': { padding: '0 2px' },
+  '.cm-fold-chevron': {
+    cursor: 'pointer',
+    fontSize: '10px',
+    color: 'var(--text-faint)',
+    opacity: '0.55',
+    transition: 'opacity 0.1s ease, color 0.1s ease',
+  },
+  '.cm-fold-chevron:hover': { color: 'var(--text-primary)', opacity: '1' },
   '.cm-foldPlaceholder': {
     background: 'var(--bg-hover)',
     color: 'var(--text-muted)',

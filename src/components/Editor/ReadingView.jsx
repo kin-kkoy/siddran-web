@@ -7,11 +7,13 @@ import styles from './ReadingView.module.css'
 // Read-only rendered view of a note — the "reading mode" the read/edit toggle
 // switches to in the new editor. Renders note markdown to HTML once per content
 // change and decorates each <pre> with a Copy button.
-function ReadingView({ markdown, onSearchTag }) {
+function ReadingView({ markdown, onSearchTag, onOpenLink }) {
   const ref = useRef(null)
   const html = useMemo(() => markdownToHtml(markdown || ''), [markdown])
 
   const handleClick = (e) => {
+    const link = e.target.closest?.('.rv-link')
+    if (link && onOpenLink) { onOpenLink(link); return }
     const tag = e.target.closest?.('.rv-hashtag')
     if (tag && onSearchTag) onSearchTag(tag.getAttribute('data-tag'))
   }

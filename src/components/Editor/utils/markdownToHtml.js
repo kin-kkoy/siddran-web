@@ -9,6 +9,7 @@ import { remarkSpoiler } from './remarkSpoiler'
 import { remarkUnderline } from './remarkUnderline'
 import { remarkHighlight } from './remarkHighlight'
 import { remarkHashtag } from './remarkHashtag'
+import { remarkWikilinks } from './remarkWikilinks'
 import { resolveImageUrl } from '../../../utils/imageUpload'
 
 // Markdown → HTML for the reading view. Reuses the same remark plugins the
@@ -35,6 +36,13 @@ const handlers = {
       properties: { className: ['rv-hashtag'], 'data-tag': node.tag },
       children: state.all(node),
     }
+  },
+  wikilink(state, node) {
+    const wl = node.wl || {}
+    const props = { className: ['rv-link', 'rv-link-' + wl.kind] }
+    if (wl.kind === 'note') props['data-target'] = wl.target
+    else { props['data-link-kind'] = wl.kind; props['data-link-id'] = wl.id }
+    return { type: 'element', tagName: 'span', properties: props, children: state.all(node) }
   },
 }
 
@@ -64,7 +72,8 @@ function rehypeCallouts() {
       const firstP = node.children.find(c => c.type === 'element' && c.tagName === 'p')
       const firstText = firstP?.children?.[0]
       if (!firstText || firstText.type !== 'text') return
-      const m = /^\[!(\w+)\]\s*(.*)$/.exec(firstText.value)
+      // Match only the [!type] marker — the value may span multiple lines.
+      const m = /^\[!(\w+)\]/.exec(firstText.value)
       if (!m) return
       const prev = node.properties?.className || []
       node.properties = node.properties || {}
@@ -72,7 +81,7 @@ function rehypeCallouts() {
         ...(Array.isArray(prev) ? prev : [prev]).filter(Boolean),
         'rv-callout', 'rv-callout-' + m[1].toLowerCase(),
       ]
-      firstText.value = m[2] // drop the [!type] marker, keep the title text
+      firstText.value = firstText.value.replace(/^\[!\w+\][ \t]*/, '') // drop the marker, keep the rest
     })
   }
 }
@@ -82,6 +91,7 @@ const processor = unified()
   .use(remarkGfm)
   .use(remarkSpoiler)
   .use(remarkUnderline)
+  .use(remarkWikilinks)
   .use(remarkHighlight)
   .use(remarkHashtag)
   .use(remarkRehype, { handlers })

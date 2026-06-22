@@ -84,6 +84,17 @@
 }
 :global(.rv-hashtag):hover { background: rgba(192, 132, 252, 0.28) }
 
+/* Wikilinks / typed cross-links in the reading view. */
+:global(.rv-link) { cursor: pointer; text-decoration: none }
+:global(.rv-link):hover { text-decoration: underline }
+:global(.rv-link-note) { color: var(--accent-blue) }
+:global(.rv-link-task) { color: var(--src-task) }
+:global(.rv-link-task)::before { content: '◷ '; opacity: 0.85 }
+:global(.rv-link-sandbox) { color: var(--src-sandbox) }
+:global(.rv-link-sandbox)::before { content: '▦ '; opacity: 0.85 }
+:global(.rv-link-bundle) { color: var(--src-bundle) }
+:global(.rv-link-bundle)::before { content: '⊞ '; opacity: 0.85 }
+
 /* Callouts (scoped under .reading so they beat the base blockquote rule). */
 .reading :global(.rv-callout) {
   border-left: 3px solid var(--accent-blue);

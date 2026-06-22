@@ -205,15 +205,23 @@ function buildDeco(state) {
         }
         case 'Blockquote': {
           const sl = doc.lineAt(nf), el = doc.lineAt(nt)
-          // `> [!type]` first line → coloured callout block; else a plain quote.
-          const co = /^\s*>\s*\[!(\w+)\]/.exec(sl.text)
-          if (co) {
-            const cls = 'cm-callout cm-callout-' + co[1].toLowerCase()
-            for (let n = sl.number; n <= el.number; n++) {
-              lineCls(doc.line(n).from, cls + (n === sl.number ? ' cm-callout-head' : ''))
+          // Walk lines: each `> [!type]` starts a fresh callout; following `>`
+          // lines are its body; a non-`>` (lazy-continuation) line ends the callout
+          // and is left unstyled. This separates back-to-back callouts and stops a
+          // plain trailing line from being absorbed into the callout/quote.
+          let calloutType = null
+          for (let n = sl.number; n <= el.number; n++) {
+            const ln = doc.line(n)
+            if (!/^\s*>/.test(ln.text)) { calloutType = null; continue }
+            const head = /^\s*>\s*\[!(\w+)\]/.exec(ln.text)
+            if (head) {
+              calloutType = head[1].toLowerCase()
+              lineCls(ln.from, 'cm-callout cm-callout-' + calloutType + ' cm-callout-head')
+            } else if (calloutType) {
+              lineCls(ln.from, 'cm-callout cm-callout-' + calloutType)
+            } else {
+              lineCls(ln.from, 'cm-quote')
             }
-          } else {
-            for (let n = sl.number; n <= el.number; n++) lineCls(doc.line(n).from, 'cm-quote')
           }
           node.node.getChildren('QuoteMark').forEach(q => {
             if (!lact(q.from, q.to)) {

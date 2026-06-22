@@ -186,6 +186,18 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
     if (tag) navigate(`/notes?q=${encodeURIComponent(tag)}`)
   }, [navigate])
 
+  // Clicking a [[link]] in the reading view — same behaviours as the editor.
+  const handleOpenLink = useCallback((el) => {
+    const kind = el.getAttribute('data-link-kind')
+    if (kind === 'task') { handleOpenTask(el.getAttribute('data-link-id')); return }
+    if (kind === 'sandbox') { handleOpenSandbox(el.getAttribute('data-link-id')); return }
+    if (kind === 'bundle') { navigate(`/tasks?bundle=${el.getAttribute('data-link-id')}`); return }
+    const target = (el.getAttribute('data-target') || '').trim()
+    const found = (notes || []).find(n => (n.title || '').trim().toLowerCase() === target.toLowerCase())
+    if (found) navigate(`/notes/${found.id}`)
+    else if (target) setLinkModalTitle(target)
+  }, [handleOpenTask, handleOpenSandbox, navigate, notes])
+
   // Draft recovery: decide the editor's initial content once per note. The
   // decision (is there a localStorage draft newer than the server copy?) is
   // computed purely here, keyed on note.id so it tracks the editor's remount
@@ -450,7 +462,7 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
           // New editor: read mode renders a fully-rendered HTML reading view;
           // edit mode is the CodeMirror live-preview editor.
           viewMode ? (
-            <ReadingView key={`read-${note.id}`} markdown={note.body || ''} onSearchTag={handleSearchTag} />
+            <ReadingView key={`read-${note.id}`} markdown={note.body || ''} onSearchTag={handleSearchTag} onOpenLink={handleOpenLink} />
           ) : (
             <CodeMirrorEditor
               key={note.id}
