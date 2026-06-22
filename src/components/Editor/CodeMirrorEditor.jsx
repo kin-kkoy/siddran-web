@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, keymap, drawSelection, placeholder as cmPlaceholder } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
-import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
+import { markdown, markdownLanguage, deleteMarkupBackward } from '@codemirror/lang-markdown'
 import { syntaxHighlighting } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { livePreviewField } from './cm/livePreview'
@@ -187,14 +187,17 @@ function CodeMirrorEditor({
         extensions: [
           history(),
           domVerticalMotion, // must precede defaultKeymap's Arrow-Up/Down
-          // List editing (Enter/Tab/Shift-Tab) must win over defaultKeymap + indentWithTab,
-          // but the [[ ]] completionKeymap (Prec.highest) still owns Enter while open.
-          keymap.of(listEditingKeymap),
+          // List editing (Enter/Tab/Shift-Tab) must win over defaultKeymap + indentWithTab.
+          // markdown() is configured with addKeymap:false (below) so its own Prec.high
+          // Enter→insertNewlineContinueMarkup no longer shadows our list Enter; we keep
+          // its Backspace→deleteMarkupBackward (nice list-marker delete) explicitly.
+          // The [[ ]] completionKeymap (Prec.highest) still owns Enter while open.
+          keymap.of([...listEditingKeymap, { key: 'Backspace', run: deleteMarkupBackward }]),
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           drawSelection(),
           EditorView.lineWrapping,
           headingFold,
-          markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [wikilinkMarkdownExtension, obsidianSyntax] }),
+          markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false, extensions: [wikilinkMarkdownExtension, obsidianSyntax] }),
           syntaxHighlighting(cinderHighlightStyle),
           livePreviewField,
           codeCopy,
