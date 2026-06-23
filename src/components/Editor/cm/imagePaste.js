@@ -14,15 +14,20 @@ let uploadCounter = 0
 // Strip markdown-breaking chars from a filename for use as alt text.
 const safeName = (name) => (name || 'image').replace(/[[\]()\n\r]/g, '').trim() || 'image'
 
-// Replace the first occurrence of an exact placeholder token with `replacement`
-// (empty removes it, trimming a trailing newline so no blank line is left).
+// Replace the first occurrence of an exact placeholder token with `replacement`.
+// Removal (empty) drops the placeholder's whole line + its newline so no blank
+// line is left — but only when the token is alone on its line, so a failed upload
+// can't swallow the newline separating it from the NEXT placeholder/line.
 function replaceToken(view, token, replacement) {
-  const text = view.state.doc.toString()
-  const idx = text.indexOf(token)
+  const doc = view.state.doc
+  const idx = doc.toString().indexOf(token)
   if (idx < 0) return // user deleted it mid-upload — nothing to do
-  let to = idx + token.length
-  if (replacement === '' && text[to] === '\n') to += 1
-  view.dispatch({ changes: { from: idx, to, insert: replacement } })
+  let from = idx, to = idx + token.length
+  if (replacement === '') {
+    const line = doc.lineAt(idx)
+    if (line.from === from && line.to === to) to = Math.min(to + 1, doc.length)
+  }
+  view.dispatch({ changes: { from, to, insert: replacement } })
 }
 
 // Run `worker` over items with at most `limit` in flight.
