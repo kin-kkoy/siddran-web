@@ -61,23 +61,17 @@ function wikilinkComplete(context) {
   const before = context.matchBefore(/\[\[[^\]\n]*/)
   if (!before) return null
   const cfg = context.state.facet(wikilinkConfig)
-  // Anchor the completion at the START of `[[` (not after it). For an empty query
-  // the position after `[[` is the end of the line, and CM's coordsAtPos(endOfLine,
-  // side=1) is null there (nothing rendered ahead of it), so it would hide the
-  // dropdown off-screen. `before.from` always has the second `[` glyph just after
-  // it, so the tooltip always resolves a position. Because `from` now spans the
-  // `[[`, we filter manually (filter:false) instead of letting CM match the query.
-  const from = before.from
-  const after = before.text.slice(2) // the query typed after `[[`
+  const from = before.from + 2
+  const after = before.text.slice(2)
 
-  // An option whose `apply` replaces `[[<query>` with the full `[[<inner>]]`.
+  // Build an option whose `apply` replaces the inner text with `<inner>]]`.
   const opt = (inner, label, detail) => ({
     label,
     detail,
     type: 'text',
     apply: (view, _c, f, t) => view.dispatch({
-      changes: { from: f, to: t, insert: `[[${inner}]]` },
-      selection: { anchor: f + inner.length + 4 },
+      changes: { from: f, to: t, insert: `${inner}]]` },
+      selection: { anchor: f + inner.length + 2 },
     }),
   })
 
@@ -98,7 +92,7 @@ function wikilinkComplete(context) {
         }
       }
     }
-    return { from, to: context.pos, options, filter: false }
+    return { from, to: context.pos, options, filter: false, validFor: /[^\]\n]*/ }
   }
 
   const sbM = /^sandbox:(.*)$/i.exec(after)
@@ -109,18 +103,15 @@ function wikilinkComplete(context) {
       const title = s.title || 'Untitled'
       if (!q || title.toLowerCase().includes(q)) options.push(opt(`sandbox:${s.id}|${title}`, title, 'sandbox'))
     }
-    return { from, to: context.pos, options, filter: false }
+    return { from, to: context.pos, options, filter: false, validFor: /[^\]\n]*/ }
   }
 
-  // Plain note titles — filtered here (the query is `after`), re-run on each
-  // keystroke so the list narrows as you type.
-  const q = after.trim().toLowerCase()
-  const options = []
-  for (const n of (cfg.notes?.() || [])) {
+  // Plain note titles.
+  const options = (cfg.notes?.() || []).map((n) => {
     const title = n.title || 'Untitled'
-    if (!q || title.toLowerCase().includes(q)) options.push(opt(title, title, 'note'))
-  }
-  return { from, to: context.pos, options, filter: false }
+    return opt(title, title, 'note')
+  })
+  return { from, to: context.pos, options, filter: true, validFor: /[^\]\n]*/ }
 }
 
 // Click a rendered link → typed links open the task modal / sandbox board; note
