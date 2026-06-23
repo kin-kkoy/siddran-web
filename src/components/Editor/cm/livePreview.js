@@ -238,12 +238,20 @@ function buildDeco(state) {
     },
   })
 
-  // list bullets & task checkboxes — line-based for symmetric, reliable handling
-  let inFence = false
+  // list bullets & task checkboxes — line-based for symmetric, reliable handling.
+  // Track ``` AND ~~~ fences (by type) so list-like lines inside a code block of
+  // either kind don't get bullet/checkbox widgets.
+  let fence = null // null | '`' | '~'
   for (let ln = 1; ln <= doc.lines; ln++) {
     const line = doc.line(ln), txt = line.text
-    if (/^\s*```/.test(txt)) { inFence = !inFence; continue }
-    if (inFence) continue
+    const fm = /^\s*(`{3,}|~{3,})/.exec(txt)
+    if (fm) {
+      const ch = fm[1][0]
+      if (fence === null) fence = ch
+      else if (ch === fence) fence = null
+      continue
+    }
+    if (fence !== null) continue
     const tm = /^(\s*)([-*+])(\s+)\[([ xX])\]/.exec(txt)
     if (tm) {
       const dashStart = line.from + tm[1].length
