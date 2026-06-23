@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Card from '../../components/Notes/Card'
 import HorizontalCard from '../../components/Notes/HorizontalCard'
 import AddCard from '../../components/Notes/AddCard'
@@ -27,7 +28,9 @@ function NotesHub({ notes, notebooks, notesLoading, notebookNotesById, notesPagi
   const [selectionMode, setSelectionMode] = useState(null)
   const [selectedNotes, setSelectedNotes] = useState([])
   const [selectedNotebook, setSelectedNotebook] = useState(null)
-  const [searchQuery, setSearchQuery] = useState("")
+  // Seed the search from a ?q= param (e.g. clicking a #hashtag in a note).
+  const [searchParams] = useSearchParams()
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || "")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [pendingImportFiles, setPendingImportFiles] = useState(null)

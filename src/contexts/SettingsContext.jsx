@@ -19,7 +19,6 @@ const DEFAULTS = {
   theme: 'default',
   matchMode: true,
   contrast: 'low',
-  autoHideToolbar: true,
   showStars: true,
   showStarsOnNotePage: true,
   reduceStars: false,

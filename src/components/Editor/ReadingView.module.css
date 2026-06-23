@@ -1,0 +1,147 @@
+/* Rendered reading-view styling. Tag rules are scoped under .reading; the
+   dynamically-added helper classes (rv-*) live in a :global block. Code-block
+   colours come from the imported highlight.js atom-one-dark theme. */
+.reading {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.9;
+  color: var(--text-primary);
+  word-wrap: break-word;
+  padding: 4px 0 40px;
+}
+
+.reading h1, .reading h2, .reading h3, .reading h4, .reading h5, .reading h6 {
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  margin: 1.4em 0 0.6em;
+  color: var(--text-primary);
+}
+.reading h1 { font-size: 1.9em }
+.reading h2 { font-size: 1.55em }
+.reading h3 { font-size: 1.3em }
+.reading h4 { font-size: 1.12em }
+.reading h5 { font-size: 1em }
+.reading h6 { font-size: 0.9em; color: var(--text-muted) }
+
+.reading p { margin: 0.7em 0 }
+.reading a { color: var(--accent-blue); text-decoration: none }
+.reading a:hover { text-decoration: underline }
+
+.reading ul, .reading ol { margin: 0.6em 0; padding-left: 1.6em }
+.reading li { margin: 0.2em 0 }
+/* Match the editor's blue bullets / ordered numbers. */
+.reading li::marker { color: var(--accent-blue) }
+.reading li > input[type='checkbox'] { margin-right: 6px; accent-color: var(--accent-blue) }
+
+.reading blockquote {
+  margin: 0.8em 0;
+  padding: 0.2em 0 0.2em 14px;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.reading code {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--accent-warning);
+}
+.reading pre {
+  position: relative;
+  margin: 0.8em 0;
+  background: #282c34; /* matches atom-one-dark */
+  border-radius: 8px;
+  overflow: auto;
+}
+.reading pre code {
+  display: block;
+  padding: 14px 16px;
+  background: transparent;
+  color: inherit;
+  font-size: 13.5px;
+  border-radius: 0;
+}
+
+.reading img { max-width: 100%; border-radius: 6px; display: block; margin: 0.4em 0 }
+.reading hr { border: none; border-top: 1px solid var(--border-strong); margin: 1.2em 0 }
+
+.reading table { border-collapse: collapse; margin: 0.8em 0 }
+.reading th, .reading td { border: 1px solid var(--border-default); padding: 6px 12px }
+.reading th { background: var(--bg-surface-alt); font-weight: 600 }
+
+.reading u { text-decoration: underline }
+.reading mark { background: rgba(240, 184, 64, 0.22); color: inherit; border-radius: 3px; padding: 0 2px }
+
+:global(.rv-hashtag) {
+  color: #c084fc;
+  background: rgba(192, 132, 252, 0.15);
+  border-radius: 20px;
+  padding: 1px 8px;
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+}
+:global(.rv-hashtag):hover { background: rgba(192, 132, 252, 0.28) }
+
+/* Wikilinks / typed cross-links in the reading view. */
+:global(.rv-link) { cursor: pointer; text-decoration: none }
+:global(.rv-link):hover { text-decoration: underline }
+:global(.rv-link-note) { color: var(--accent-blue) }
+:global(.rv-link-task) { color: var(--src-task) }
+:global(.rv-link-task)::before { content: '◷ '; opacity: 0.85 }
+:global(.rv-link-sandbox) { color: var(--src-sandbox) }
+:global(.rv-link-sandbox)::before { content: '▦ '; opacity: 0.85 }
+:global(.rv-link-bundle) { color: var(--src-bundle) }
+:global(.rv-link-bundle)::before { content: '⊞ '; opacity: 0.85 }
+
+/* Callouts (scoped under .reading so they beat the base blockquote rule). */
+.reading :global(.rv-callout) {
+  border-left: 3px solid var(--accent-blue);
+  background: rgba(90, 156, 240, 0.07);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 0.8em 0;
+  color: var(--text-primary);
+}
+.reading :global(.rv-callout) > p:first-child { font-weight: 600; margin-top: 0 }
+.reading :global(.rv-callout-warning), .reading :global(.rv-callout-question), .reading :global(.rv-callout-caution) {
+  border-left-color: var(--accent-warning); background: rgba(240, 184, 64, 0.07);
+}
+.reading :global(.rv-callout-danger), .reading :global(.rv-callout-error), .reading :global(.rv-callout-bug), .reading :global(.rv-callout-failure) {
+  border-left-color: var(--accent-danger); background: rgba(224, 92, 92, 0.07);
+}
+.reading :global(.rv-callout-tip), .reading :global(.rv-callout-success), .reading :global(.rv-callout-hint), .reading :global(.rv-callout-done) {
+  border-left-color: var(--accent-success); background: rgba(82, 196, 122, 0.07);
+}
+
+:global(.rv-spoiler) {
+  background: var(--text-faint);
+  color: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+:global(.rv-spoiler):hover { background: var(--bg-hover); color: var(--text-primary) }
+
+:global(.rv-pre) :global(.rv-copy-btn) {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 8px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 120ms ease, color 120ms ease;
+}
+:global(.rv-pre):hover :global(.rv-copy-btn) { opacity: 1 }
+:global(.rv-copy-btn):hover { color: var(--text-primary) }

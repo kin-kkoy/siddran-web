@@ -22,8 +22,10 @@ import { visit, SKIP } from 'unist-util-visit';
 const OPEN_RE = /^<spoiler>$/i;
 const CLOSE_RE = /^<\/spoiler>$/i;
 
-// Legacy: ||hidden text|| (no pipes inside)
-const LEGACY_SPOILER_RE = /\|\|([^|]+)\|\|/g;
+// Legacy: ||hidden text|| (no pipes inside). Tight delimiters (non-space just
+// inside each ||) so prose like `x || y || z` isn't mis-spoilered; matches the
+// editor's Lezer Spoiler rule.
+const LEGACY_SPOILER_RE = /\|\|(?=\S)([^|]+?)(?<=\S)\|\|/g;
 
 // Legacy fallback for the autolink-shattered case: when GFM autolink ran
 // before us and broke ||URL|| into [text:'||', link, text:'||']. Re-stitches

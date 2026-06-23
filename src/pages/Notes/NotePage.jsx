@@ -5,9 +5,14 @@ import { IoMdArrowRoundBack } from "react-icons/io"
 import { FaStar, FaRegStar, FaEllipsisV } from 'react-icons/fa'
 import { MdChromeReaderMode } from "react-icons/md";
 import { HiPencilSquare } from "react-icons/hi2";
-import { HiOutlineDownload, HiOutlineCog } from "react-icons/hi";
+import { HiOutlineDownload, HiOutlineCog, HiOutlineDocumentText } from "react-icons/hi";
 import { LuMaximize, LuMinimize } from "react-icons/lu";
-import LexicalEditor from '../../components/Editor/LexicalEditor'
+import CodeMirrorEditor from '../../components/Editor/CodeMirrorEditor'
+import { printNoteToPdf } from '../../components/Editor/utils/exportPdf'
+import ConfirmModal from '../../components/Common/ConfirmModal'
+import TaskDetailsModal from '../../components/Common/TaskDetailsModal'
+import { useApi } from '../../contexts/ApiContext'
+import { useSandboxes } from '../../hooks/useSandboxes'
 import { toast } from '../../utils/toast'
 import Skeleton from '../../components/Common/Skeleton'
 import { NOTE_COLORS } from '../../components/Notes/noteColors'
@@ -15,9 +20,11 @@ import NoteSettingsPopup from '../../components/Settings/NoteSettingsPopup'
 import SandboxDock from '../../components/Sandbox/Dock/SandboxDock'
 import { useSandboxView } from '../../contexts/SandboxViewContext'
 
-function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction, tasks, toggleTaskCompletion }) {
+function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggleFavorite, updateColor, exportNote, setSidebarCollapsed, lessDistraction = false, setLessDistraction, tasks, toggleTaskCompletion, addNote, updateTask, bundles }) {
 
   const sandboxView = useSandboxView()
+  const { authFetch, API } = useApi()
+  const { sandboxes, sandboxesLoaded } = useSandboxes()
 
   // Auto-collapse the sidebar when the sandbox dock expands to half mode so the
   // editor + sandbox columns have room to breathe.
@@ -50,6 +57,14 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   const headerRowRef = useRef(null)
   const [headerVisible, setHeaderVisible] = useState(true)
   const [noteSettingsOpen, setNoteSettingsOpen] = useState(false)
+  // Wikilink "create note?" confirm flow: holds the clicked unresolved title.
+  const [linkModalTitle, setLinkModalTitle] = useState(null)
+  const [creatingLink, setCreatingLink] = useState(false)
+  // [[task:id]] cross-link → task details modal hosted here.
+  const [openTask, setOpenTask] = useState(null)
+  const openingTaskRef = useRef(false)
+  // [[sandbox:id]] that resolves to no known board → "not found" notice modal.
+  const [sandboxNotFound, setSandboxNotFound] = useState(false)
 
   // re-renders if note changes (parent changes)
   useEffect(() => {
@@ -117,11 +132,69 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
     isDirtyRef.current = dirty
   }, [])
 
-  // Save handler for Lexical editor - receives markdown content
+  // Save handler for the editor - receives markdown content
   const handleEditorSave = useCallback(async (markdownContent) => {
     if (!note) return false
     return await editBody(note.id, markdownContent)
   }, [note?.id, editBody])
+
+  // Confirm-creating a note from an unresolved [[wikilink]]: create it (awaiting
+  // the synced note so we land on its real id), then navigate.
+  const handleCreateLinkedNote = useCallback(async () => {
+    const title = linkModalTitle
+    if (!title || creatingLink || !addNote) return
+    setCreatingLink(true)
+    const newNote = await addNote(title)
+    setCreatingLink(false)
+    setLinkModalTitle(null)
+    if (newNote) navigate(`/notes/${newNote.id}`)
+  }, [linkModalTitle, creatingLink, addNote, navigate])
+
+  // Open a [[task:id]] link: prefer the already-loaded task, else fetch by id.
+  const handleOpenTask = useCallback(async (id) => {
+    if (openingTaskRef.current) return
+    const local = (tasks || []).find(t => String(t.id) === String(id))
+    if (local) { setOpenTask(local); return }
+    openingTaskRef.current = true
+    try {
+      const res = await authFetch(`${API}/tasks/${id}`)
+      if (!res.ok) { toast.error('That linked item no longer exists.'); return }
+      setOpenTask(await res.json())
+    } catch {
+      toast.error('Could not open that linked item.')
+    } finally {
+      openingTaskRef.current = false
+    }
+  }, [tasks, authFetch, API])
+
+  // Open a [[sandbox:id]] link, or show a "not found" modal if no such board.
+  // While the list hasn't hydrated yet, fall through to navigation rather than
+  // false-flag a valid board as missing; once hydrated, a genuinely-missing board
+  // (including for a user with zero boards) shows the not-found modal.
+  const handleOpenSandbox = useCallback((id) => {
+    if (!sandboxesLoaded || sandboxes.some(s => String(s.id) === String(id))) {
+      navigate(`/sandboxes/${id}`)
+    } else {
+      setSandboxNotFound(true)
+    }
+  }, [sandboxes, sandboxesLoaded, navigate])
+
+  // Clicking a #hashtag opens the notes list filtered by that term.
+  const handleSearchTag = useCallback((tag) => {
+    if (tag) navigate(`/notes?q=${encodeURIComponent(tag)}`)
+  }, [navigate])
+
+  // Clicking a [[link]] in the reading view — same behaviours as the editor.
+  const handleOpenLink = useCallback((el) => {
+    const kind = el.getAttribute('data-link-kind')
+    if (kind === 'task') { handleOpenTask(el.getAttribute('data-link-id')); return }
+    if (kind === 'sandbox') { handleOpenSandbox(el.getAttribute('data-link-id')); return }
+    if (kind === 'bundle') { navigate(`/tasks?bundle=${el.getAttribute('data-link-id')}`); return }
+    const target = (el.getAttribute('data-target') || '').trim()
+    const found = (notes || []).find(n => (n.title || '').trim().toLowerCase() === target.toLowerCase())
+    if (found) navigate(`/notes/${found.id}`)
+    else if (target) setLinkModalTitle(target)
+  }, [handleOpenTask, handleOpenSandbox, navigate, notes])
 
   // Draft recovery: decide the editor's initial content once per note. The
   // decision (is there a localStorage draft newer than the server copy?) is
@@ -213,7 +286,7 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   const handleKeyDown = e => {
     if(e.key === "Enter" || e.key === "Tab"){
       e.preventDefault();
-      // Focus the Lexical editor's content editable
+      // Focus the editor's content editable
       const editorElement = document.querySelector('[contenteditable="true"]');
       editorElement?.focus();
     }
@@ -340,6 +413,14 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
               </button>
 
               <button
+                onClick={() => { printNoteToPdf(note); setMenuOpen(false) }}
+                className={styles.menuItem}
+              >
+                <HiOutlineDocumentText />
+                <span>Export as PDF</span>
+              </button>
+
+              <button
                 onClick={() => { setNoteSettingsOpen(true); setMenuOpen(false) }}
                 className={styles.menuItem}
               >
@@ -383,20 +464,77 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
           readOnly={viewMode}
         />
 
-        <LexicalEditor
+        {/* CodeMirror editor stays mounted across the read/edit toggle (readMode prop)
+            so unsaved edits are never lost; in read mode it renders its own reading
+            view from the live doc. */}
+        <CodeMirrorEditor
           key={note.id}
+          readMode={viewMode}
           initialContent={initialContentInfo.content}
           onSave={handleEditorSave}
           noteId={note.id}
           onDirtyChange={handleDirtyChange}
           placeholder='Start typing here...'
-          interfaceMode={viewMode}
+          interfaceMode={false}
+          notes={notes}
+          onNavigateNote={(noteId) => navigate(`/notes/${noteId}`)}
+          onCreateNote={(title) => setLinkModalTitle(title)}
+          onOpenTask={handleOpenTask}
+          onOpenSandbox={handleOpenSandbox}
+          onOpenBundle={(id) => navigate(`/tasks?bundle=${id}`)}
+          onSearchTag={handleSearchTag}
+          onOpenLink={handleOpenLink}
+          tasks={tasks}
+          bundles={bundles}
+          sandboxes={sandboxes}
         />
       </div>
 
       <NoteSettingsPopup
         isOpen={noteSettingsOpen}
         onClose={() => setNoteSettingsOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={linkModalTitle !== null}
+        title='Create note?'
+        message={`"${linkModalTitle}" doesn't exist yet. Create it and go there?`}
+        confirmText='Create & open'
+        cancelText='No'
+        confirmVariant='primary'
+        busy={creatingLink}
+        busyText='Creating…'
+        busyContent={
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Skeleton height={18} width='55%' />
+            <Skeleton height={12} width='90%' />
+            <Skeleton height={12} width='80%' />
+            <Skeleton height={12} width='70%' />
+          </div>
+        }
+        onClose={() => { if (!creatingLink) setLinkModalTitle(null) }}
+        onConfirm={handleCreateLinkedNote}
+      />
+
+      {openTask && (
+        <TaskDetailsModal
+          task={openTask}
+          updateTask={updateTask}
+          onClose={() => setOpenTask(null)}
+          onOpenInHub={() => { navigate(`/tasks?task=${openTask.id}`); setOpenTask(null) }}
+        />
+      )}
+
+      <ConfirmModal
+        isOpen={sandboxNotFound}
+        title='Sandbox not found'
+        message="This sandbox doesn't exist anymore (it may have been deleted)."
+        confirmText='OK'
+        confirmVariant='primary'
+        hideCancel
+        glow='danger'
+        onConfirm={() => setSandboxNotFound(false)}
+        onClose={() => setSandboxNotFound(false)}
       />
     </div>
   )

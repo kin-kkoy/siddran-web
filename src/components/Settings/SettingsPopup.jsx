@@ -109,17 +109,6 @@ function InterfaceTab({ settings, updateSetting }) {
         />
       </SettingRow>
 
-      {/* Auto-hide toolbar */}
-      <SettingRow
-        label="Auto-Hide Toolbar"
-        description="When off, the formatting toolbar stays visible in write mode."
-      >
-        <ToggleSwitch
-          checked={settings.autoHideToolbar}
-          onChange={(v) => updateSetting('autoHideToolbar', v)}
-        />
-      </SettingRow>
-
       {/* Note editor width */}
       <SettingRow
         label="Note Editor Width"

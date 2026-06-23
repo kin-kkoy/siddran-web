@@ -19,13 +19,14 @@ export function useSandboxes() {
     }, [authFetch, API, isAuthed])
 
     const sandboxes = useSyncExternalStore(store.subscribe, store.getSnapshot)
+    const sandboxesLoaded = useSyncExternalStore(store.subscribe, store.getHydrated)
 
     const create = useCallback((title) => store.create(title), [])
     const rename = useCallback((id, title) => store.rename(id, title), [])
     const remove = useCallback((id) => store.remove(id), [])
     const touch = useCallback((id) => store.touch(id), [])
 
-    return { sandboxes, create, rename, remove, touch }
+    return { sandboxes, sandboxesLoaded, create, rename, remove, touch }
 }
 
 export const STORAGE_KEY_SANDBOXES = 'cinder_sandboxes'

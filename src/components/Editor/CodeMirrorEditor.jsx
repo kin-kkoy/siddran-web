@@ -1,0 +1,284 @@
+import { useEffect, useRef, useState } from 'react'
+import { EditorState, Compartment } from '@codemirror/state'
+import { EditorView, keymap, drawSelection, tooltips, placeholder as cmPlaceholder } from '@codemirror/view'
+import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
+import { markdown, markdownLanguage, deleteMarkupBackward } from '@codemirror/lang-markdown'
+import { syntaxHighlighting } from '@codemirror/language'
+import { languages } from '@codemirror/language-data'
+import { livePreview } from './cm/livePreview'
+import { domVerticalMotion } from './cm/verticalMotion'
+import { codeCopy } from './cm/codeCopy'
+import { imageExtensions } from './cm/imagePaste'
+import { wikilinks, wikilinkMarkdownExtension, resolveNote } from './cm/wikilinks'
+import { obsidianSyntax } from './cm/syntaxNodes'
+import { headingFold } from './cm/fold'
+import { listEditingKeymap, listIndentNormalizer } from './cm/listEditing'
+import { cinderHighlightStyle } from './cm/highlight'
+import { cinderTheme } from './cm/theme'
+import ReadingView from './ReadingView'
+import { useApi } from '../../contexts/ApiContext'
+import styles from './CodeMirrorEditor.module.css'
+
+// Autosave cadence — crash-safe like the rest of the app: a periodic backend save
+// plus a frequent localStorage draft that NotePage's recovery (cinder_draft_<id>)
+// reads back.
+const AUTOSAVE_INTERVAL_MS = 2 * 60 * 1000 // backend save
+const DRAFT_SAVE_INTERVAL_MS = 5 * 1000    // localStorage draft
+
+// CodeMirror 6 live-preview note editor. The document IS the markdown (note.body),
+// so there is no serialize/deserialize layer: onSave just hands back the doc text.
+//
+// Props:
+//   initialContent  markdown string the editor opens with
+//   onSave(md)      => Promise<boolean>, persists the note body
+//   onDirtyChange   (isDirty: boolean) => void
+//   noteId          stable id (editor is remounted per note via key); draft key
+//   placeholder     empty-state text
+//   interfaceMode   true = read-only
+function CodeMirrorEditor({
+  initialContent = '',
+  onSave,
+  onDirtyChange,
+  noteId,
+  placeholder = 'Start typing here...',
+  interfaceMode = false,
+  readMode = false,
+  notes = [],
+  onNavigateNote,
+  onCreateNote,
+  onOpenTask,
+  onOpenSandbox,
+  onOpenBundle,
+  onSearchTag,
+  onOpenLink,
+  tasks = [],
+  bundles = [],
+  sandboxes = [],
+}) {
+  const hostRef = useRef(null)
+  const viewRef = useRef(null)
+  const editableRef = useRef(new Compartment())
+
+  // Read mode renders a fully-rendered HTML view from the editor's LIVE doc while
+  // keeping the CodeMirror instance mounted (just hidden). Toggling read/edit no
+  // longer unmounts the editor, so in-flight unsaved edits are never lost.
+  const [readSnapshot, setReadSnapshot] = useState(initialContent)
+
+  // Auth for image upload — kept in refs so the mount-once view handlers always
+  // read the current authFetch/API.
+  const { authFetch, API } = useApi()
+  const authFetchRef = useRef(authFetch)
+  const apiRef = useRef(API)
+  useEffect(() => { authFetchRef.current = authFetch }, [authFetch])
+  useEffect(() => { apiRef.current = API }, [API])
+
+  // Wikilink data/callbacks — refs so the mount-once view always reads current.
+  const notesRef = useRef(notes)
+  const onNavigateRef = useRef(onNavigateNote)
+  const onCreateRef = useRef(onCreateNote)
+  const onOpenTaskRef = useRef(onOpenTask)
+  const onOpenSandboxRef = useRef(onOpenSandbox)
+  const onOpenBundleRef = useRef(onOpenBundle)
+  const onSearchTagRef = useRef(onSearchTag)
+  const tasksRef = useRef(tasks)
+  const bundlesRef = useRef(bundles)
+  const sandboxesRef = useRef(sandboxes)
+  useEffect(() => { notesRef.current = notes }, [notes])
+  useEffect(() => { onNavigateRef.current = onNavigateNote }, [onNavigateNote])
+  useEffect(() => { onCreateRef.current = onCreateNote }, [onCreateNote])
+  useEffect(() => { onOpenTaskRef.current = onOpenTask }, [onOpenTask])
+  useEffect(() => { onOpenSandboxRef.current = onOpenSandbox }, [onOpenSandbox])
+  useEffect(() => { onOpenBundleRef.current = onOpenBundle }, [onOpenBundle])
+  useEffect(() => { onSearchTagRef.current = onSearchTag }, [onSearchTag])
+  useEffect(() => { tasksRef.current = tasks }, [tasks])
+  useEffect(() => { bundlesRef.current = bundles }, [bundles])
+  useEffect(() => { sandboxesRef.current = sandboxes }, [sandboxes])
+
+  // Keep the latest callbacks reachable from the long-lived EditorView without
+  // rebuilding it on every parent render.
+  const onSaveRef = useRef(onSave)
+  const onDirtyRef = useRef(onDirtyChange)
+  useEffect(() => { onSaveRef.current = onSave }, [onSave])
+  useEffect(() => { onDirtyRef.current = onDirtyChange }, [onDirtyChange])
+
+  // Save bookkeeping (refs so they survive across the view's lifetime).
+  const lastSavedRef = useRef(initialContent) // last content persisted to backend
+  const dirtyRef = useRef(false)              // differs from backend-saved content
+  const draftDirtyRef = useRef(false)         // differs from last localStorage draft
+
+  // Build the editor once on mount.
+  useEffect(() => {
+    const draftKey = `cinder_draft_${noteId}`
+    const editableExt = (ro) => [
+      EditorView.editable.of(!ro),
+      EditorState.readOnly.of(ro),
+    ]
+    const getDoc = () => (viewRef.current ? viewRef.current.state.doc.toString() : null)
+
+    // Refresh the localStorage crash-draft when content diverges from the last
+    // backend save; clear it (and dirty state) once they match again.
+    const saveDraft = () => {
+      if (!draftDirtyRef.current) return
+      const md = getDoc()
+      if (md == null) return
+      if (md === lastSavedRef.current) {
+        try { localStorage.removeItem(draftKey) } catch { /* ignore quota/parse */ }
+        draftDirtyRef.current = false
+        if (dirtyRef.current) { dirtyRef.current = false; onDirtyRef.current?.(false) }
+        return
+      }
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ content: md, savedAt: Date.now() }))
+      } catch { /* ignore quota */ }
+      draftDirtyRef.current = false
+    }
+
+    // Persist to the backend; on success clear dirty state and delete the draft.
+    const saveBackend = () => {
+      if (!dirtyRef.current) return
+      const md = getDoc()
+      if (md == null) return
+      if (md === lastSavedRef.current) {
+        dirtyRef.current = false
+        draftDirtyRef.current = false
+        onDirtyRef.current?.(false)
+        return
+      }
+      Promise.resolve(onSaveRef.current?.(md)).then(ok => {
+        if (ok !== false) {
+          lastSavedRef.current = md
+          dirtyRef.current = false
+          draftDirtyRef.current = false
+          onDirtyRef.current?.(false)
+          try { localStorage.removeItem(draftKey) } catch { /* ignore */ }
+        }
+      }).catch(() => { /* keep dirty + draft for a later retry */ })
+    }
+
+    const updateListener = EditorView.updateListener.of((u) => {
+      if (!u.docChanged) return
+      draftDirtyRef.current = true
+      if (!dirtyRef.current) { dirtyRef.current = true; onDirtyRef.current?.(true) }
+    })
+
+    // Checkbox toggle from its rendered widget + save-on-blur.
+    const domHandlers = EditorView.domEventHandlers({
+      mousedown: (event, view) => {
+        const target = event.target
+        if (!target || !target.classList?.contains('cm-task-check')) return false
+        const pos = view.posAtDOM(target)
+        const line = view.state.doc.lineAt(pos)
+        const m = /^(\s*)([-*+])(\s+)\[([ xX])\]/.exec(line.text)
+        if (!m) return false
+        const from = line.from + m[1].length + 1 + m[3].length
+        const checked = /x/i.test(m[4])
+        view.dispatch({ changes: { from, to: from + 3, insert: checked ? '[ ]' : '[x]' } })
+        event.preventDefault()
+        return true
+      },
+      blur: () => { saveBackend(); return false },
+    })
+
+    const view = new EditorView({
+      parent: hostRef.current,
+      state: EditorState.create({
+        doc: initialContent,
+        extensions: [
+          history(),
+          // Render tooltips (the [[ ]] autocomplete dropdown) in document.body so the
+          // app's nested scroll/stacking contexts (StarCanvas, overflow panes) can't
+          // clip or hide them.
+          tooltips({ parent: document.body }),
+          domVerticalMotion, // must precede defaultKeymap's Arrow-Up/Down
+          // List editing (Enter/Tab/Shift-Tab) must win over defaultKeymap + indentWithTab.
+          // markdown() is configured with addKeymap:false (below) so its own Prec.high
+          // Enter→insertNewlineContinueMarkup no longer shadows our list Enter; we keep
+          // its Backspace→deleteMarkupBackward (nice list-marker delete) explicitly.
+          // The [[ ]] completionKeymap (Prec.highest) still owns Enter while open.
+          keymap.of([...listEditingKeymap, { key: 'Backspace', run: deleteMarkupBackward }]),
+          keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+          listIndentNormalizer, // snap stray hand-typed list indents to a sibling level
+          drawSelection(),
+          EditorView.lineWrapping,
+          headingFold,
+          markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false, extensions: [wikilinkMarkdownExtension, obsidianSyntax] }),
+          syntaxHighlighting(cinderHighlightStyle),
+          livePreview,
+          codeCopy,
+          imageExtensions(() => ({ authFetch: authFetchRef.current, API: apiRef.current })),
+          wikilinks({
+            notes: () => notesRef.current,
+            resolve: (t) => resolveNote(notesRef.current, t),
+            navigate: (id) => onNavigateRef.current?.(id),
+            create: (t) => onCreateRef.current?.(t),
+            openTask: (id) => onOpenTaskRef.current?.(id),
+            openSandbox: (id) => onOpenSandboxRef.current?.(id),
+            openBundle: (id) => onOpenBundleRef.current?.(id),
+            searchTag: (tag) => onSearchTagRef.current?.(tag),
+            tasks: () => tasksRef.current,
+            bundles: () => bundlesRef.current,
+            sandboxes: () => sandboxesRef.current,
+          }),
+          cinderTheme,
+          cmPlaceholder(placeholder),
+          editableRef.current.of(editableExt(interfaceMode)),
+          updateListener,
+          domHandlers,
+        ],
+      }),
+    })
+    viewRef.current = view
+
+    const autosaveTimer = setInterval(saveBackend, AUTOSAVE_INTERVAL_MS)
+    const draftTimer = setInterval(saveDraft, DRAFT_SAVE_INTERVAL_MS)
+
+    return () => {
+      clearInterval(autosaveTimer)
+      clearInterval(draftTimer)
+      // Final draft write on unmount so unsaved changes survive navigation/crash.
+      if (dirtyRef.current || draftDirtyRef.current) {
+        const md = view.state.doc.toString()
+        if (md !== lastSavedRef.current) {
+          try {
+            localStorage.setItem(draftKey, JSON.stringify({ content: md, savedAt: Date.now() }))
+          } catch { /* ignore quota */ }
+        }
+      }
+      view.destroy()
+      viewRef.current = null
+    }
+    // Mount-once: NotePage remounts this component per note via `key`, so the
+    // doc never needs external syncing. Deps intentionally omitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Reconfigure read-only state when the view mode flips, without rebuilding.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: editableRef.current.reconfigure([
+        EditorView.editable.of(!interfaceMode),
+        EditorState.readOnly.of(interfaceMode),
+      ]),
+    })
+  }, [interfaceMode])
+
+  // Entering read mode: snapshot the live doc so the reading view reflects unsaved
+  // edits. Leaving it: the hidden editor needs a re-measure to lay out correctly.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    if (readMode) setReadSnapshot(view.state.doc.toString())
+    else view.requestMeasure()
+  }, [readMode])
+
+  return (
+    <>
+      <div ref={hostRef} className={styles.editorRoot} style={readMode ? { display: 'none' } : undefined} />
+      {readMode && <ReadingView markdown={readSnapshot} onSearchTag={onSearchTag} onOpenLink={onOpenLink} />}
+    </>
+  )
+}
+
+export default CodeMirrorEditor

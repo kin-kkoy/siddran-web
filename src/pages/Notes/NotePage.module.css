@@ -3,7 +3,9 @@
     /* max-width: min(900px, 90vw);  */
     max-width: var(--note-editor-width, 1200px);
     margin: 0 auto;
-    padding: 60px 20px;
+    /* Tighter top padding so the header row sits near the top instead of leaving
+       a large unused gap; keeps comfortable bottom room for scrolling. */
+    padding: 24px 20px 48px;
     min-height: 100vh;
 }
 
@@ -70,7 +72,12 @@
     padding: 32px 40px;
     margin-bottom: 20px;
     min-height: calc(100vh - 200px);
-    will-change: transform;
+    /* NOTE: no `will-change: transform` here. Promoting this element to its own
+       compositing layer breaks CodeMirror 6's coordinate-based vertical caret
+       motion (Arrow-Up/Down maps screen coords back to doc positions via
+       caretRangeFromPoint, which a transformed/promoted ancestor shifts). The
+       Lexical editor was unaffected because contenteditable arrow keys are
+       handled natively by the browser. */
 }
 
 /* Less-distraction mode — drop the paper look entirely. Background goes
