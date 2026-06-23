@@ -13,6 +13,7 @@ import { remarkHashtag } from './remarkHashtag'
 import { remarkWikilinks } from './remarkWikilinks'
 import { normalizeCalloutSource } from './calloutBlocks'
 import { resolveImageUrl } from '../../../utils/imageUpload'
+import logger from '../../../utils/logger'
 
 // Markdown → HTML for the reading view. Reuses the same remark plugins the
 // editor uses (gfm + the custom spoiler/underline) so notes render identically;
@@ -106,7 +107,18 @@ const processor = unified()
   .use(rehypeHighlight, { ignoreMissing: true })
   .use(rehypeStringify)
 
+const escapeHtml = (s) => s.replace(/[&<>"']/g, c => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+))
+
 export function markdownToHtml(md) {
   if (!md) return ''
-  return String(processor.processSync(normalizeCalloutSource(md)))
+  try {
+    return String(processor.processSync(normalizeCalloutSource(md)))
+  } catch (err) {
+    // A render-time parser throw must never crash the note view — fall back to the
+    // raw markdown, escaped, so the note still shows its content.
+    logger.error('markdownToHtml failed; showing raw text', err)
+    return `<pre class="rv-fallback">${escapeHtml(md)}</pre>`
+  }
 }
