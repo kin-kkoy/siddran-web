@@ -40,18 +40,18 @@ function moveVertical(view, forward, extend) {
   if (!coords) return false
   if (goalX == null) goalX = coords.left
 
-  const lh = view.defaultLineHeight || 18
-  const step = Math.max(4, lh * 0.5)
-  const cRect = view.contentDOM.getBoundingClientRect()
+  const step = Math.max(4, (view.defaultLineHeight || 18) * 0.5)
   let target = null
 
   // Walk outward from the current line box until we land on a different visual
-  // row (different y), not just a different x on the same row.
+  // row (different y), not just a different x on the same row. Hit-testing only
+  // resolves VISIBLE pixels, so a null result means we walked off the rendered
+  // area (the adjacent row is just past the viewport) → stop and fall back below.
   let y = forward ? coords.bottom + 1 : coords.top - 1
   for (let i = 0; i < 80; i++) {
-    if (y < cRect.top || y > cRect.bottom) break
     const p = pointToPos(view, goalX, y)
-    if (p != null && p !== head) {
+    if (p == null) break
+    if (p !== head) {
       const pc = view.coordsAtPos(p)
       if (pc && (forward ? pc.top > coords.top + 1 : pc.bottom < coords.bottom - 1)) { target = p; break }
     }
@@ -59,10 +59,15 @@ function moveVertical(view, forward, extend) {
   }
 
   if (target == null) {
-    // Hit the top/bottom edge of the content — snap to the document boundary.
-    const edge = forward ? view.state.doc.length : 0
-    if (edge === head) return true
-    target = edge
+    // The adjacent row is off-screen. Move to the SAME column in the next/prev
+    // document line and let scrollIntoView reveal it — never leap to the document
+    // boundary (the old behaviour, which caused the caret to jump to start/end).
+    const doc = view.state.doc
+    const line = doc.lineAt(head)
+    const n = forward ? line.number + 1 : line.number - 1
+    if (n < 1 || n > doc.lines) return true // already at the document edge
+    const tl = doc.line(n)
+    target = Math.min(tl.from + (head - line.from), tl.to)
   }
 
   const selection = extend ? EditorSelection.range(main.anchor, target) : EditorSelection.cursor(target)

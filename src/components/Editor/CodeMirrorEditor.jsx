@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { EditorState, Compartment } from '@codemirror/state'
-import { EditorView, keymap, drawSelection, placeholder as cmPlaceholder } from '@codemirror/view'
+import { EditorView, keymap, drawSelection, tooltips, placeholder as cmPlaceholder } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage, deleteMarkupBackward } from '@codemirror/lang-markdown'
 import { syntaxHighlighting } from '@codemirror/language'
@@ -185,6 +185,10 @@ function CodeMirrorEditor({
         doc: initialContent,
         extensions: [
           history(),
+          // Render tooltips (the [[ ]] autocomplete dropdown) in document.body so the
+          // app's nested scroll/stacking contexts (StarCanvas, overflow panes) can't
+          // clip or hide them.
+          tooltips({ parent: document.body }),
           domVerticalMotion, // must precede defaultKeymap's Arrow-Up/Down
           // List editing (Enter/Tab/Shift-Tab) must win over defaultKeymap + indentWithTab.
           // markdown() is configured with addKeymap:false (below) so its own Prec.high
