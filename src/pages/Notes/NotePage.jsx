@@ -5,10 +5,11 @@ import { IoMdArrowRoundBack } from "react-icons/io"
 import { FaStar, FaRegStar, FaEllipsisV } from 'react-icons/fa'
 import { MdChromeReaderMode } from "react-icons/md";
 import { HiPencilSquare } from "react-icons/hi2";
-import { HiOutlineDownload, HiOutlineCog } from "react-icons/hi";
+import { HiOutlineDownload, HiOutlineCog, HiOutlineDocumentText } from "react-icons/hi";
 import { LuMaximize, LuMinimize } from "react-icons/lu";
 import LexicalEditor from '../../components/Editor/LexicalEditor'
 import CodeMirrorEditor from '../../components/Editor/CodeMirrorEditor'
+import { printNoteToPdf } from '../../components/Editor/utils/exportPdf'
 import ConfirmModal from '../../components/Common/ConfirmModal'
 import TaskDetailsModal from '../../components/Common/TaskDetailsModal'
 import { useApi } from '../../contexts/ApiContext'
@@ -412,6 +413,14 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
               >
                 <HiOutlineDownload />
                 <span>Export as markdown</span>
+              </button>
+
+              <button
+                onClick={() => { printNoteToPdf(note); setMenuOpen(false) }}
+                className={styles.menuItem}
+              >
+                <HiOutlineDocumentText />
+                <span>Export as PDF</span>
               </button>
 
               <button
