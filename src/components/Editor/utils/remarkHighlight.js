@@ -3,7 +3,9 @@ import { visit, SKIP } from 'unist-util-visit'
 // `==text==` → a custom `highlight` mdast node (rendered as <mark> by the
 // markdownToHtml handler). Text-regex transformer, mirroring remarkSpoiler's
 // legacy pass.
-const RE = /==([^=]+)==/g
+// Tight delimiters (non-space just inside each `==`) so prose like `a == b == c`
+// isn't mis-highlighted; matches the editor's Lezer Highlight rule.
+const RE = /==(?=\S)([^=]+?)(?<=\S)==/g
 
 export function remarkHighlight() {
   return (tree) => {

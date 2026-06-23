@@ -4,6 +4,8 @@
 //   Hashtag    #tag
 //   Spoiler    ||text||
 // Char codes: 61 '=', 35 '#', 124 '|', 32 ' ', 9 tab, 10 newline.
+// Space/tab/newline, or -1 (out of range) — not valid content right inside a delimiter.
+const isSpaceCode = (c) => c === 32 || c === 9 || c === 10 || c === -1
 export const obsidianSyntax = {
   defineNodes: [{ name: 'Highlight' }, { name: 'Hashtag' }, { name: 'Spoiler' }],
   parseInline: [
@@ -12,9 +14,12 @@ export const obsidianSyntax = {
       before: 'Emphasis',
       parse(cx, next, pos) {
         if (next !== 61 || cx.char(pos + 1) !== 61) return -1
+        // Tight delimiters: a non-space must sit just inside each `==`, so prose
+        // like `a == b == c` isn't mis-highlighted while `==text==` still is.
+        if (isSpaceCode(cx.char(pos + 2))) return -1
         let e = pos + 2
         while (e < cx.end && !(cx.char(e) === 61 && cx.char(e + 1) === 61)) e++
-        if (e >= cx.end) return -1
+        if (e >= cx.end || isSpaceCode(cx.char(e - 1))) return -1
         return cx.addElement(cx.elt('Highlight', pos, e + 2))
       },
     },
@@ -23,9 +28,10 @@ export const obsidianSyntax = {
       before: 'Emphasis',
       parse(cx, next, pos) {
         if (next !== 124 || cx.char(pos + 1) !== 124) return -1
+        if (isSpaceCode(cx.char(pos + 2))) return -1 // tight delimiters (see Highlight)
         let e = pos + 2
         while (e < cx.end && !(cx.char(e) === 124 && cx.char(e + 1) === 124)) e++
-        if (e >= cx.end) return -1
+        if (e >= cx.end || isSpaceCode(cx.char(e - 1))) return -1
         return cx.addElement(cx.elt('Spoiler', pos, e + 2))
       },
     },
