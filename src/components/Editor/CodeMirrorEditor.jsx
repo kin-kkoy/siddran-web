@@ -5,7 +5,7 @@ import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirro
 import { markdown, markdownLanguage, deleteMarkupBackward } from '@codemirror/lang-markdown'
 import { syntaxHighlighting } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
-import { livePreviewField } from './cm/livePreview'
+import { livePreview } from './cm/livePreview'
 import { domVerticalMotion } from './cm/verticalMotion'
 import { codeCopy } from './cm/codeCopy'
 import { imageExtensions } from './cm/imagePaste'
@@ -200,7 +200,7 @@ function CodeMirrorEditor({
           headingFold,
           markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false, extensions: [wikilinkMarkdownExtension, obsidianSyntax] }),
           syntaxHighlighting(cinderHighlightStyle),
-          livePreviewField,
+          livePreview,
           codeCopy,
           imageExtensions(() => ({ authFetch: authFetchRef.current, API: apiRef.current })),
           wikilinks({
