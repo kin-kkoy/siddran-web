@@ -109,28 +109,6 @@ function InterfaceTab({ settings, updateSetting }) {
         />
       </SettingRow>
 
-      {/* Auto-hide toolbar */}
-      <SettingRow
-        label="Auto-Hide Toolbar"
-        description="When off, the formatting toolbar stays visible in write mode."
-      >
-        <ToggleSwitch
-          checked={settings.autoHideToolbar}
-          onChange={(v) => updateSetting('autoHideToolbar', v)}
-        />
-      </SettingRow>
-
-      {/* Experimental editor (beta) */}
-      <SettingRow
-        label="Use New Editor (Beta)"
-        description="Switch notes to the new CodeMirror live-preview editor. Markdown syntax reveals as you edit. Experimental — your existing notes are unaffected."
-      >
-        <ToggleSwitch
-          checked={settings.experimentalEditor === true}
-          onChange={(v) => updateSetting('experimentalEditor', v)}
-        />
-      </SettingRow>
-
       {/* Note editor width */}
       <SettingRow
         label="Note Editor Width"

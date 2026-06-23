@@ -26,16 +26,6 @@ function NoteSettingsPopup({ isOpen, onClose }) {
           <div className={styles.content}>
 
             <SettingRow
-              label="Auto-Hide Toolbar"
-              description="When off, the formatting toolbar stays visible in write mode."
-            >
-              <ToggleSwitch
-                checked={settings.autoHideToolbar}
-                onChange={(v) => updateSetting('autoHideToolbar', v)}
-              />
-            </SettingRow>
-
-            <SettingRow
               label="Note Editor Width"
               description="Maximum width of the writing surface on note pages."
             >

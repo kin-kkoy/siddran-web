@@ -19,17 +19,16 @@ import ReadingView from './ReadingView'
 import { useApi } from '../../contexts/ApiContext'
 import styles from './CodeMirrorEditor.module.css'
 
-// Autosave cadence — mirrors Lexical's AutosavePlugin so the new editor is as
-// crash-safe as the old one: periodic backend save + a frequent localStorage
-// draft that NotePage's recovery (cinder_draft_<id>) reads back.
+// Autosave cadence — crash-safe like the rest of the app: a periodic backend save
+// plus a frequent localStorage draft that NotePage's recovery (cinder_draft_<id>)
+// reads back.
 const AUTOSAVE_INTERVAL_MS = 2 * 60 * 1000 // backend save
 const DRAFT_SAVE_INTERVAL_MS = 5 * 1000    // localStorage draft
 
-// CodeMirror 6 editor — a drop-in alternative to LexicalEditor behind the
-// experimentalEditor flag. The document IS the markdown (note.body), so there is
-// no serialize/deserialize layer: onSave just hands back the doc text.
+// CodeMirror 6 live-preview note editor. The document IS the markdown (note.body),
+// so there is no serialize/deserialize layer: onSave just hands back the doc text.
 //
-// Prop contract matches LexicalEditor exactly:
+// Props:
 //   initialContent  markdown string the editor opens with
 //   onSave(md)      => Promise<boolean>, persists the note body
 //   onDirtyChange   (isDirty: boolean) => void

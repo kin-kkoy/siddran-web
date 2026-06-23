@@ -19,8 +19,6 @@ const DEFAULTS = {
   theme: 'default',
   matchMode: true,
   contrast: 'low',
-  autoHideToolbar: true,
-  experimentalEditor: false,
   showStars: true,
   showStarsOnNotePage: true,
   reduceStars: false,

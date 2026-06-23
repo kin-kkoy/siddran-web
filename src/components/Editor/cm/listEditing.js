@@ -2,7 +2,7 @@ import { ChangeSet, EditorSelection } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 
-// Lexical-like list editing for the raw-markdown CM6 editor. Markdown lists are
+// WYSIWYG-style list editing for the raw-markdown CM6 editor. Markdown lists are
 // just text here, so without help the user would hand-type every marker. These
 // commands add the WYSIWYG feel:
 //   Enter      → continue the list (next number / bullet / fresh checkbox);
