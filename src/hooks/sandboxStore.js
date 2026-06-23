@@ -16,6 +16,7 @@ const MIGRATED_FLAG = 'cinder_sandbox_migrated_v1'
 const BATCH_CHUNK = 200 // server caps a batch at 500; stay well under
 
 let list = readList()
+let hydrated = false // true once the first server load has completed (or failed)
 const listeners = new Set()
 let api = { authFetch: null, API: '', isAuthed: false }
 let booted = false
@@ -42,6 +43,9 @@ export const subscribe = (cb) => {
     return () => listeners.delete(cb)
 }
 export const getSnapshot = () => list
+// Whether the board list has been reconciled with the server at least once. Lets
+// callers tell "no boards yet, still loading" from "this user genuinely has none".
+export const getHydrated = () => hydrated
 
 async function request(path, options) {
     if (!api.authFetch) throw new Error('sandbox API not connected')
@@ -68,6 +72,8 @@ async function hydrate() {
     } catch (err) {
         logger.error('sandboxStore — hydrate failed', err)
         // cache already on screen; stay offline-friendly
+    } finally {
+        if (!hydrated) { hydrated = true; listeners.forEach(cb => cb()) }
     }
 }
 

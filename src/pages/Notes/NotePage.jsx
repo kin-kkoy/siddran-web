@@ -26,7 +26,7 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   const sandboxView = useSandboxView()
   const { settings } = useSettings()
   const { authFetch, API } = useApi()
-  const { sandboxes } = useSandboxes()
+  const { sandboxes, sandboxesLoaded } = useSandboxes()
 
   // Auto-collapse the sidebar when the sandbox dock expands to half mode so the
   // editor + sandbox columns have room to breathe.
@@ -170,15 +170,16 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   }, [tasks, authFetch, API])
 
   // Open a [[sandbox:id]] link, or show a "not found" modal if no such board.
-  // If the list hasn't hydrated yet (empty), fall through to navigation rather
-  // than false-flag a valid board as missing.
+  // While the list hasn't hydrated yet, fall through to navigation rather than
+  // false-flag a valid board as missing; once hydrated, a genuinely-missing board
+  // (including for a user with zero boards) shows the not-found modal.
   const handleOpenSandbox = useCallback((id) => {
-    if (sandboxes.length === 0 || sandboxes.some(s => String(s.id) === String(id))) {
+    if (!sandboxesLoaded || sandboxes.some(s => String(s.id) === String(id))) {
       navigate(`/sandboxes/${id}`)
     } else {
       setSandboxNotFound(true)
     }
-  }, [sandboxes, navigate])
+  }, [sandboxes, sandboxesLoaded, navigate])
 
   // Clicking a #hashtag opens the notes list filtered by that term.
   const handleSearchTag = useCallback((tag) => {
