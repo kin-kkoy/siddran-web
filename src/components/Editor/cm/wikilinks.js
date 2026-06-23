@@ -49,17 +49,10 @@ export function parseWikilink(inner) {
   return { target, alias, pipe }
 }
 
-// Classify a `[[ … ]]` inner string: a `task:`/`sandbox:` prefix makes it a typed
-// cross-link, otherwise it's a note link. `pipe` is the alias separator index in
-// the inner text (or -1) so the decoration can hide the `head|` part.
-export function parseTypedLink(inner) {
-  const pipe = inner.indexOf('|')
-  const head = (pipe >= 0 ? inner.slice(0, pipe) : inner).trim()
-  const label = pipe >= 0 ? inner.slice(pipe + 1).trim() : ''
-  const typed = /^(task|sandbox|bundle):(.+)$/i.exec(head)
-  if (typed) return { kind: typed[1].toLowerCase(), id: typed[2].trim(), label, pipe }
-  return { kind: 'note', target: head.split('#')[0].trim(), label, pipe }
-}
+// `parseTypedLink` lives in utils/parseWikilink.js (shared with the reading view's
+// remarkWikilinks so the two can't classify a `[[ … ]]` differently); re-exported
+// here for the live-preview decorations that import it from this module.
+export { parseTypedLink } from '../utils/parseWikilink'
 
 // Autocomplete source. After `[[` it suggests notes; after a typed prefix
 // (`[[task:` / `[[sandbox:`) it suggests that kind — tasks (+ bundle tasks, which
