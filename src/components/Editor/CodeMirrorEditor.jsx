@@ -16,6 +16,7 @@ import { listEditingKeymap, listIndentNormalizer } from './cm/listEditing'
 import { cinderHighlightStyle } from './cm/highlight'
 import { cinderTheme } from './cm/theme'
 import ReadingView from './ReadingView'
+import EditorDock from './EditorDock'
 import { useApi } from '../../contexts/ApiContext'
 import styles from './CodeMirrorEditor.module.css'
 
@@ -277,6 +278,7 @@ function CodeMirrorEditor({
     <>
       <div ref={hostRef} className={styles.editorRoot} style={readMode ? { display: 'none' } : undefined} />
       {readMode && <ReadingView markdown={readSnapshot} onSearchTag={onSearchTag} onOpenLink={onOpenLink} />}
+      {!readMode && !interfaceMode && <EditorDock viewRef={viewRef} sandboxes={sandboxes} />}
     </>
   )
 }
