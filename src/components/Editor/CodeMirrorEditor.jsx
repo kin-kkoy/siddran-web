@@ -202,7 +202,7 @@ function CodeMirrorEditor({
           drawSelection(),
           EditorView.lineWrapping,
           headingFold,
-          markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false, extensions: [wikilinkMarkdownExtension, obsidianSyntax] }),
+          markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false, extensions: [wikilinkMarkdownExtension, obsidianSyntax, { remove: ['SetextHeading'] }] }),
           syntaxHighlighting(cinderHighlightStyle),
           livePreview,
           codeCopy,

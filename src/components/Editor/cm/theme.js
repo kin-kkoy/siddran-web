@@ -135,7 +135,11 @@ export const cinderTheme = EditorView.theme({
   // ── Bullets / rules / checkboxes (widgets) ──
   '.cm-bullet': { color: 'var(--accent-blue)', display: 'inline-block', width: '0.9em' },
   '.cm-ordered-mark': { color: 'var(--accent-blue)' }, // ordered list number, matches bullet + reading view
-  '.cm-hr': { borderTop: '1px solid var(--border-strong)', margin: '0.7em 0' },
+  '.cm-line.cm-hr-line': {
+    lineHeight: '0',
+    padding: '0.4em 0',
+    background: 'linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--border-strong) calc(50% - 0.5px), var(--border-strong) calc(50% + 0.5px), transparent calc(50% + 0.5px))',
+  },
   '.cm-task': { display: 'inline-block' },
   '.cm-task-check': {
     width: '15px',

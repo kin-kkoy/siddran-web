@@ -1,7 +1,7 @@
 import { Decoration, EditorView, ViewPlugin } from '@codemirror/view'
 import { RangeSet } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
-import { HrWidget, BulletWidget, CheckWidget, ImageWidget } from './widgets'
+import { BulletWidget, CheckWidget, ImageWidget } from './widgets'
 import { wikilinkConfig, parseTypedLink } from './wikilinks'
 
 // Live-preview decorations — a Phase 1 subset of the reference clone's buildDeco
@@ -196,9 +196,10 @@ function scanInline(state, ranges) {
       }
       case 'HorizontalRule': {
         const line = doc.lineAt(nf)
-        // Inline replace (the widget is a block-display <div>, so it renders on its
-        // own line) — keeps everything in the viewport plugin so it appears on scroll.
-        if (!lact(nf, nt)) deco.push(Decoration.replace({ widget: new HrWidget() }).range(line.from, line.to))
+        if (!lact(nf, nt)) {
+          hide(line.from, line.to)
+          lineCls(line.from, 'cm-hr-line')
+        }
         return false
       }
       case 'Image': {
@@ -308,7 +309,4 @@ const inlinePlugin = ViewPlugin.fromClass(class {
   provide: plugin => EditorView.atomicRanges.of(view => view.plugin(plugin)?.atomic || RangeSet.empty),
 })
 
-// The live-preview extension — a single viewport-scoped ViewPlugin. HR and
-// whole-line images render via block-display widgets (inline replace), so they
-// appear correctly as the viewport scrolls without needing a document-wide field.
 export const livePreview = inlinePlugin

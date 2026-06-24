@@ -90,8 +90,15 @@ function rehypeCallouts() {
   }
 }
 
+function remarkDisableSetext() {
+  const ext = this.data('micromarkExtensions') || []
+  ext.push({ disable: { null: ['setextUnderline'] } })
+  this.data('micromarkExtensions', ext)
+}
+
 const processor = unified()
   .use(remarkParse)
+  .use(remarkDisableSetext)
   .use(remarkGfm)
   // Render a single newline as a hard line break (<br>), matching how the editor
   // shows each line separately. Two newlines still make a new paragraph.
