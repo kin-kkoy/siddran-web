@@ -35,7 +35,7 @@ function headingFoldRange(state, lineFrom) {
 // Fold a list item that owns indented children. Children = following lines
 // indented deeper than this item's marker; blank lines inside the subtree are
 // tolerated but trailing blanks are excluded from the fold.
-function listFoldRange(state, lineFrom) {
+export function listFoldRange(state, lineFrom) {
   const doc = state.doc
   const line = doc.lineAt(lineFrom)
   const m = LIST_ITEM.exec(line.text)
@@ -59,7 +59,7 @@ function foldRangeAt(state, lineFrom) {
   return headingFoldRange(state, lineFrom) || listFoldRange(state, lineFrom)
 }
 
-function rangeFolded(state, range) {
+export function rangeFolded(state, range) {
   let folded = false
   foldedRanges(state).between(range.from, range.from + 1, (from, to) => {
     if (from === range.from && to >= range.to) folded = true
@@ -67,17 +67,17 @@ function rangeFolded(state, range) {
   return folded
 }
 
-const CHEVRON_SVG =
+export const CHEVRON_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" ' +
   'stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
 
 class ChevronMarker extends GutterMarker {
-  constructor(folded) { super(); this.folded = folded }
-  eq(o) { return o.folded === this.folded }
+  constructor(folded, headingLevel) { super(); this.folded = folded; this.hl = headingLevel }
+  eq(o) { return o.folded === this.folded && o.hl === this.hl }
   toDOM() {
     const s = document.createElement('span')
-    s.className = 'cm-fold-chevron' + (this.folded ? ' is-folded' : '')
-    s.innerHTML = CHEVRON_SVG // base glyph points right; CSS rotates it down when open
+    s.className = 'cm-fold-chevron' + (this.folded ? ' is-folded' : '') + (this.hl ? ' cm-fold-h' + this.hl : '')
+    s.innerHTML = CHEVRON_SVG
     return s
   }
 }
@@ -87,11 +87,14 @@ export const headingFold = [
   gutter({
     class: 'cm-foldGutter',
     lineMarker(view, line) {
+      const text = view.state.doc.lineAt(line.from).text
+      if (LIST_ITEM.test(text)) return null
       const range = foldRangeAt(view.state, line.from)
       if (!range) return null
-      return new ChevronMarker(rangeFolded(view.state, range))
+      const hm = HEADING.exec(text)
+      return new ChevronMarker(rangeFolded(view.state, range), hm ? hm[1].length : 0)
     },
-    initialSpacer() { return new ChevronMarker(false) },
+    initialSpacer() { return new ChevronMarker(false, 0) },
     domEventHandlers: {
       mousedown(view, line) {
         const range = foldRangeAt(view.state, line.from)

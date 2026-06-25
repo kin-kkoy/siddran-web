@@ -75,6 +75,8 @@
 .reading u { text-decoration: underline }
 .reading mark { background: rgba(240, 184, 64, 0.22); color: inherit; border-radius: 3px; padding: 0 2px }
 
+:global(.rv-blank) { margin: 0 }
+
 :global(.rv-hashtag) {
   color: #c084fc;
   background: rgba(192, 132, 252, 0.15);

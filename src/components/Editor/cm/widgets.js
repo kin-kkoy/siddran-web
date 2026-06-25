@@ -28,6 +28,10 @@ export class BulletWidget extends WidgetType {
   toDOM() {
     const s = document.createElement('span')
     s.className = 'cm-bullet'
+    // contenteditable=false so native caret hit-testing (clickFix in
+    // verticalMotion.js) can't land the caret *inside* the glyph — it resolves to
+    // the adjacent editable position instead (matching CheckWidget).
+    s.setAttribute('contenteditable', 'false')
     s.textContent = '•'
     return s
   }

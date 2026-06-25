@@ -92,8 +92,48 @@ function rehypeCallouts() {
 
 function remarkDisableSetext() {
   const ext = this.data('micromarkExtensions') || []
-  ext.push({ disable: { null: ['setextUnderline'] } })
+  ext.push({ disable: { null: ['setextUnderline', 'codeIndented'] } })
   this.data('micromarkExtensions', ext)
+}
+
+function remarkPreserveBlankLines() {
+  return (tree) => {
+    preserveBlanks(tree)
+  }
+}
+
+function preserveBlanks(node) {
+  if (!node.children || node.children.length < 2) return
+  for (const child of node.children) preserveBlanks(child)
+  if (node.type !== 'root' && node.type !== 'blockquote' && node.type !== 'listItem') return
+  const out = []
+  for (let i = 0; i < node.children.length; i++) {
+    const child = node.children[i]
+    if (i > 0) {
+      const prev = node.children[i - 1]
+      const extra = (child.position?.start?.line || 0) - (prev.position?.end?.line || 0) - 2
+      for (let j = 0; j < extra; j++) {
+        out.push({ type: 'paragraph', data: { hProperties: { className: ['rv-blank'] } }, children: [{ type: 'break' }] })
+      }
+    }
+    out.push(child)
+  }
+  node.children = out
+}
+
+function preserveIndent(md) {
+  const lines = md.split('\n')
+  let inCode = false
+  let inBlock = false
+  return lines.map(line => {
+    if (/^ {0,3}(`{3,}|~{3,})/.test(line)) { inCode = !inCode; return line }
+    if (inCode) return line
+    if (/^\s*>/.test(line)) { inBlock = true; return line }
+    if (/^\s*[-*+]\s/.test(line) || /^\s*\d+[.)]\s/.test(line)) { inBlock = true; return line }
+    if (line.trim() === '') { inBlock = false; return line }
+    if (inBlock) return line
+    return line.replace(/^( +)(?=\S)/, m => '\u00A0'.repeat(m.length))
+  }).join('\n')
 }
 
 const processor = unified()
@@ -103,6 +143,7 @@ const processor = unified()
   // Render a single newline as a hard line break (<br>), matching how the editor
   // shows each line separately. Two newlines still make a new paragraph.
   .use(remarkBreaks)
+  .use(remarkPreserveBlankLines)
   .use(remarkSpoiler)
   .use(remarkUnderline)
   .use(remarkWikilinks)
@@ -121,7 +162,7 @@ const escapeHtml = (s) => s.replace(/[&<>"']/g, c => (
 export function markdownToHtml(md) {
   if (!md) return ''
   try {
-    return String(processor.processSync(normalizeCalloutSource(md)))
+    return String(processor.processSync(preserveIndent(normalizeCalloutSource(md))))
   } catch (err) {
     // A render-time parser throw must never crash the note view — fall back to the
     // raw markdown, escaped, so the note still shows its content.

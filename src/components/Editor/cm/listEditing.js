@@ -21,7 +21,7 @@ const MAX_DEPTH = 3 // nesting levels; top-level list items are depth 1
 
 // Parse a list-item line into its parts, or null if the line isn't a list item.
 function parseItem(text) {
-  const m = /^(\s*)([-*+]|\d+[.)])(\s+)(\[[ xX]\]\s+)?(.*)$/.exec(text)
+  const m = /^(\s*)([-*+]|\d+[.)])(\s+)(\[[ xX]\]\s*)?(.*)$/.exec(text)
   if (!m) return null
   const indent = m[1], marker = m[2], spaces = m[3], checkbox = m[4] || '', content = m[5]
   const ordered = /\d/.test(marker)
@@ -197,6 +197,28 @@ function outdentList(view) {
   if (item.indent === 0) return true // already top level → nothing to outdent, swallow
   const o = computeOutdent(doc, line, item, pos)
   return commit(view, o.changes, o.caret)
+}
+
+// Enter on an indented non-list line: carry the indentation on first Enter,
+// remove it on second Enter (blank indented line). Returns false for non-indented
+// lines so the default keymap handles them.
+export function enterIndent(view) {
+  const state = view.state
+  const { head } = state.selection.main
+  if (!state.selection.main.empty) return false
+  const line = state.doc.lineAt(head)
+  const indent = /^(\s+)/.exec(line.text)?.[1]
+  if (!indent) return false
+  // Already a list item — let enterList handle it
+  if (parseItem(line.text)) return false
+  // Blank indented line → strip the indent (exit indentation)
+  if (line.text.trim() === '') {
+    view.dispatch({ changes: { from: line.from, to: line.to, insert: '' } })
+    return true
+  }
+  // Indented content → carry the indent to the new line
+  view.dispatch(state.replaceSelection('\n' + indent), { scrollIntoView: true })
+  return true
 }
 
 export const listEditingKeymap = [

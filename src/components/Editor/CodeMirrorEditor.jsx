@@ -3,7 +3,7 @@ import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, keymap, drawSelection, tooltips, placeholder as cmPlaceholder } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage, deleteMarkupBackward } from '@codemirror/lang-markdown'
-import { syntaxHighlighting } from '@codemirror/language'
+import { syntaxHighlighting, indentUnit } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { livePreview } from './cm/livePreview'
 import { domVerticalMotion } from './cm/verticalMotion'
@@ -12,7 +12,7 @@ import { imageExtensions } from './cm/imagePaste'
 import { wikilinks, wikilinkMarkdownExtension, resolveNote } from './cm/wikilinks'
 import { obsidianSyntax } from './cm/syntaxNodes'
 import { headingFold } from './cm/fold'
-import { listEditingKeymap, listIndentNormalizer } from './cm/listEditing'
+import { listEditingKeymap, listIndentNormalizer, enterIndent } from './cm/listEditing'
 import { cinderHighlightStyle } from './cm/highlight'
 import { cinderTheme } from './cm/theme'
 import ReadingView from './ReadingView'
@@ -196,13 +196,14 @@ function CodeMirrorEditor({
           // Enter→insertNewlineContinueMarkup no longer shadows our list Enter; we keep
           // its Backspace→deleteMarkupBackward (nice list-marker delete) explicitly.
           // The [[ ]] completionKeymap (Prec.highest) still owns Enter while open.
-          keymap.of([...listEditingKeymap, { key: 'Backspace', run: deleteMarkupBackward }]),
+          keymap.of([...listEditingKeymap, { key: 'Enter', run: enterIndent }, { key: 'Backspace', run: deleteMarkupBackward }]),
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+          indentUnit.of('    '),
           listIndentNormalizer, // snap stray hand-typed list indents to a sibling level
           drawSelection(),
           EditorView.lineWrapping,
           headingFold,
-          markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false, extensions: [wikilinkMarkdownExtension, obsidianSyntax, { remove: ['SetextHeading'] }] }),
+          markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false, extensions: [wikilinkMarkdownExtension, obsidianSyntax, { remove: ['SetextHeading', 'IndentedCode'] }] }),
           syntaxHighlighting(cinderHighlightStyle),
           livePreview,
           codeCopy,

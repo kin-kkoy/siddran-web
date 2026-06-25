@@ -83,17 +83,44 @@ const goalReset = EditorView.updateListener.of((u) => {
 })
 
 // Clicks suffer the same height-model drift: CM resolves the click point to a
-// doc position via posAtCoords (heightmap), landing the caret a line off. After
-// a plain single click we re-resolve with the browser's real hit-testing and
-// correct it. Drag-selections, shift-clicks and double/triple clicks are left to
-// CM (event.detail > 1 / non-empty selection).
+// doc position via posAtCoords (heightmap), landing the caret a line off. After a
+// plain single click we re-resolve with the browser's real hit-testing and land a
+// clean caret. This also repairs two live-preview list quirks:
+//   • clicking a contenteditable=false widget (bullet/checkbox) can make the
+//     browser *select* it — left alone, the next keystroke replaces it (a checkbox
+//     becomes a bullet). We collapse that stray selection to a caret.
+//   • a click on/before a rendered list marker resolves *before* the bullet; we
+//     snap it to the item's content start so the caret sits beside the marker.
+// Drag-selections (pointer moved), shift-clicks and double/triple clicks are left
+// to CM.
+const LIST_PREFIX = /^(\s*)(?:[-*+]|\d+[.)])(\s+)(\[[ xX]\]\s*)?/
+let downX = 0, downY = 0
 const clickFix = EditorView.domEventHandlers({
+  mousedown: (event) => { downX = event.clientX; downY = event.clientY; return false },
   click: (event, view) => {
     if (event.button !== 0 || event.detail > 1 || event.shiftKey) return false
+    // Pointer moved → it's a drag-select; don't touch the selection.
+    if (Math.abs(event.clientX - downX) > 3 || Math.abs(event.clientY - downY) > 3) return false
     const sel = view.state.selection.main
-    if (!sel.empty) return false
-    const pos = pointToPos(view, event.clientX, event.clientY)
-    if (pos != null && pos !== sel.head) view.dispatch({ selection: EditorSelection.cursor(pos) })
+    let pos = pointToPos(view, event.clientX, event.clientY)
+    if (pos == null) {
+      // Hit-test landed on a contenteditable=false widget (no caret node → posAtDOM
+      // throws). If the browser selected that widget (e.g. a checkbox), collapse the
+      // stray selection to its end so the caret sits after the marker and the next
+      // keystroke can't replace it; otherwise there's nothing to correct.
+      if (!sel.empty) view.dispatch({ selection: EditorSelection.cursor(sel.to) })
+      return false
+    }
+    const doc = view.state.doc
+    const line = doc.lineAt(pos)
+    const m = LIST_PREFIX.exec(line.text)
+    if (m) {
+      const contentStart = line.from + m[0].length
+      if (pos < contentStart) pos = contentStart // snap to beside the marker
+    }
+    // Set a clean caret unless it's already exactly there: clears a stray
+    // widget-selection and corrects heightmap click-drift in one go.
+    if (!sel.empty || pos !== sel.head) view.dispatch({ selection: EditorSelection.cursor(pos) })
     return false
   },
 })

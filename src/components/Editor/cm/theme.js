@@ -149,6 +149,17 @@ export const cinderTheme = EditorView.theme({
     cursor: 'pointer',
     accentColor: 'var(--accent-blue)',
   },
+  '.cm-line.cm-list-line': {
+    // The leading 1.25em reserves clean content-space (left of the bullet) for the
+    // inline fold chevron, so it never falls into the gutter margin where it would
+    // be detached + un-clickable. nest-pad adds the per-depth indent; hang is the
+    // hanging-indent for wrapped rows.
+    paddingLeft: 'calc(1.25em + var(--nest-pad, 0em) + var(--hang))',
+    position: 'relative', // anchors the absolutely-positioned inline fold chevron
+  },
+  '.cm-line.cm-list-line .cm-bullet, .cm-line.cm-list-line .cm-task, .cm-line.cm-list-line .cm-ordered-mark': {
+    marginLeft: 'calc(-1 * var(--hang))',
+  },
 
   // Wikilinks (cm/wikilinks.js): rendered internal link, unresolved variant, and
   // the revealed `[[ ]]` source when the caret is on it.
@@ -226,7 +237,7 @@ export const cinderTheme = EditorView.theme({
   '.cm-gutters': { background: 'transparent', border: 'none', color: 'var(--text-faint)', marginLeft: '-22px' },
   '.cm-foldGutter .cm-gutterElement': {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
     padding: '0',
     minWidth: '18px',
@@ -237,6 +248,7 @@ export const cinderTheme = EditorView.theme({
     justifyContent: 'center',
     width: '18px',
     height: '18px',
+    marginTop: '5px',
     borderRadius: '4px',
     color: 'var(--text-muted)',
     opacity: '0.7',
@@ -252,6 +264,11 @@ export const cinderTheme = EditorView.theme({
     transition: 'transform 0.12s ease',
   },
   '.cm-fold-chevron.is-folded svg': { transform: 'rotate(0deg)' }, // folded: points right
+  '.cm-fold-chevron.cm-fold-h1': { marginTop: '18px' },
+  '.cm-fold-chevron.cm-fold-h2': { marginTop: '13px' },
+  '.cm-fold-chevron.cm-fold-h3': { marginTop: '9px' },
+  '.cm-fold-chevron.cm-fold-h4': { marginTop: '7px' },
+  '.cm-fold-chevron.cm-fold-h6': { marginTop: '4px' },
   '.cm-fold-chevron:hover': {
     color: 'var(--text-primary)',
     background: 'var(--bg-hover)',
@@ -265,6 +282,41 @@ export const cinderTheme = EditorView.theme({
     margin: '0 4px',
     padding: '0 6px',
   },
+  // Inline list fold chevron (livePreview InlineFoldWidget): absolutely positioned
+  // within the list line's reserved 1.25em lead, sitting just left of the bullet at
+  // every depth (--nest-pad scales it with nesting). It spans the first text row so
+  // it stays beside the bullet when the item wraps, and is a real click/hover target
+  // with a hover pill. Out of flow → doesn't fight the bullet's negative margin.
+  '.cm-fold-inline': {
+    position: 'absolute',
+    // Anchor to --mark (the marker's own x-offset = depth indent + leading spaces),
+    // so the chevron sits a constant ~0.15em left of the marker for every marker
+    // type (bullet / checkbox / number) and depth. (1.25em line lead − 0.9em box −
+    // 0.15em gap = +0.2em.)
+    left: 'calc(var(--mark, 0em) + 0.2em)',
+    top: '0',
+    width: '0.9em',
+    height: '1.75em', // one text row → vertically centres on row 1 even when wrapped
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    color: 'var(--text-muted)',
+    opacity: '0.55',
+    borderRadius: '4px',
+    zIndex: '1',
+    transition: 'opacity 0.12s ease, color 0.12s ease, background 0.12s ease',
+  },
+  '.cm-fold-inline svg': {
+    width: '0.72em',
+    height: '0.72em',
+    display: 'block',
+    transform: 'rotate(90deg)', // open: points down
+    transformOrigin: '50% 50%',
+    transition: 'transform 0.12s ease',
+  },
+  '.cm-fold-inline.is-folded svg': { transform: 'rotate(0deg)' }, // folded: points right
+  '.cm-fold-inline:hover': { opacity: '1', color: 'var(--text-primary)', background: 'var(--bg-hover)' },
 
   // Autocomplete option detail (the task/bundle/sandbox/note tag).
   '.cm-tooltip-autocomplete .cm-completionDetail': {

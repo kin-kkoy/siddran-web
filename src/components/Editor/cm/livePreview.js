@@ -1,8 +1,9 @@
-import { Decoration, EditorView, ViewPlugin } from '@codemirror/view'
+import { Decoration, EditorView, ViewPlugin, WidgetType } from '@codemirror/view'
 import { RangeSet } from '@codemirror/state'
-import { syntaxTree } from '@codemirror/language'
+import { syntaxTree, foldEffect, unfoldEffect } from '@codemirror/language'
 import { BulletWidget, CheckWidget, ImageWidget } from './widgets'
 import { wikilinkConfig, parseTypedLink } from './wikilinks'
+import { listFoldRange, rangeFolded, CHEVRON_SVG } from './fold'
 
 // Live-preview decorations — a Phase 1 subset of the reference clone's buildDeco
 // (garb2/obsidian-notes-clone.html). The principle: walk the markdown syntax tree
@@ -49,6 +50,28 @@ function parseImage(doc, nf, nt) {
   if (fullUrl.startsWith('uploading:')) return null
   const wm = /#w=(\d+)$/.exec(fullUrl)
   return { width: wm ? parseInt(wm[1], 10) : null, src: wm ? fullUrl.slice(0, wm.index) : fullUrl }
+}
+
+class InlineFoldWidget extends WidgetType {
+  constructor(folded) { super(); this.folded = folded }
+  eq(o) { return o.folded === this.folded }
+  toDOM(view) {
+    const s = document.createElement('span')
+    s.className = 'cm-fold-inline' + (this.folded ? ' is-folded' : '')
+    s.innerHTML = CHEVRON_SVG
+    s.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const pos = view.posAtDOM(s)
+      const line = view.state.doc.lineAt(pos)
+      const range = listFoldRange(view.state, line.from)
+      if (!range) return
+      const f = rangeFolded(view.state, range)
+      view.dispatch({ effects: f ? unfoldEffect.of(range) : foldEffect.of(range) })
+    })
+    return s
+  }
+  ignoreEvent() { return true }
 }
 
 // ---- inline + line decorations, scoped to the given ranges (the viewport) ----
@@ -258,26 +281,54 @@ function scanInline(state, ranges) {
     for (let ln = firstLn; ln <= lastLn; ln++) {
       if (fenced.has(ln)) continue
       const line = doc.line(ln), txt = line.text
+      // Per list line we publish three CSS custom props consumed by the theme:
+      //   --nest-pad : extra per-depth indent padding
+      //   --hang     : hanging-indent width (marker + spaces) for wrapped rows
+      //   --mark     : x-offset of the marker itself (depth indent + leading spaces),
+      //                used to anchor the inline fold chevron beside it regardless of
+      //                marker type — bullet, checkbox and number all sit at this x.
       const tm = /^(\s*)([-*+])(\s+)\[([ xX])\]/.exec(txt)
       if (tm) {
-        const dashStart = line.from + tm[1].length
+        const sp = tm[1].length
+        const dashStart = line.from + sp
         const cbFrom = dashStart + 1 + tm[3].length, cbTo = cbFrom + 3
         hide(dashStart, cbFrom)
         deco.push(Decoration.replace({ widget: new CheckWidget(/x/i.test(tm[4])) }).range(cbFrom, cbTo))
+        const nestPad = (Math.floor(sp / 4) * 0.6).toFixed(2)
+        const mark = (Math.floor(sp / 4) * 0.6 + sp * 0.25).toFixed(2)
+        const hang = (sp * 0.25 + 1.56).toFixed(2)
+        deco.push(Decoration.line({ class: 'cm-list-line', attributes: { style: `--nest-pad:${nestPad}em;--mark:${mark}em;--hang:${hang}em` } }).range(line.from))
+        const tfr = listFoldRange(state, line.from)
+        if (tfr) deco.push(Decoration.widget({ widget: new InlineFoldWidget(rangeFolded(state, tfr)), side: -1 }).range(dashStart))
         continue
       }
-      const bm = /^(\s*)([-*+])(\s+)\S/.exec(txt)
+      const bm = /^(\s*)([-*+])(\s+)/.exec(txt)
       if (bm) {
-        const f = line.from + bm[1].length
+        const sp = bm[1].length
+        const f = line.from + sp
         deco.push(Decoration.replace({ widget: new BulletWidget() }).range(f, f + 1))
+        const nestPad = (Math.floor(sp / 4) * 0.6).toFixed(2)
+        const mark = (Math.floor(sp / 4) * 0.6 + sp * 0.25).toFixed(2)
+        const hang = (sp * 0.25 + 0.9 + bm[3].length * 0.25).toFixed(2)
+        deco.push(Decoration.line({ class: 'cm-list-line', attributes: { style: `--nest-pad:${nestPad}em;--mark:${mark}em;--hang:${hang}em` } }).range(line.from))
+        const bfr = listFoldRange(state, line.from)
+        if (bfr) deco.push(Decoration.widget({ widget: new InlineFoldWidget(rangeFolded(state, bfr)), side: -1 }).range(f))
         continue
       }
       // Ordered-list number: tint it so it matches the bullet colour (and the
       // reading view's coloured markers). The number text stays editable.
-      const om = /^(\s*)(\d+[.)])(\s+)\S/.exec(txt)
+      const om = /^(\s*)(\d+[.)])(\s+)/.exec(txt)
       if (om) {
-        const f = line.from + om[1].length
+        const sp = om[1].length
+        const f = line.from + sp
         deco.push(Decoration.mark({ class: 'cm-ordered-mark' }).range(f, f + om[2].length))
+        const nestPad = (Math.floor(sp / 4) * 0.6).toFixed(2)
+        const mark = (Math.floor(sp / 4) * 0.6 + sp * 0.25).toFixed(2)
+        const digitCount = om[2].length - 1
+        const hang = (sp * 0.25 + digitCount * 0.56 + 0.3 + om[3].length * 0.25).toFixed(2)
+        deco.push(Decoration.line({ class: 'cm-list-line', attributes: { style: `--nest-pad:${nestPad}em;--mark:${mark}em;--hang:${hang}em` } }).range(line.from))
+        const ofr = listFoldRange(state, line.from)
+        if (ofr) deco.push(Decoration.widget({ widget: new InlineFoldWidget(rangeFolded(state, ofr)), side: -1 }).range(f))
       }
     }
   }
