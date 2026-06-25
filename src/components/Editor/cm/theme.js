@@ -133,14 +133,18 @@ export const cinderTheme = EditorView.theme({
   },
 
   // ── Bullets / rules / checkboxes (widgets) ──
-  '.cm-bullet': { color: 'var(--accent-blue)', display: 'inline-block', width: '0.9em' },
+  // display:inline (not inline-block) so negative text-indent on the list line lays
+  // the bullet out like the ordered-number text — inline-block widgets don't shift
+  // with text-indent, which blows out the marker→text gap. marginRight gives the
+  // gap the fixed width used to provide (~0.9em footprint total).
+  '.cm-bullet': { color: 'var(--accent-blue)', display: 'inline', marginRight: '0.45em' },
   '.cm-ordered-mark': { color: 'var(--accent-blue)' }, // ordered list number, matches bullet + reading view
   '.cm-line.cm-hr-line': {
     lineHeight: '0',
     padding: '0.4em 0',
     background: 'linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--border-strong) calc(50% - 0.5px), var(--border-strong) calc(50% + 0.5px), transparent calc(50% + 0.5px))',
   },
-  '.cm-task': { display: 'inline-block' },
+  '.cm-task': { display: 'inline' }, // inline so it shifts with the line's text-indent
   '.cm-task-check': {
     width: '15px',
     height: '15px',
@@ -150,15 +154,18 @@ export const cinderTheme = EditorView.theme({
     accentColor: 'var(--accent-blue)',
   },
   '.cm-line.cm-list-line': {
-    // The leading 1.25em reserves clean content-space (left of the bullet) for the
-    // inline fold chevron, so it never falls into the gutter margin where it would
-    // be detached + un-clickable. nest-pad adds the per-depth indent; hang is the
-    // hanging-indent for wrapped rows.
+    // Hanging indent via padding-left + negative text-indent (NOT a negative margin
+    // on the marker). text-indent shifts the WHOLE first visual row — leading
+    // spaces, marker and all — left by --hang, so the marker keeps its position but
+    // the line's first coordinate moves with it, letting the selection layer paint
+    // over the marker (a negative margin leaves the marker in the padding, which the
+    // selection never covers). Requires the markers to be display:inline (above) so
+    // they shift with text-indent. Wrapped rows ignore text-indent and stay at
+    // padding-left, landing under the first content character.
+    // The leading 1.25em reserves clean content-space for the inline fold chevron.
     paddingLeft: 'calc(1.25em + var(--nest-pad, 0em) + var(--hang))',
+    textIndent: 'calc(-1 * var(--hang))',
     position: 'relative', // anchors the absolutely-positioned inline fold chevron
-  },
-  '.cm-line.cm-list-line .cm-bullet, .cm-line.cm-list-line .cm-task, .cm-line.cm-list-line .cm-ordered-mark': {
-    marginLeft: 'calc(-1 * var(--hang))',
   },
 
   // Wikilinks (cm/wikilinks.js): rendered internal link, unresolved variant, and
