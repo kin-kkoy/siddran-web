@@ -297,3 +297,69 @@
 
 
 
+
+/* ── EXPERIMENTAL split view ─────────────────────────────────────────────
+   Two note panes side by side. Each scrolls independently; the focused pane
+   gets a subtle inset ring. */
+.splitRow {
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.pane {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-y: auto;
+    /* Reserve the ring's width so focusing a pane doesn't nudge layout. */
+    box-shadow: inset 0 0 0 2px transparent;
+    transition: box-shadow 0.2s ease;
+}
+
+.pane:first-child {
+    border-right: 1px solid var(--border-default);
+}
+
+.paneFocused {
+    box-shadow: inset 0 0 0 2px var(--accent-blue);
+}
+
+/* Right pane before a note is chosen. */
+.splitEmpty {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 24px;
+}
+
+.splitEmptyText {
+    color: var(--text-muted);
+    font-size: 15px;
+    text-align: center;
+    max-width: 260px;
+}
+
+.splitEmptyClose {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
+}
+
+.splitEmptyClose:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}

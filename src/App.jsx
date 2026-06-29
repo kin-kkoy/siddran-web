@@ -27,6 +27,7 @@ import CalendarPeek from "./components/Calendar/Peek/CalendarPeek.jsx"
 import { SettingsProvider } from "./contexts/SettingsContext.jsx"
 import { ApiProvider } from "./contexts/ApiContext.jsx"
 import { SandboxViewProvider } from "./contexts/SandboxViewContext.jsx"
+import { NoteSplitProvider } from "./contexts/NoteSplitContext.jsx"
 import SettingsPopup from "./components/Settings/SettingsPopup.jsx"
 import ToastContainer from "./components/Common/ToastContainer.jsx"
 import logger from "./utils/logger.js"
@@ -676,6 +677,7 @@ function App() {
     <SettingsProvider authFetch={authFetch} API={API} isAuthed={isAuthed}>
     <ApiProvider authFetch={authFetch} API={API} isAuthed={isAuthed}>
     <SandboxViewProvider>
+    <NoteSplitProvider>
     <div style={style}>
 
       {isAuthed && (
@@ -843,6 +845,7 @@ function App() {
 
       </BrowserRouter>
     </div>
+    </NoteSplitProvider>
     </SandboxViewProvider>
     </ApiProvider>
     </SettingsProvider>

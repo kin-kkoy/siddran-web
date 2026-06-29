@@ -3,11 +3,27 @@ import { Link } from "react-router-dom"
 import styles from './SidebarList.module.css'
 import { compareByFavorite } from '../../../utils/noteSorting'
 import { HiChevronDown } from 'react-icons/hi'
+import { useNoteSplit } from '../../../contexts/NoteSplitContext'
 
 
 function SidebarList({ isCollapsed, notes, notebooks = [], currentNoteID }) {
 
+    const split = useNoteSplit()
     const [collapsedIds, setCollapsedIds] = useState(() => new Set())
+
+    // In split view, a click targets the focused pane. When the right pane is
+    // focused we replace its note in place (no route change) instead of
+    // navigating — but never duplicate the left note (shared draft / save key).
+    const handleSelect = (noteId) => (e) => {
+        if (split.enabled && split.focusedSide === 'right') {
+            e.preventDefault()
+            if (noteId == currentNoteID) return // can't show the same note on both sides (loose: route id is a string)
+            split.setSplitNoteId(noteId)
+        }
+    }
+
+    // Highlight both open notes: the route note (left) and the split note (right).
+    const isActive = (noteId) => currentNoteID == noteId || split.splitNoteId == noteId
 
     const toggleNotebook = (id) => {
         setCollapsedIds(prev => {
@@ -84,7 +100,8 @@ function SidebarList({ isCollapsed, notes, notebooks = [], currentNoteID }) {
                                             <Link
                                                 key={note.id}
                                                 to={`/notes/${note.id}`}
-                                                className={`${styles.noteItem} ${styles.groupedNote} ${currentNoteID == note.id ? styles.active : ''}`}
+                                                onClick={handleSelect(note.id)}
+                                                className={`${styles.noteItem} ${styles.groupedNote} ${isActive(note.id) ? styles.active : ''}`}
                                             >
                                                 <span className={styles.noteTitle}>{note.title || 'Untitled'}</span>
                                             </Link>
@@ -98,7 +115,8 @@ function SidebarList({ isCollapsed, notes, notebooks = [], currentNoteID }) {
                         {standaloneNotes.map(note => (
                             <Link key={note.id}
                                 to={`/notes/${note.id}`}
-                                className={`${styles.noteItem} ${currentNoteID == note.id ? styles.active : ''}`}
+                                onClick={handleSelect(note.id)}
+                                className={`${styles.noteItem} ${isActive(note.id) ? styles.active : ''}`}
                             >
                                 <span className={styles.noteTitle}>{note.title || 'Untitled'}</span>
                             </Link>
