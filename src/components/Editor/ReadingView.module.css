@@ -30,6 +30,10 @@
 .reading a:hover { text-decoration: underline }
 
 .reading ul, .reading ol { margin: 0.6em 0; padding-left: 1.6em }
+/* Force the same disc bullet at every nesting depth (browsers default nested
+   <ul>s to circle/square). Mirrors the editor, which renders the same • for
+   child/grandchild via BulletWidget. */
+.reading ul { list-style-type: disc }
 .reading li { margin: 0.2em 0 }
 /* "Loose" list items (those with children, or blank-line-separated) wrap their
    text in <p> and add a nested <ul>/<ol>; the default paragraph + list margins
@@ -56,6 +60,13 @@
   vertical-align: middle;
   accent-color: var(--accent-blue);
 }
+/* Completed task: grey the label text. Reset nested lists back to the default
+   colour so an unchecked child under a checked parent keeps its normal weight
+   (mirrors the editor, which greys per-line). */
+.reading li:has(> input[type='checkbox']:checked),
+.reading li:has(> p > input[type='checkbox']:checked) { color: var(--text-muted) }
+.reading li:has(> input[type='checkbox']:checked) :is(ul, ol),
+.reading li:has(> p > input[type='checkbox']:checked) :is(ul, ol) { color: var(--text-primary) }
 
 .reading blockquote {
   margin: 0;

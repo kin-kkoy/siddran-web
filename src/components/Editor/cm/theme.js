@@ -146,6 +146,9 @@ export const cinderTheme = EditorView.theme({
     background: 'linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--border-strong) calc(50% - 0.5px), var(--border-strong) calc(50% + 0.5px), transparent calc(50% + 0.5px))',
   },
   '.cm-task': { display: 'inline' }, // inline so it shifts with the line's text-indent
+  // Completed task: grey the label text (the checkbox keeps its accent colour since
+  // that's an accentColor, not a text colour). Matches the reading view.
+  '.cm-line.cm-task-checked': { color: 'var(--text-muted)' },
   '.cm-task-check': {
     width: '15px',
     height: '15px',

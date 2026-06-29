@@ -306,14 +306,16 @@ function scanInline(state, ranges) {
       const tm = /^(\s*)([-*+]|\d+[.)])(\s+)\[([ xX])\][ \t]/.exec(txt)
       if (tm) {
         const sp = tm[1].length
+        const checked = /x/i.test(tm[4])
         const dashStart = line.from + sp
         const cbFrom = dashStart + tm[2].length + tm[3].length, cbTo = cbFrom + 3
         hide(dashStart, cbFrom)
-        deco.push(Decoration.replace({ widget: new CheckWidget(/x/i.test(tm[4])) }).range(cbFrom, cbTo))
+        deco.push(Decoration.replace({ widget: new CheckWidget(checked) }).range(cbFrom, cbTo))
         const nestPad = (Math.floor(sp / 4) * 0.6).toFixed(2)
         const mark = (Math.floor(sp / 4) * 0.6 + sp * 0.25).toFixed(2)
         const hang = (sp * 0.25 + 1.56).toFixed(2)
-        deco.push(Decoration.line({ class: 'cm-list-line', attributes: { style: `--nest-pad:${nestPad}em;--mark:${mark}em;--hang:${hang}em` } }).range(line.from))
+        // A checked task gets `cm-task-checked` so the theme can grey the label text.
+        deco.push(Decoration.line({ class: checked ? 'cm-list-line cm-task-checked' : 'cm-list-line', attributes: { style: `--nest-pad:${nestPad}em;--mark:${mark}em;--hang:${hang}em` } }).range(line.from))
         const tfr = listFoldRange(state, line.from)
         if (tfr) deco.push(Decoration.widget({ widget: new InlineFoldWidget(rangeFolded(state, tfr)), side: -1 }).range(dashStart))
         continue
