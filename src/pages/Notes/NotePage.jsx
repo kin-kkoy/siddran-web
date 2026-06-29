@@ -13,6 +13,7 @@ import ConfirmModal from '../../components/Common/ConfirmModal'
 import TaskDetailsModal from '../../components/Common/TaskDetailsModal'
 import { useApi } from '../../contexts/ApiContext'
 import { useSandboxes } from '../../hooks/useSandboxes'
+import { readViewMode, writeViewMode } from '../../hooks/noteViewModeCache'
 import { toast } from '../../utils/toast'
 import Skeleton from '../../components/Common/Skeleton'
 import { NOTE_COLORS } from '../../components/Notes/noteColors'
@@ -50,7 +51,15 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   const [menuPosition, setMenuPosition] = useState('below') // 'above' or 'below'
   const [searchParams, setSearchParams] = useSearchParams() //how to display said note
   const titleInputReference = useRef(null); // `useRef` is basically just React's way of doing: `document.querySelectorAll()` or `.getElementByID()`
-  const viewMode = searchParams.get('view') === 'read' // for view mode, true = read, false = write
+  // View mode resolution: an explicit `?view=` param wins (e.g. the card's
+  // "open in read mode" button, or an in-note toggle). With no param — opening
+  // via the card body or a wikilink — fall back to the note's last-used mode
+  // remembered in localStorage (defaults to write). Cache is only read when the
+  // param is absent, which only happens before any toggle, so memoising on
+  // note.id never goes stale during a mount.
+  const viewParam = searchParams.get('view')
+  const cachedViewMode = useMemo(() => (note ? readViewMode(note.id) : 'write'), [note?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const viewMode = viewParam ? viewParam === 'read' : cachedViewMode === 'read' // true = read, false = write
   const menuRef = useRef(null)
   const buttonRef = useRef(null)
   const isDirtyRef = useRef(false)
@@ -87,6 +96,12 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
       setNewTags(note.tags || "")
     }
   }, [note])
+
+  // Remember each note's view mode so it reopens the way it was left. Covers
+  // both the in-note toggle and arriving via the card's read-mode button.
+  useEffect(() => {
+    if (note) writeViewMode(note.id, viewMode ? 'read' : 'write')
+  }, [note?.id, viewMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Click outside detection for menu
   useEffect(() => {
@@ -301,12 +316,10 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   }
 
   const toggleViewMode = () => {
-    if(viewMode){
-      searchParams.delete('view') // write mode
-    }else{
-      searchParams.set('view', 'read') // SET to read mode
-    }
-
+    // Always write an explicit value (never delete): an absent param means
+    // "freshly opened, use the remembered mode", so toggling to write must be
+    // distinguishable from that — otherwise it'd fall back to the cache.
+    searchParams.set('view', viewMode ? 'write' : 'read')
     setSearchParams(searchParams) // set after altering the params
   }
 
