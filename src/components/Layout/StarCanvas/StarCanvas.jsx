@@ -79,7 +79,7 @@ function StarCanvas({ lessDistraction = false }) {
   const driftSpeedRef   = useRef(settings.starDriftSpeed   ?? 3.90)
   const twinkleSpeedRef = useRef(settings.starTwinkleSpeed ?? 1.00)
   const twinkleDepthRef = useRef(settings.starTwinkleDepth ?? 1.65)
-  const countRef        = useRef(settings.starCount        ?? 135)
+  const countRef        = useRef(settings.starCount        ?? 100)
   const directionRef    = useRef(DIRECTION_ANGLES[settings.starDirection ?? '↙'] ?? Math.PI * 3 / 4)
   const starsRef        = useRef([])
   const radiusRangeRef  = useRef(1.3)
@@ -91,7 +91,7 @@ function StarCanvas({ lessDistraction = false }) {
     driftSpeedRef.current   = settings.starDriftSpeed   ?? 3.90
     twinkleSpeedRef.current = settings.starTwinkleSpeed ?? 1.00
     twinkleDepthRef.current = settings.starTwinkleDepth ?? 1.65
-    countRef.current        = settings.starCount        ?? 135
+    countRef.current        = settings.starCount        ?? 100
     directionRef.current    = DIRECTION_ANGLES[settings.starDirection ?? '↙'] ?? Math.PI * 3 / 4
   }, [
     settings.starSize, settings.starDriftSpeed, settings.starTwinkleSpeed,

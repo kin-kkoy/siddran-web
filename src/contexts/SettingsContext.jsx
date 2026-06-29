@@ -26,7 +26,7 @@ const DEFAULTS = {
   starDriftSpeed: 3.90,
   starTwinkleSpeed: 1.00,
   starTwinkleDepth: 1.65,
-  starCount: 135,
+  starCount: 100,
   starDirection: '↙',
   noteEditorWidth: 1200,
   rememberNoteState: false,
