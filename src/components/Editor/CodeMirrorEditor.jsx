@@ -163,15 +163,22 @@ function CodeMirrorEditor({
     })
 
     // Checkbox toggle from its rendered widget + save-on-blur.
+    // NOTE: this MUST be `click`, not `mousedown`. The CheckWidget's <input> calls
+    // preventDefault() on mousedown (to stop the caret jumping into the widget), and
+    // CM6 skips every registered DOM handler once an event's default is prevented
+    // (view runHandlers: `if (event.defaultPrevented) break`). A mousedown handler
+    // here therefore never fires. The click event is not prevented, so it runs;
+    // returning true makes CM preventDefault the native toggle, keeping the document
+    // text the single source of truth for the checkbox state.
     const domHandlers = EditorView.domEventHandlers({
-      mousedown: (event, view) => {
+      click: (event, view) => {
         const target = event.target
         if (!target || !target.classList?.contains('cm-task-check')) return false
         const pos = view.posAtDOM(target)
         const line = view.state.doc.lineAt(pos)
-        const m = /^(\s*)([-*+])(\s+)\[([ xX])\]/.exec(line.text)
+        const m = /^(\s*)([-*+]|\d+[.)])(\s+)\[([ xX])\][ \t]/.exec(line.text)
         if (!m) return false
-        const from = line.from + m[1].length + 1 + m[3].length
+        const from = line.from + m[1].length + m[2].length + m[3].length
         const checked = /x/i.test(m[4])
         view.dispatch({ changes: { from, to: from + 3, insert: checked ? '[ ]' : '[x]' } })
         event.preventDefault()
@@ -275,10 +282,35 @@ function CodeMirrorEditor({
     else view.requestMeasure()
   }, [readMode])
 
+  const handleCheckboxToggle = (index) => {
+    const view = viewRef.current
+    if (!view) return
+    const doc = view.state.doc.toString()
+    // Must match EXACTLY what GFM/remark renders as a task checkbox so this index
+    // lines up with the reading view's rendered <input> order. That means: a
+    // bullet (-,*,+) OR an ordered marker (1. / 1)), then the [ ]/[x] box, then
+    // REQUIRED whitespace after ']' — `- [ ]text` (no trailing space) is literal
+    // text, not a task, and must NOT be counted (else every later checkbox is
+    // toggled one row off).
+    const regex = /^[ \t]*(?:[-*+]|\d+[.)])[ \t]+\[([ xX])\][ \t]/gm
+    let match
+    let count = 0
+    while ((match = regex.exec(doc)) !== null) {
+      if (count === index) {
+        const checked = /[xX]/.test(match[1])
+        const cbPos = match.index + match[0].indexOf('[') + 1
+        view.dispatch({ changes: { from: cbPos, to: cbPos + 1, insert: checked ? ' ' : 'x' } })
+        setReadSnapshot(view.state.doc.toString())
+        break
+      }
+      count++
+    }
+  }
+
   return (
     <>
       <div ref={hostRef} className={styles.editorRoot} style={readMode ? { display: 'none' } : undefined} />
-      {readMode && <ReadingView markdown={readSnapshot} onSearchTag={onSearchTag} onOpenLink={onOpenLink} />}
+      {readMode && <ReadingView markdown={readSnapshot} onSearchTag={onSearchTag} onOpenLink={onOpenLink} onCheckboxToggle={handleCheckboxToggle} />}
       {!readMode && !interfaceMode && <EditorDock viewRef={viewRef} sandboxes={sandboxes} />}
     </>
   )

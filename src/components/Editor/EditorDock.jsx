@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  FaBold, FaItalic, FaStrikethrough, FaHeading, FaCode,
-  FaLink, FaListUl, FaListOl, FaQuoteLeft,
+  FaBold, FaItalic, FaUnderline, FaStrikethrough, FaHeading, FaCode,
+  FaLink, FaListUl, FaListOl, FaQuoteLeft, FaQuestion,
 } from 'react-icons/fa'
 import { MdCheckBox, MdHorizontalRule } from 'react-icons/md'
 import { LuShapes, LuCalendarDays, LuStickyNote, LuListTodo, LuEyeOff, LuHighlighter } from 'react-icons/lu'
@@ -80,6 +80,10 @@ function insertWikilink(view, prefix = '') {
 const ACTIONS = [
   { key: 'bold', icon: FaBold, title: 'Bold', action: v => wrapSelection(v, '**') },
   { key: 'italic', icon: FaItalic, title: 'Italic', action: v => wrapSelection(v, '*') },
+  // Underline has no native markdown; we store it as <u>…</u> raw HTML. The
+  // reading view (remarkUnderline), PDF export, and the editor's live preview
+  // (Underline node in cm/syntaxNodes.js + cm/livePreview.js) all render it.
+  { key: 'underline', icon: FaUnderline, title: 'Underline', action: v => wrapSelection(v, '<u>', '</u>') },
   { key: 'strike', icon: FaStrikethrough, title: 'Strikethrough', action: v => wrapSelection(v, '~~') },
   { key: 'heading', icon: FaHeading, title: 'Heading (cycle)', action: cycleHeading },
   { key: 'code', icon: FaCode, title: 'Inline code', action: v => wrapSelection(v, '`') },
@@ -107,8 +111,10 @@ function EditorDock({ viewRef, sandboxes = [] }) {
   })
   const [wikilinkOpen, setWikilinkOpen] = useState(false)
   const [sandboxMenuOpen, setSandboxMenuOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const wikilinkRef = useRef(null)
   const sandboxMenuRef = useRef(null)
+  const helpRef = useRef(null)
 
   const togglePin = useCallback(() => {
     setPinned(prev => {
@@ -120,14 +126,15 @@ function EditorDock({ viewRef, sandboxes = [] }) {
 
   // Close dropdowns on outside click
   useEffect(() => {
-    if (!wikilinkOpen && !sandboxMenuOpen) return
+    if (!wikilinkOpen && !sandboxMenuOpen && !helpOpen) return
     const handler = (e) => {
       if (wikilinkOpen && wikilinkRef.current && !wikilinkRef.current.contains(e.target)) setWikilinkOpen(false)
       if (sandboxMenuOpen && sandboxMenuRef.current && !sandboxMenuRef.current.contains(e.target)) setSandboxMenuOpen(false)
+      if (helpOpen && helpRef.current && !helpRef.current.contains(e.target)) setHelpOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [wikilinkOpen, sandboxMenuOpen])
+  }, [wikilinkOpen, sandboxMenuOpen, helpOpen])
 
   const handleAction = useCallback((action) => {
     const view = viewRef.current
@@ -241,8 +248,39 @@ function EditorDock({ viewRef, sandboxes = [] }) {
           )}
         </div>
 
-        {/* Pin toggle */}
+        {/* Markdown tips (escaping + underline) — right side, beside the pin */}
         <span className={styles.sep} />
+        <div className={styles.dropdownAnchor} ref={helpRef}>
+          <button
+            className={`${styles.btn} ${helpOpen ? styles.active : ''}`}
+            title="Markdown tips"
+            aria-label="Markdown tips"
+            onMouseDown={e => { e.preventDefault(); setHelpOpen(p => !p); setWikilinkOpen(false); setSandboxMenuOpen(false) }}
+          >
+            <FaQuestion />
+          </button>
+          {helpOpen && (
+            <div className={`${styles.dropdown} ${styles.tipPopover}`}>
+              <div className={styles.tipTitle}>Show a symbol literally</div>
+              <p className={styles.tipLine}>
+                Put <code>\</code> before it so it doesn&apos;t format:
+              </p>
+              <ul className={styles.tipList}>
+                <li><code>\*\*word\*\*</code> → **word**</li>
+                <li><code>\[a\]</code>, <code>\#tag</code>, <code>\=\=x\=\=</code></li>
+              </ul>
+              <p className={styles.tipLine}>
+                Or wrap in backticks to show as code: <code>`code`</code>
+              </p>
+              <div className={styles.tipTitle}>Underline</div>
+              <p className={styles.tipLine}>
+                Wrap text in <code>&lt;u&gt;…&lt;/u&gt;</code> (or use the underline button).
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Pin toggle — shares the section with the tips button (no separator) */}
         <button
           className={`${styles.btn} ${pinned ? styles.active : ''}`}
           title={pinned ? 'Unpin dock (auto-hide)' : 'Pin dock (always visible)'}

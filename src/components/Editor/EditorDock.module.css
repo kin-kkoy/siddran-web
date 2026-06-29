@@ -129,3 +129,49 @@
   color: var(--text-faint);
   font-size: 13px;
 }
+
+/* ── Markdown tips popover ── */
+.tipPopover {
+  /* Right-aligned to the button (it sits near the dock's right edge, so a
+     centered popover would overflow the viewport). */
+  left: auto;
+  right: 0;
+  transform: none;
+  min-width: 244px;
+  max-width: 284px;
+  padding: 10px 12px;
+  white-space: normal;
+  cursor: default;
+}
+
+.tipTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 8px 0 4px;
+}
+.tipTitle:first-child { margin-top: 0 }
+
+.tipLine {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0 0 4px;
+}
+
+.tipList {
+  margin: 0 0 6px;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.tipPopover code {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 11px;
+  background: var(--bg-hover);
+  border-radius: 3px;
+  padding: 1px 4px;
+  color: var(--accent-warning);
+}

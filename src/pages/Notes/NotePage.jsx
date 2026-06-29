@@ -54,8 +54,22 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   const menuRef = useRef(null)
   const buttonRef = useRef(null)
   const isDirtyRef = useRef(false)
-  const headerRowRef = useRef(null)
+  const headerObserverRef = useRef(null)
   const [headerVisible, setHeaderVisible] = useState(true)
+  // Callback ref (not useRef + mount effect): on a hard refresh the page first
+  // renders the skeleton, so a mount-time effect would run before the real header
+  // exists and the observer would never attach (sticky toggle then never shows).
+  // A callback ref fires whenever the header element mounts/unmounts.
+  const headerRowRef = useCallback((el) => {
+    if (headerObserverRef.current) { headerObserverRef.current.disconnect(); headerObserverRef.current = null }
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setHeaderVisible(entry.isIntersecting),
+      { threshold: 0 }
+    )
+    observer.observe(el)
+    headerObserverRef.current = observer
+  }, [])
   const [noteSettingsOpen, setNoteSettingsOpen] = useState(false)
   // Wikilink "create note?" confirm flow: holds the clicked unresolved title.
   const [linkModalTitle, setLinkModalTitle] = useState(null)
@@ -73,17 +87,6 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
       setNewTags(note.tags || "")
     }
   }, [note])
-
-  useEffect(() => {
-    const el = headerRowRef.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      ([entry]) => setHeaderVisible(entry.isIntersecting),
-      { threshold: 0 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
 
   // Click outside detection for menu
   useEffect(() => {
@@ -350,17 +353,15 @@ function NotePage({ notes, notesLoading, editTitle, editBody, updateTags, toggle
   const noteContent = (
     <div className={styles.container}>
 
-      {!headerVisible && (
-        <div className={styles.viewToggleWrapper}>
-          <button
-            onClick={toggleViewMode}
-            className={styles.viewToggleFloating}
-            aria-label={viewMode ? 'Switch to edit mode' : 'Switch to read mode'}
-          >
-            {viewMode ? <HiPencilSquare /> : <MdChromeReaderMode />}
-          </button>
-        </div>
-      )}
+      <div className={`${styles.viewToggleWrapper} ${headerVisible ? styles.viewToggleHidden : ''}`}>
+        <button
+          onClick={toggleViewMode}
+          className={styles.viewToggleFloating}
+          aria-label={viewMode ? 'Switch to edit mode' : 'Switch to read mode'}
+        >
+          {viewMode ? <HiPencilSquare /> : <MdChromeReaderMode />}
+        </button>
+      </div>
 
       {/* Header row with back button, tags input, and menu */}
       <div className={styles.headerRow} ref={headerRowRef}>

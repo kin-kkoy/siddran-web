@@ -27,6 +27,10 @@
     pointer-events: none;
 }
 
+.viewToggleHidden {
+    visibility: hidden;
+}
+
 .viewToggleFloating {
     pointer-events: auto;
     display: flex;

@@ -40,6 +40,7 @@ export const cinderTheme = EditorView.theme({
   '.cm-strong': { fontWeight: '700', color: 'var(--text-primary)' },
   '.cm-em': { fontStyle: 'italic' },
   '.cm-strike': { textDecoration: 'line-through', color: 'var(--text-muted)' },
+  '.cm-underline': { textDecoration: 'underline' },
   '.cm-code-inline': {
     fontFamily: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
     fontSize: '0.86em',
@@ -309,7 +310,7 @@ export const cinderTheme = EditorView.theme({
     justifyContent: 'center',
     cursor: 'pointer',
     color: 'var(--text-muted)',
-    opacity: '0.55',
+    opacity: '0.7',
     borderRadius: '4px',
     zIndex: '1',
     transition: 'opacity 0.12s ease, color 0.12s ease, background 0.12s ease',

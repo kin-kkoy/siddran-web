@@ -11,6 +11,7 @@
 }
 
 .reading h1, .reading h2, .reading h3, .reading h4, .reading h5, .reading h6 {
+  position: relative;
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -30,9 +31,31 @@
 
 .reading ul, .reading ol { margin: 0.6em 0; padding-left: 1.6em }
 .reading li { margin: 0.2em 0 }
+/* "Loose" list items (those with children, or blank-line-separated) wrap their
+   text in <p> and add a nested <ul>/<ol>; the default paragraph + list margins
+   then open a big gap between a parent item and its first child. Tighten both so
+   a parent sits close to its children. */
+.reading li p { margin: 0.2em 0 }
+.reading li > ul, .reading li > ol { margin: 0.2em 0 }
 /* Match the editor's blue bullets / ordered numbers. */
 .reading li::marker { color: var(--accent-blue) }
-.reading li > input[type='checkbox'] { margin-right: 6px; accent-color: var(--accent-blue) }
+/* Structural selectors (not the .task-list-item class) so CSS Modules can't
+   scope-rename them away from remark's global DOM class. */
+.reading li:has(> input[type='checkbox']),
+.reading li:has(> p > input[type='checkbox']) { list-style: none }
+/* Pull the checkbox into the marker gutter so it lines up with sibling bullets
+   instead of sitting where the bullet's TEXT would start. Covers both tight
+   (li > input) and loose (li > p > input) task items remark can emit. NOTE: the
+   fold decoration prepends a chevron <span> to parent <li>s, so the <p> is no
+   longer :first-child — match any direct-child <p> rather than :first-child, or
+   parent items with children lose the pull and sit too far right. */
+.reading li:has(> input[type='checkbox']) > input[type='checkbox'],
+.reading li:has(> p > input[type='checkbox']) > p > input[type='checkbox'] {
+  margin-left: -1.35em;
+  margin-right: 6px;
+  vertical-align: middle;
+  accent-color: var(--accent-blue);
+}
 
 .reading blockquote {
   margin: 0;
@@ -118,6 +141,53 @@
 .reading :global(.rv-callout-tip), .reading :global(.rv-callout-success), .reading :global(.rv-callout-hint), .reading :global(.rv-callout-done) {
   border-left-color: var(--accent-success); background: rgba(82, 196, 122, 0.07);
 }
+
+/* Fold chevrons — heading section collapse in reading view. */
+:global(.rv-fold-chevron) {
+  position: absolute;
+  left: -24px;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, opacity 0.12s ease;
+}
+:global(.rv-fold-chevron) svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+  transform: rotate(90deg);
+  transform-origin: 50% 50%;
+  transition: transform 0.12s ease;
+}
+:global(.rv-fold-chevron.is-folded) svg { transform: rotate(0deg) }
+:global(.rv-fold-h1) { top: 11px }
+:global(.rv-fold-h2) { top: 7px }
+:global(.rv-fold-h3) { top: 5px }
+:global(.rv-fold-h4) { top: 3px }
+:global(.rv-fold-h5) { top: 1px }
+:global(.rv-fold-chevron):hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  opacity: 1;
+}
+:global(.rv-fold-list) {
+  left: -38px;
+  top: 6px;
+  width: 16px;
+  height: 16px;
+}
+:global(.rv-fold-list) svg {
+  width: 10px;
+  height: 10px;
+}
+:global(.rv-folded) { display: none !important }
 
 :global(.rv-spoiler) {
   background: var(--text-faint);

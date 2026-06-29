@@ -164,6 +164,15 @@ function scanInline(state, ranges) {
         hide(nt - 2, nt)
         return false
       }
+      case 'Underline': {
+        // <u>text</u> → underlined; caret on it shows the raw tags. Open tag is
+        // 3 chars (`<u>`), close tag 4 (`</u>`).
+        if (over(nf, nt)) { mk(nf, nt, 'cm-underline'); return false }
+        mk(nf + 3, nt - 4, 'cm-underline')
+        hide(nf, nf + 3)
+        hide(nt - 4, nt)
+        return false
+      }
       case 'Hashtag': {
         // Caret on it → plain editable text; off → clickable pill.
         if (over(nf, nt)) break
@@ -287,11 +296,18 @@ function scanInline(state, ranges) {
       //   --mark     : x-offset of the marker itself (depth indent + leading spaces),
       //                used to anchor the inline fold chevron beside it regardless of
       //                marker type — bullet, checkbox and number all sit at this x.
-      const tm = /^(\s*)([-*+])(\s+)\[([ xX])\]/.exec(txt)
+      // Require whitespace after `]` so this matches GFM/remark exactly: `- [ ]x`
+      // (no space) is literal text, not a task, and must fall through to the
+      // bullet branch below — otherwise write mode shows a checkbox while read
+      // mode shows a plain bullet for the same line.
+      // Ordered markers (1. / 1)) count too: remark renders `1. [ ] x` as a task
+      // (number hidden, list-style:none), so we hide the whole marker and show
+      // just the checkbox here — matching read mode.
+      const tm = /^(\s*)([-*+]|\d+[.)])(\s+)\[([ xX])\][ \t]/.exec(txt)
       if (tm) {
         const sp = tm[1].length
         const dashStart = line.from + sp
-        const cbFrom = dashStart + 1 + tm[3].length, cbTo = cbFrom + 3
+        const cbFrom = dashStart + tm[2].length + tm[3].length, cbTo = cbFrom + 3
         hide(dashStart, cbFrom)
         deco.push(Decoration.replace({ widget: new CheckWidget(/x/i.test(tm[4])) }).range(cbFrom, cbTo))
         const nestPad = (Math.floor(sp / 4) * 0.6).toFixed(2)
