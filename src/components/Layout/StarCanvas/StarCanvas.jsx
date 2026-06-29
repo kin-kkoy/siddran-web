@@ -132,9 +132,26 @@ function StarCanvas({ lessDistraction = false }) {
     const onVisibility = () => { paused = document.hidden }
     document.addEventListener('visibilitychange', onVisibility)
 
+    // Freeze the redraw while the user is actively scrolling — repainting a
+    // full-viewport canvas every frame competes with the browser's scroll
+    // compositing and can cause jank. Resume ~150ms after the last scroll event.
+    // Capture phase so it catches scrolls from inner scrollers (note body, CM6)
+    // too, since scroll events don't bubble.
+    let scrolling = false
+    let scrollTimer
+    const onScroll = () => {
+      scrolling = true
+      clearTimeout(scrollTimer)
+      scrollTimer = setTimeout(() => { scrolling = false }, 150)
+    }
+    window.addEventListener('scroll', onScroll, true)
+
     const draw = (time) => {
       animId = requestAnimationFrame(draw)
-      if (paused || pausedByModalRef.current) return
+      if (paused || pausedByModalRef.current || scrolling) {
+        lastTime = time // keep the clock fresh so drift doesn't lurch on resume
+        return
+      }
 
       const dt = lastTime ? (time - lastTime) / 1000 : 0
       lastTime = time
@@ -184,6 +201,8 @@ function StarCanvas({ lessDistraction = false }) {
       cancelAnimationFrame(animId)
       window.removeEventListener('resize', resize)
       document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('scroll', onScroll, true)
+      clearTimeout(scrollTimer)
     }
   }, [showStars, reduceStars])
 
