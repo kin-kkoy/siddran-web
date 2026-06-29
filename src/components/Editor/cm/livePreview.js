@@ -369,7 +369,11 @@ const inlinePlugin = ViewPlugin.fromClass(class {
     this.atomic = r.atomic
   }
   update(u) {
-    if (u.docChanged || u.viewportChanged || u.selectionSet) this.compute(u.view)
+    // geometryChanged catches lines brought into view by something other than a
+    // scroll or edit — chiefly a fold collapsing above them (restoring saved folds
+    // on mount) or the editor un-hiding when leaving read mode. Without it those
+    // newly-visible lines stay as raw markdown until the next caret move/click.
+    if (u.docChanged || u.viewportChanged || u.selectionSet || u.geometryChanged) this.compute(u.view)
   }
 }, {
   decorations: v => v.decorations,

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { markdownToHtml } from './utils/markdownToHtml'
 import { CHEVRON_SVG } from './cm/fold'
+import { readFolds, writeFolds } from '../../hooks/noteFoldsCache'
 import { toast } from '../../utils/toast'
 import 'highlight.js/styles/atom-one-dark.css'
 import styles from './ReadingView.module.css'
@@ -8,7 +9,7 @@ import styles from './ReadingView.module.css'
 // Read-only rendered view of a note — the "reading mode" the read/edit toggle
 // switches to in the new editor. Renders note markdown to HTML once per content
 // change and decorates each <pre> with a Copy button.
-function ReadingView({ markdown, onSearchTag, onOpenLink, onCheckboxToggle }) {
+function ReadingView({ markdown, noteId, rememberFolds, onSearchTag, onOpenLink, onCheckboxToggle }) {
   const ref = useRef(null)
   const html = useMemo(() => markdownToHtml(markdown || ''), [markdown])
 
@@ -32,6 +33,22 @@ function ReadingView({ markdown, onSearchTag, onOpenLink, onCheckboxToggle }) {
     const cleanups = []
     const sectionMap = new Map()
 
+    // Persistent per-note folds (shared with the editor by source line number).
+    // `foldedSet` is the saved state to restore; `persistFolds` snapshots whatever
+    // is currently collapsed back to the store. Both are no-ops when the toggle is
+    // off. This effect re-runs after every commit, so restore re-applies on its own.
+    const foldedSet = rememberFolds ? new Set(readFolds(noteId)) : null
+    const lineOf = (el) => parseInt(el?.getAttribute('data-line'), 10)
+    const persistFolds = () => {
+      if (!rememberFolds || !noteId) return
+      const lines = []
+      root.querySelectorAll('.rv-fold-chevron.is-folded').forEach((ch) => {
+        const ln = lineOf(ch.parentElement)
+        if (ln) lines.push(ln)
+      })
+      writeFolds(noteId, lines)
+    }
+
     root.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
       const level = parseInt(heading.tagName[1])
       const section = []
@@ -48,6 +65,11 @@ function ReadingView({ markdown, onSearchTag, onOpenLink, onCheckboxToggle }) {
       chevron.className = 'rv-fold-chevron rv-fold-h' + level
       chevron.innerHTML = CHEVRON_SVG
 
+      if (foldedSet?.has(lineOf(heading))) {
+        chevron.classList.add('is-folded')
+        section.forEach((s) => s.classList.add('rv-folded'))
+      }
+
       const onClick = (e) => {
         e.stopPropagation()
         const folded = chevron.classList.toggle('is-folded')
@@ -62,6 +84,7 @@ function ReadingView({ markdown, onSearchTag, onOpenLink, onCheckboxToggle }) {
             }
           })
         }
+        persistFolds()
       }
 
       chevron.addEventListener('click', onClick)
@@ -81,10 +104,16 @@ function ReadingView({ markdown, onSearchTag, onOpenLink, onCheckboxToggle }) {
       chevron.className = 'rv-fold-chevron rv-fold-list'
       chevron.innerHTML = CHEVRON_SVG
 
+      if (foldedSet?.has(lineOf(li))) {
+        chevron.classList.add('is-folded')
+        nested.forEach((n) => n.classList.add('rv-folded'))
+      }
+
       const onClick = (e) => {
         e.stopPropagation()
         const folded = chevron.classList.toggle('is-folded')
         nested.forEach((n) => n.classList.toggle('rv-folded', folded))
+        persistFolds()
       }
 
       chevron.addEventListener('click', onClick)

@@ -55,7 +55,7 @@ export function listFoldRange(state, lineFrom) {
   return { from: line.to, to }
 }
 
-function foldRangeAt(state, lineFrom) {
+export function foldRangeAt(state, lineFrom) {
   return headingFoldRange(state, lineFrom) || listFoldRange(state, lineFrom)
 }
 
@@ -65,6 +65,45 @@ export function rangeFolded(state, range) {
     if (from === range.from && to >= range.to) folded = true
   })
   return folded
+}
+
+// The set of folded heading/list lines as 1-based line numbers. A fold range
+// starts at `line.to` of its anchor line, so `lineAt(from)` is that anchor line.
+// This is what we persist (per-note) so folds can be restored across remounts and
+// shared with the reading view, which keys the same lines via `data-line`.
+export function foldedLineSet(state) {
+  const lines = []
+  foldedRanges(state).between(0, state.doc.length, (from) => {
+    lines.push(state.doc.lineAt(from).number)
+  })
+  return lines
+}
+
+// Reconcile the view's folds to exactly `lineNumbers`: fold any desired line not
+// yet folded, unfold any current fold whose line isn't desired. One dispatch.
+// Used for first restore on mount (no current folds → just folds the list) and to
+// re-sync the editor after folds were toggled in the reading view.
+export function applyFolds(view, lineNumbers) {
+  const state = view.state
+  const want = new Set(lineNumbers)
+  const effects = []
+  const haveLines = new Set()
+
+  // Unfold any current fold whose anchor line is no longer wanted.
+  foldedRanges(state).between(0, state.doc.length, (from, to) => {
+    const lineNo = state.doc.lineAt(from).number
+    haveLines.add(lineNo)
+    if (!want.has(lineNo)) effects.push(unfoldEffect.of({ from, to }))
+  })
+
+  // Fold any wanted line not already folded (skip out-of-range / non-foldable).
+  for (const lineNo of want) {
+    if (haveLines.has(lineNo) || lineNo < 1 || lineNo > state.doc.lines) continue
+    const range = foldRangeAt(state, state.doc.line(lineNo).from)
+    if (range) effects.push(foldEffect.of(range))
+  }
+
+  if (effects.length) view.dispatch({ effects })
 }
 
 export const CHEVRON_SVG =

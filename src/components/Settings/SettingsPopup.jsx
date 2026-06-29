@@ -148,6 +148,17 @@ function InterfaceTab({ settings, updateSetting }) {
         </div>
       </SettingRow>
 
+      {/* Remember per-note fold state */}
+      <SettingRow
+        label="Remember File/Note State"
+        description="Keep collapsed headings, bullets and checklists folded per note across refreshes and read/edit modes."
+      >
+        <ToggleSwitch
+          checked={settings.rememberNoteState === true}
+          onChange={(v) => updateSetting('rememberNoteState', v)}
+        />
+      </SettingRow>
+
       {/* Star canvas toggle */}
       <SettingRow
         label="Twinkling Stars"

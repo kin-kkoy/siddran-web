@@ -29,6 +29,7 @@ const DEFAULTS = {
   starCount: 135,
   starDirection: '↙',
   noteEditorWidth: 1200,
+  rememberNoteState: false,
 }
 
 // ── Color utilities ────────────────────────────────────────────────

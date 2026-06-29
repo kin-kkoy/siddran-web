@@ -7,7 +7,7 @@ import { parseTypedLink } from './parseWikilink'
 import { remarkHashtag } from './remarkHashtag'
 import { remarkHighlight } from './remarkHighlight'
 import { remarkSpoiler } from './remarkSpoiler'
-import { normalizeCalloutSource } from './calloutBlocks'
+import { normalizeCalloutSource, normalizeCalloutWithMap } from './calloutBlocks'
 
 // Drift guard: each inline syntax (hashtag, ==highlight==, ||spoiler||) is defined
 // TWICE — once as a CodeMirror Lezer parser for the editor (cm/syntaxNodes.js) and
@@ -89,5 +89,24 @@ describe('callout segmentation (normalizeCalloutSource)', () => {
   })
   it('a multi-line callout body stays together', () => {
     expect(normalizeCalloutSource('> [!note] a\n> still a')).toBe('> [!note] a\n> still a')
+  })
+})
+
+// The fold-persistence feature keys folds by source line number. When a callout
+// inserts a blank line, the reading view must translate the heading/list line in
+// the NORMALIZED text back to the ORIGINAL editor line, or it remembers the wrong
+// line and the editor folds the wrong section on reload.
+describe('callout line map (normalizeCalloutWithMap)', () => {
+  it('maps normalized lines back to the original editor lines', () => {
+    const { text, map } = normalizeCalloutWithMap('> [!note] a\n# H\nbody')
+    expect(text).toBe('> [!note] a\n\n# H\nbody') // a blank line was inserted
+    expect(map).toEqual([0, -1, 1, 2])           // -1 = the inserted blank (no original line)
+    // '# H' is on normalized line 3 (1-based) → maps back to original line 2.
+    expect(map[3 - 1] + 1).toBe(2)
+  })
+  it('uses an identity (null) map when there are no callouts', () => {
+    const { text, map } = normalizeCalloutWithMap('# H\nbody')
+    expect(text).toBe('# H\nbody')
+    expect(map).toBe(null)
   })
 })

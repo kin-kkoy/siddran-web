@@ -11,7 +11,7 @@ import { remarkUnderline } from './remarkUnderline'
 import { remarkHighlight } from './remarkHighlight'
 import { remarkHashtag } from './remarkHashtag'
 import { remarkWikilinks } from './remarkWikilinks'
-import { normalizeCalloutSource } from './calloutBlocks'
+import { normalizeCalloutWithMap } from './calloutBlocks'
 import { resolveImageUrl } from '../../../utils/imageUpload'
 import logger from '../../../utils/logger'
 
@@ -63,6 +63,31 @@ function rehypeCinderImages() {
       }
       node.properties.src = resolveImageUrl(src)
       node.properties.loading = 'lazy'
+    })
+  }
+}
+
+// Tag each heading and list item with its 1-based source line (`data-line`) so the
+// reading view can restore/persist folds keyed by the same line number the CM6
+// editor uses. Positions come from remark-parse and survive into hast — but for a
+// note with callouts they're in the post-normalize coordinate space (blank lines
+// were inserted), so we translate them back to the original editor line via
+// `activeLineMap` (set per-call below; processSync is synchronous so this is safe).
+const LINE_TAGGED = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'])
+let activeLineMap = null
+function rehypeLineNumbers() {
+  return (tree) => {
+    visit(tree, 'element', (node) => {
+      if (!LINE_TAGGED.has(node.tagName)) return
+      let line = node.position?.start?.line
+      if (!line) return
+      if (activeLineMap) {
+        const orig = activeLineMap[line - 1] // normalized line (1-based) → map index (0-based)
+        if (orig == null || orig < 0) return  // inserted blank / unknown → no stable line
+        line = orig + 1                        // back to the 1-based original editor line
+      }
+      node.properties = node.properties || {}
+      node.properties['data-line'] = String(line)
     })
   }
 }
@@ -150,6 +175,7 @@ const processor = unified()
   .use(remarkHighlight)
   .use(remarkHashtag)
   .use(remarkRehype, { handlers })
+  .use(rehypeLineNumbers)
   .use(rehypeCallouts)
   .use(rehypeCinderImages)
   .use(rehypeHighlight, { ignoreMissing: true })
@@ -162,11 +188,16 @@ const escapeHtml = (s) => s.replace(/[&<>"']/g, c => (
 export function markdownToHtml(md) {
   if (!md) return ''
   try {
-    return String(processor.processSync(preserveIndent(normalizeCalloutSource(md))))
+    const { text, map } = normalizeCalloutWithMap(md)
+    activeLineMap = map // consumed by rehypeLineNumbers; preserveIndent keeps line count
+    return String(processor.processSync(preserveIndent(text)))
   } catch (err) {
     // A render-time parser throw must never crash the note view — fall back to the
     // raw markdown, escaped, so the note still shows its content.
     logger.error('markdownToHtml failed; showing raw text', err)
     return `<pre class="rv-fallback">${escapeHtml(md)}</pre>`
+  } finally {
+    activeLineMap = null
   }
 }
+

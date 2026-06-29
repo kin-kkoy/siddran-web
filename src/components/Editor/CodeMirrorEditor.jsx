@@ -3,7 +3,7 @@ import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, keymap, drawSelection, tooltips, placeholder as cmPlaceholder } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage, deleteMarkupBackward } from '@codemirror/lang-markdown'
-import { syntaxHighlighting, indentUnit } from '@codemirror/language'
+import { syntaxHighlighting, indentUnit, foldEffect, unfoldEffect } from '@codemirror/language'
 import { languages } from '@codemirror/language-data'
 import { livePreview } from './cm/livePreview'
 import { domVerticalMotion } from './cm/verticalMotion'
@@ -11,13 +11,15 @@ import { codeCopy } from './cm/codeCopy'
 import { imageExtensions } from './cm/imagePaste'
 import { wikilinks, wikilinkMarkdownExtension, resolveNote } from './cm/wikilinks'
 import { obsidianSyntax } from './cm/syntaxNodes'
-import { headingFold } from './cm/fold'
+import { headingFold, foldedLineSet, applyFolds } from './cm/fold'
 import { listEditingKeymap, listIndentNormalizer, enterIndent } from './cm/listEditing'
 import { cinderHighlightStyle } from './cm/highlight'
 import { cinderTheme } from './cm/theme'
 import ReadingView from './ReadingView'
 import EditorDock from './EditorDock'
 import { useApi } from '../../contexts/ApiContext'
+import { useSettings } from '../../contexts/SettingsContext'
+import { readFolds, writeFolds } from '../../hooks/noteFoldsCache'
 import styles from './CodeMirrorEditor.module.css'
 
 // Autosave cadence — crash-safe like the rest of the app: a periodic backend save
@@ -64,6 +66,14 @@ function CodeMirrorEditor({
   // keeping the CodeMirror instance mounted (just hidden). Toggling read/edit no
   // longer unmounts the editor, so in-flight unsaved edits are never lost.
   const [readSnapshot, setReadSnapshot] = useState(initialContent)
+
+  // "Remember File/Note State" — when on, per-note folds persist (localStorage)
+  // and restore across remounts + read/edit modes. Kept in a ref so the mount-once
+  // view's listeners read the live value.
+  const { settings } = useSettings()
+  const rememberFolds = settings.rememberNoteState === true
+  const rememberRef = useRef(rememberFolds)
+  useEffect(() => { rememberRef.current = rememberFolds }, [rememberFolds])
 
   // Auth for image upload — kept in refs so the mount-once view handlers always
   // read the current authFetch/API.
@@ -156,7 +166,27 @@ function CodeMirrorEditor({
       }).catch(() => { /* keep dirty + draft for a later retry */ })
     }
 
+    // Persist folds (per note) when the toggle is on. A fold/unfold lands as an
+    // effect with no doc change, so persist those immediately (the reading view
+    // reads the store on the next mode switch). A pure doc edit shifts where folds
+    // sit, so refresh the stored line numbers on a debounce to keep them current.
+    let foldSaveTimer = null
+    const persistFolds = () => {
+      if (!rememberRef.current || !viewRef.current) return
+      writeFolds(noteId, foldedLineSet(viewRef.current.state))
+    }
+    const scheduleFoldPersist = () => {
+      if (foldSaveTimer) clearTimeout(foldSaveTimer)
+      foldSaveTimer = setTimeout(persistFolds, 1000)
+    }
+
     const updateListener = EditorView.updateListener.of((u) => {
+      if (rememberRef.current) {
+        const foldChanged = u.transactions.some((tr) =>
+          tr.effects.some((e) => e.is(foldEffect) || e.is(unfoldEffect)))
+        if (foldChanged) persistFolds()
+        else if (u.docChanged) scheduleFoldPersist()
+      }
       if (!u.docChanged) return
       draftDirtyRef.current = true
       if (!dirtyRef.current) { dirtyRef.current = true; onDirtyRef.current?.(true) }
@@ -238,12 +268,22 @@ function CodeMirrorEditor({
     })
     viewRef.current = view
 
+    // Restore this note's saved folds (no-op when the toggle is off / none saved).
+    // KNOWN ISSUE: when a note opens with a LARGE folded section, the lines that fold
+    // reveals can render as raw markdown until the first click or read↔write toggle.
+    // CM's viewport is provisional during the page's initial layout, so livePreview
+    // decorates the wrong region; nothing re-triggers it until an interaction. A bare
+    // rAF deferral was tried and did NOT resolve it. Tracked as a known bug — see the
+    // fold-persistence memory.
+    if (rememberRef.current) applyFolds(view, readFolds(noteId))
+
     const autosaveTimer = setInterval(saveBackend, AUTOSAVE_INTERVAL_MS)
     const draftTimer = setInterval(saveDraft, DRAFT_SAVE_INTERVAL_MS)
 
     return () => {
       clearInterval(autosaveTimer)
       clearInterval(draftTimer)
+      if (foldSaveTimer) clearTimeout(foldSaveTimer)
       // Final draft write on unmount so unsaved changes survive navigation/crash.
       if (dirtyRef.current || draftDirtyRef.current) {
         const md = view.state.doc.toString()
@@ -279,8 +319,13 @@ function CodeMirrorEditor({
     const view = viewRef.current
     if (!view) return
     if (readMode) setReadSnapshot(view.state.doc.toString())
-    else view.requestMeasure()
-  }, [readMode])
+    else {
+      // Returning to the editor: re-sync folds with whatever the reading view
+      // persisted, so a fold toggled there shows here too.
+      if (rememberRef.current) applyFolds(view, readFolds(noteId))
+      view.requestMeasure()
+    }
+  }, [readMode, noteId])
 
   const handleCheckboxToggle = (index) => {
     const view = viewRef.current
@@ -310,7 +355,7 @@ function CodeMirrorEditor({
   return (
     <>
       <div ref={hostRef} className={styles.editorRoot} style={readMode ? { display: 'none' } : undefined} />
-      {readMode && <ReadingView markdown={readSnapshot} onSearchTag={onSearchTag} onOpenLink={onOpenLink} onCheckboxToggle={handleCheckboxToggle} />}
+      {readMode && <ReadingView markdown={readSnapshot} noteId={noteId} rememberFolds={rememberFolds} onSearchTag={onSearchTag} onOpenLink={onOpenLink} onCheckboxToggle={handleCheckboxToggle} />}
       {!readMode && !interfaceMode && <EditorDock viewRef={viewRef} sandboxes={sandboxes} />}
     </>
   )
