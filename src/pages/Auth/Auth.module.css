@@ -107,6 +107,53 @@
   box-shadow: none;
 }
 
+/* "or" divider between the login form and the try-it-free CTA */
+.demoDivider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 4px;
+  color: var(--text-faint);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.demoDivider::before,
+.demoDivider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-default);
+}
+
+/* Ghost/secondary button — explore the app with no account */
+.demoButton {
+  width: 100%;
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 13px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-top: 12px;
+}
+.demoButton:hover {
+  border-color: var(--accent-warning);
+  color: var(--accent-warning);
+  box-shadow: 0 0 0 3px var(--accent-warning-alpha);
+}
+
+.demoHint {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 10px 0 0;
+}
+
 .authError {
   background: rgba(224, 92, 92, 0.1);
   border: 1px solid rgba(224, 92, 92, 0.3);

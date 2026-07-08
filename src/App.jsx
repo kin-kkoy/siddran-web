@@ -30,7 +30,14 @@ import { SandboxViewProvider } from "./contexts/SandboxViewContext.jsx"
 import { NoteSplitProvider } from "./contexts/NoteSplitContext.jsx"
 import SettingsPopup from "./components/Settings/SettingsPopup.jsx"
 import ToastContainer from "./components/Common/ToastContainer.jsx"
+import DemoBanner from "./components/Common/DemoBanner.jsx"
 import logger from "./utils/logger.js"
+// Guest ("try it free") demo mode — an ephemeral in-memory backend. See src/guest/.
+import { guestFetch, resetGuestData } from "./guest/guestApi.js"
+import { isGuestActive, setGuestActive } from "./guest/guestState.js"
+import { installMemStorage, restoreRealStorage } from "./guest/memStorage.js"
+import { resetForGuest as resetSandboxStore } from "./hooks/sandboxStore.js"
+import { resetForGuest as resetSandboxItems } from "./hooks/sandboxItemsStore.js"
 
 // Block fields compared when diffing a plan-mode session (snapshot vs working copy).
 const PLAN_EVENT_FIELDS = ['title', 'description', 'start_at', 'end_at', 'all_day', 'color', 'ref_type', 'ref_id']
@@ -72,6 +79,11 @@ function NotePageWrapper({ notes, notesLoading, editTitle, editBody, updateTags,
 function App() {
 
   const [isAuthed, setIsAuthed] = useState(false)
+  // Guest demo mode. Deliberately NOT persisted anywhere — a refresh reloads with
+  // isGuest=false, which drops the visitor back to the login page with all their
+  // in-memory demo data gone. `unlocked` (computed below) is what actually gates
+  // the app shell: a guest sees everything a logged-in user does.
+  const [isGuest, setIsGuest] = useState(false)
   // Gates the first render until the startup token check resolves, so we never
   // flash the login page (or fire protected requests) while a bootstrap refresh
   // is in flight.
@@ -222,6 +234,11 @@ function App() {
 
   // helper function for AUTHENTICATED FETCH
   const authFetch = useCallback(async (URL, reqProps = {}) => {
+    // Guest demo mode: serve everything from the in-memory mock, never the network.
+    // Read the module flag (not React state) so this callback stays referentially
+    // stable and the data hooks don't tear down/re-run on unrelated renders.
+    if (isGuestActive()) return guestFetch(URL, reqProps)
+
     let res = await fetch(URL, {
       ...reqProps,
       credentials: 'include',
@@ -260,16 +277,47 @@ function App() {
     return res
   }, [getAuthHeaders, refreshAuthToken])
 
+  // Effective "app is unlocked" flag: real auth OR guest demo. Gates the shell,
+  // the data hooks, and the providers — a guest experiences the full app.
+  const unlocked = isAuthed || isGuest
+
+  // Enter guest demo mode: swap in the ephemeral storage + backend, reseed the
+  // welcome-tour data, and wipe any singleton caches a prior session left behind.
+  const enterGuest = useCallback(() => {
+    installMemStorage()      // from here on, no write touches disk
+    resetGuestData()         // fresh welcome-tour seed
+    resetSandboxStore()      // drop any real cached board list
+    resetSandboxItems()      // drop any real cached board items
+    setGuestActive(true)     // module flag authFetch/imageUpload read
+    setUsername('Guest')
+    setIsGuest(true)
+  }, [])
+
+  // Leave guest mode (on "Sign up" or logout): restore real storage + network.
+  const exitGuest = useCallback(() => {
+    setGuestActive(false)
+    restoreRealStorage()
+    setUsername(null)
+    setIsGuest(false)
+  }, [])
+
+  // Logout handler threaded into the Sidebar: a guest's "logout" exits the demo
+  // (there's no real session to end); a real user logs out normally.
+  const handleSidebarLogout = useCallback((val) => {
+    if (isGuestActive()) exitGuest()
+    else setIsAuthed(val)
+  }, [exitGuest])
+
 
   // ------------- DATA LOGIC (Adding, deleting, etc. of Notes and Notebooks) ===================================
   const {
     notes, notebooks, loading: notesLoading, notebookNotesById, notesPagination, notebooksPagination, loadMoreNotes, loadMoreNotebooks, loadingMore, addNote, deleteNote, editTitle, editBody, toggleFavorite, updateColor, updateTags, createNotebook, deleteNotebook, toggleFavoriteNotebook, updateNotebookColor, updateNotebookTags, renameNotebook, removeNoteFromNotebook, addNotesToNotebook, importMarkdownFiles, exportNote
-  } = useNotes(authFetch, API, isAuthed)
+  } = useNotes(authFetch, API, unlocked)
 
   // ------------- TASKS DATA LOGIC ===================================
   const {
     tasks, dailyTasks, bundles, tasksPagination, dailyTasksPagination, bundlesPagination, loadMoreTasks, loadMoreDailyTasks, loadMoreBundles, loadingMore: tasksLoadingMore, loading: tasksLoading, addTask, updateTask, patchTaskInCache, setDailyTime, deleteTask, toggleTaskCompletion, addDailyTask, updateDailyTask, deleteDailyTask, toggleDailyTaskCompletion, batchToggleDailyTasks, batchDeleteDailyTasks, addBundle, updateBundle, deleteBundle, addBundleTasks, batchUpdateBundleTasks, toggleBundleTaskCompletion, batchDeleteBundleTasks
-  } = useTasks(authFetch, API, isAuthed)
+  } = useTasks(authFetch, API, unlocked)
 
   // ------------- CALENDAR DATA LOGIC ===================================
   const calView = useCalendarView()
@@ -282,15 +330,15 @@ function App() {
   // Lifted to App level so the root-mounted peek and the /calendar route share one source.
   const {
     events: calendarEvents, addEvent, updateEvent, deleteEvent, addEvents, removeEventsBySchedule, recolorEventsBySchedule
-  } = useCalendarEvents(authFetch, API, isAuthed && calendarActive)
-  const { schedules, createSchedule, restampSchedule, deleteSchedule, updateSchedule } = useSchedules(authFetch, API, isAuthed && calendarActive)
+  } = useCalendarEvents(authFetch, API, unlocked && calendarActive)
+  const { schedules, createSchedule, restampSchedule, deleteSchedule, updateSchedule } = useSchedules(authFetch, API, unlocked && calendarActive)
   const {
     tasks: calendarTasks, undated: calendarUndated, retimeTask, scheduleTask, unscheduleTask
-  } = useCalendarTasks(authFetch, API, isAuthed && calendarActive)
+  } = useCalendarTasks(authFetch, API, unlocked && calendarActive)
   // Recurring dailies + per-day completions (gated the same way so non-calendar pages stay quiet).
   const {
     recurringDailies, completions: dailyCompletions, toggleCompletion, addRecurring, removeRecurring
-  } = useCalendarDailies(authFetch, API, isAuthed && calendarActive)
+  } = useCalendarDailies(authFetch, API, unlocked && calendarActive)
   // Ephemeral ("today's") dailies come from the SHARED useTasks store (single source) so TasksHub
   // add/delete/edit reflect on the calendar live, with no refetch.
   const ephemeralDailies = useMemo(() => dailyTasks.filter(d => d.recurrence == null), [dailyTasks])
@@ -520,7 +568,7 @@ function App() {
 
   // Global Cmd/Ctrl+; toggles the peek; Esc closes it (when not typing in a field).
   useEffect(() => {
-    if (!isAuthed) return
+    if (!unlocked) return
     const onKey = (e) => {
       const el = document.activeElement
       const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
@@ -534,7 +582,7 @@ function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isAuthed, calView])
+  }, [unlocked, calView])
 
   // Auto-collapse the sidebar while the calendar is pinned to the half-split.
   useEffect(() => {
@@ -655,7 +703,7 @@ function App() {
   // --cinder-sidebar-w exposes the sidebar's current width so full-bleed pages
   // (e.g. SandBoxPage) can absolutely-position themselves flush against it
   // without re-implementing the collapse logic.
-  const sidebarW = isAuthed ? (isCollapsed ? '70px' : '220px') : '0px'
+  const sidebarW = unlocked ? (isCollapsed ? '70px' : '220px') : '0px'
   const style = {
     backgroundColor: "var(--bg-primary)",
     color: "var(--text-primary)",
@@ -674,13 +722,13 @@ function App() {
 
   return (
 
-    <SettingsProvider authFetch={authFetch} API={API} isAuthed={isAuthed}>
-    <ApiProvider authFetch={authFetch} API={API} isAuthed={isAuthed}>
+    <SettingsProvider authFetch={authFetch} API={API} isAuthed={unlocked}>
+    <ApiProvider authFetch={authFetch} API={API} isAuthed={unlocked}>
     <SandboxViewProvider>
     <NoteSplitProvider>
     <div style={style}>
 
-      {isAuthed && (
+      {unlocked && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -707,20 +755,20 @@ function App() {
         }}>
 
           {/* Only show sidebar when logged in */}
-          {isAuthed && (
+          {unlocked && (
             <Sidebar username={username}
               isCollapsed={isCollapsed}
               toggleSidebar={setIsCollapsed}
               notes={notes}
               notebooks={notebooks}
               currentNoteID={currentNoteID}
-              setIsAuthed={setIsAuthed}
+              setIsAuthed={handleSidebarLogout}
             />
           )}
 
 
           {/* blank space reserved for fixed sidebar */}
-          {isAuthed && (
+          {unlocked && (
             <div style={{
               width: isCollapsed ? '70px' : '220px',
               flexShrink: 0,  /* Prevents this from shrinking */
@@ -743,16 +791,16 @@ function App() {
             zIndex: 1001,
           }}>
             <div ref={leftPaneRef} style={{
-              flex: (isAuthed && calView.isHalf) ? `0 0 ${100 - halfPct}%` : 1,
-              padding: isAuthed ? '0 40px' : '0',
+              flex: (unlocked && calView.isHalf) ? `0 0 ${100 - halfPct}%` : 1,
+              padding: unlocked ? '0 40px' : '0',
               overflowY: 'auto',
               minWidth: 0,
             }}>
 
             <Routes>
-              <Route path="/login" element={<LoginPage setIsAuthed={setIsAuthed} setAppUsername={setUsername} />} />
+              <Route path="/login" element={<LoginPage setIsAuthed={setIsAuthed} setAppUsername={setUsername} onTryDemo={enterGuest} />} />
               <Route path="/register" element={<RegisterPage setIsAuthed={setIsAuthed} setAppUsername={setUsername} />} />
-              {isAuthed ? (
+              {unlocked ? (
                 <>
                   <Route path="/" element={notesHubElement} />
                   <Route path="/notes" element={notesHubElement} />
@@ -795,14 +843,14 @@ function App() {
                   <Route path="*" element={<NotFoundPage />} />
                 </>
               ) : (
-                <Route path="*" element={<LoginPage setIsAuthed={setIsAuthed} setAppUsername={setUsername} />} />
+                <Route path="*" element={<LoginPage setIsAuthed={setIsAuthed} setAppUsername={setUsername} onTryDemo={enterGuest} />} />
               )}
               {/* <Route path="add" element={}/> */}
             </Routes>
             </div>
 
             {/* Calendar half-split pane (peek pinned) — draggable divider to resize. */}
-            {isAuthed && calView.isHalf && (
+            {unlocked && calView.isHalf && (
               <>
                 <div
                   onPointerDown={onSplitDown}
@@ -825,7 +873,7 @@ function App() {
         </div>
 
         {/* Calendar peek drawer (root-mounted so it persists across routes) */}
-        {isAuthed && (
+        {unlocked && (
           <CalendarPeek
             events={peekEvents}
             tasks={peekTasks}
@@ -838,7 +886,10 @@ function App() {
         )}
 
         {/* Settings popup (rendered at app level, controlled by context) */}
-        {isAuthed && <SettingsPopup />}
+        {unlocked && <SettingsPopup />}
+
+        {/* Demo-mode banner — only while a guest is exploring */}
+        {isGuest && <DemoBanner onSignUp={exitGuest} />}
 
         {/* Toast notifications (always available) */}
         <ToastContainer />

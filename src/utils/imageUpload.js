@@ -1,3 +1,5 @@
+import { isGuestActive } from '../guest/guestState'
+
 // Keep ALLOWED_IMAGE_MIME / MAX_IMAGE_BYTES in sync with backend routes/uploads.js.
 export const ALLOWED_IMAGE_MIME = new Set([
     'image/png',
@@ -40,8 +42,23 @@ const messageForStatus = (status) => {
     }
 }
 
+const fileToDataURL = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(new Error('Could not read image'))
+    reader.readAsDataURL(file)
+})
+
 export const uploadImageFile = async (authFetch, API, file) => {
     validateImageFile(file)
+
+    // Guest demo mode: never touch the network or R2. Inline the image as a data
+    // URL so it renders for the session and disappears on refresh. resolveImageUrl
+    // already passes `data:` URLs straight through.
+    if (isGuestActive()) {
+        const dataUrl = await fileToDataURL(file)
+        return { path: dataUrl }
+    }
 
     const presignRes = await authFetch(`${API}/uploads/presign`, {
         method: 'POST',

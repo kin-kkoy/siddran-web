@@ -42,6 +42,16 @@ export const subscribe = (cb) => {
     listeners.add(cb)
     return () => listeners.delete(cb)
 }
+
+// Guest demo mode: wipe the singleton so a previous (real) session's cached
+// boards can't leak in, and allow connect() to re-hydrate from the guest mock.
+export const resetForGuest = () => {
+    list = []
+    hydrated = false
+    booted = false
+    pendingCreates.clear()
+    listeners.forEach(cb => cb())
+}
 export const getSnapshot = () => list
 // Whether the board list has been reconciled with the server at least once. Lets
 // callers tell "no boards yet, still loading" from "this user genuinely has none".

@@ -25,6 +25,17 @@ export const connect = (next) => {
     api = { authFetch: next.authFetch, API: next.API, isAuthed: !!next.isAuthed }
 }
 
+// Guest demo mode: drop all per-board records (and their pending timers) so a
+// previous session's cached items can't surface, and each board reloads fresh
+// from the guest mock on next ensure()/loadFromServer().
+export const resetForGuest = () => {
+    for (const rec of boards.values()) {
+        if (rec.cacheTimer) clearTimeout(rec.cacheTimer)
+        if (rec.netTimer) clearTimeout(rec.netTimer)
+    }
+    boards.clear()
+}
+
 export const ensure = (id) => {
     if (!id) return null
     let rec = boards.get(id)

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import styles from './Auth.module.css'
 import logger from '../../utils/logger'
 
-function LoginPage({ setIsAuthed, setAppUsername }) {
+function LoginPage({ setIsAuthed, setAppUsername, onTryDemo }) {
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
@@ -14,6 +14,13 @@ function LoginPage({ setIsAuthed, setAppUsername }) {
     const navigate = useNavigate()
     const API = import.meta.env.VITE_API_URL || 'http://localhost:3000' 
 
+
+    // Enter the ephemeral guest demo: sets up the in-memory backend (in App) then
+    // navigates into the app. Nothing is persisted; a refresh returns here.
+    const tryDemo = () => {
+        onTryDemo?.()
+        navigate('/notes')
+    }
 
     const login = async () => {
         if(!username.trim() || !password.trim()){
@@ -98,13 +105,29 @@ function LoginPage({ setIsAuthed, setAppUsername }) {
                     </div>
 
                     <button
-                        className={styles.authButton} 
+                        className={styles.authButton}
                         onClick={login}
                         disabled={loading} // this simply makes the button unclickable when pressed.
                     >
                         {loading ? `Logging in...` : `Login`}
                     </button>
-                    
+
+                    {onTryDemo && (
+                        <>
+                            <div className={styles.demoDivider}>or</div>
+                            <button
+                                type="button"
+                                className={styles.demoButton}
+                                onClick={tryDemo}
+                            >
+                                ✨ Try it free — no signup
+                            </button>
+                            <p className={styles.demoHint}>
+                                Explore the whole app instantly. Nothing is saved or collected.
+                            </p>
+                        </>
+                    )}
+
                 </div>
 
                 {/* redirect to register page */}
