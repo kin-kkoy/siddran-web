@@ -13,8 +13,8 @@ import { wikilinks, wikilinkMarkdownExtension, resolveNote } from './cm/wikilink
 import { obsidianSyntax } from './cm/syntaxNodes'
 import { headingFold, foldedLineSet, applyFolds } from './cm/fold'
 import { listEditingKeymap, listIndentNormalizer, enterIndent } from './cm/listEditing'
-import { cinderHighlightStyle } from './cm/highlight'
-import { cinderTheme } from './cm/theme'
+import { siddranHighlightStyle } from './cm/highlight'
+import { siddranTheme } from './cm/theme'
 import ReadingView from './ReadingView'
 import EditorDock from './EditorDock'
 import { useApi } from '../../contexts/ApiContext'
@@ -241,7 +241,7 @@ function CodeMirrorEditor({
           EditorView.lineWrapping,
           headingFold,
           markdown({ base: markdownLanguage, codeLanguages: languages, addKeymap: false, extensions: [wikilinkMarkdownExtension, obsidianSyntax, { remove: ['SetextHeading', 'IndentedCode'] }] }),
-          syntaxHighlighting(cinderHighlightStyle),
+          syntaxHighlighting(siddranHighlightStyle),
           livePreview,
           codeCopy,
           imageExtensions(() => ({ authFetch: authFetchRef.current, API: apiRef.current })),
@@ -258,7 +258,7 @@ function CodeMirrorEditor({
             bundles: () => bundlesRef.current,
             sandboxes: () => sandboxesRef.current,
           }),
-          cinderTheme,
+          siddranTheme,
           cmPlaceholder(placeholder),
           editableRef.current.of(editableExt(interfaceMode)),
           updateListener,

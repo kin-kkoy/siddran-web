@@ -50,7 +50,7 @@ const handlers = {
 }
 
 // Resolve image src through the R2 helper and lift `#w=NNN` into a width style.
-function rehypeCinderImages() {
+function rehypeSiddranImages() {
   return (tree) => {
     visit(tree, 'element', (node) => {
       if (node.tagName !== 'img' || !node.properties) return
@@ -177,7 +177,7 @@ const processor = unified()
   .use(remarkRehype, { handlers })
   .use(rehypeLineNumbers)
   .use(rehypeCallouts)
-  .use(rehypeCinderImages)
+  .use(rehypeSiddranImages)
   .use(rehypeHighlight, { ignoreMissing: true })
   .use(rehypeStringify)
 

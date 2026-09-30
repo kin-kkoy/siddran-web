@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 
 // Persistent bar shown while a visitor is exploring in guest demo mode. Reminds
 // them nothing persists and offers a one-click path to a real account. Styled to
-// Cinder's dark cosmic theme via the shared CSS variables.
+// Siddran's dark cosmic theme via the shared CSS variables.
 export default function DemoBanner({ onSignUp }) {
   const navigate = useNavigate()
 

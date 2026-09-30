@@ -1,4 +1,4 @@
-// In-memory mock of the Ember backend for guest ("try it free") demo mode.
+// In-memory mock of the siddran-backend for guest ("try it free") demo mode.
 //
 // authFetch routes here instead of to the network when a guest is active, so
 // every notes/tasks/calendar/sandbox/settings request the app makes is served
@@ -55,7 +55,7 @@ function seed() {
   }
 
   const welcome = note(
-    '👋 Welcome to the Cinder demo',
+    '👋 Welcome to the Siddran demo',
     [
       "You're in **demo mode** — poke around freely. Nothing here is saved, and the",
       "moment you refresh the page everything resets to zero. No account, no",
