@@ -1,80 +1,92 @@
-# Cinder
+# Siddran
 
-A distraction-free note-taking app built with React and Lexical. Also comes with tasks.
+A notes, tasks and planning app for the web: a Markdown editor with live preview, task
+lists, a calendar, and an infinite-canvas sandbox, all in one dark, distraction-free UI.
 
----
+**Live demo:** https://cinder-ebon.vercel.app. Use "Try it free — no signup" on the login page to explore
+without an account. Guest mode runs against an in-memory mock of the API, so nothing is
+saved and a refresh starts over.
+
+## Siddran family
+
+| Repo | What it is |
+| --- | --- |
+| **siddran-web** (this repo) | React web client, deployed on Vercel. |
+| [siddran-backend](https://github.com/kin-kkoy/siddran-backend) | Node/Express REST API with PostgreSQL that the web client talks to. |
+| [siddran-desktop](https://github.com/kin-kkoy/siddran-desktop) | Tauri desktop build, local-first: data lives as `.md` and JSON files in a folder you pick. |
 
 ## Features
 
-### Authentication
-- Simple login & registration (no email required. Might implement soon)
-- Session management via cookies & JWT
-
 ### Notes
-- **Auto-save** — notes save automatically when the editor loses focus, no save button needed
-- **Markdown support** — powered by the [Lexical](https://lexical.dev/) editor
-- **Reading mode** — toggle between writing and reading, similar to Obsidian
-- **Favorites & colors** — mark notes as favorites and assign card colors
-- **Floating dock** — shortcut toolbar that hides while you write and reappears when you need it
+- CodeMirror 6 editor with Obsidian-style live preview: Markdown syntax hides until the caret reaches it
+- Separate reading view, remembered per note
+- `[[wikilinks]]` to other notes, plus typed links to tasks, bundles and sandboxes (`[[task:42|label]]`)
+- Callouts (`> [!note]`), highlights, underline, spoilers, `#hashtags`, syntax-highlighted code blocks with a copy button
+- Paste images straight into a note (uploaded to object storage through a presigned URL)
+- Foldable lists, favorites, card colors, tags
+- Split view for two notes side by side (experimental)
+- Export a note as Markdown or PDF (PDF uses the browser's print dialog)
 
 ### Notebooks
-- Group notes into notebooks
-- Notebooks always appear at the top of the list
-- Supports favorites and color customization
+- Group notes into notebooks, with favorites and colors
+- Import `.md` files (with frontmatter) into a notebook
 
 ### Tasks
-- Ongoing implementation
+- One-off tasks with due dates
+- Bundles: grouped task lists
+- Daily tasks, either one-off or recurring (every day, weekdays, weekends, or custom days)
 
-### Mods
-- To be implemented
+### Calendar
+- Month, week and day views
+- Drag undated tasks from a drawer onto the time grid to schedule them
+- Schedule designer: design a weekly timetable once, then stamp it onto the calendar and recolor, edit or duplicate it later
+- A compact calendar "peek" panel with quick-add
 
-### Sidebar
-- Navigation and profile features
-- Displays a scrollable list of notes
+### Sandboxes
+- Infinite canvas built on Konva: freehand drawing (perfect-freehand), shapes, connectors, text boxes
+- Attach existing notes and tasks to the board as cards
+- Selection, alignment, snapping, z-order, undo/redo
+- Export the drawing layer to PNG
 
 ### Settings
-- Light / Dark mode
-- Themes
-- Toolbar visibility — choose between "auto hide" or "always visible"
+- Ten color themes, a contrast setting, and a tunable animated star background
 
----
-
-## Tech Stack
+## Tech stack
 
 | Layer | Tech |
 | --- | --- |
 | Framework | React 19 |
-| Editor | Lexical |
+| Editor | CodeMirror 6, with a unified/remark/rehype pipeline for reading view and export |
+| Canvas | Konva / react-konva, perfect-freehand |
 | Routing | React Router v7 |
-| Build | Vite 7 |
+| Build / test | Vite 8, Vitest |
 | Styling | CSS Modules |
+| Hosting | Vercel (SPA rewrite in `vercel.json`) |
 
----
+Auth uses a short-lived JWT access token plus a refresh token in an HttpOnly cookie, both
+issued by [siddran-backend](https://github.com/kin-kkoy/siddran-backend).
 
-## Getting Started
+## Getting started
+
+Run [siddran-backend](https://github.com/kin-kkoy/siddran-backend) locally first (it defaults to
+port 3000), or point the client at a deployed instance.
 
 ```bash
-# Install dependencies
 npm install
-
-# Start the dev server
-npm run dev
-
-# Build for production
-npm run build
+npm run dev       # Vite dev server
+npm run build     # production build
+npm run test      # Vitest
+npm run lint
 ```
 
----
+Environment variables (Vite, set in a local `.env`):
 
-## Roadmap
+| Name | Purpose |
+| --- | --- |
+| `VITE_API_URL` | Backend base URL. Defaults to `http://localhost:3000`. |
+| `VITE_R2_PUBLIC_URL` | Public base URL for uploaded images. |
 
-- [ ] Code block copy button
-- [ ] Toggle button in settings to make notebooks color be the whole notebook card instead of just being the spine.
-- [ ] Task lists with subtask nesting (2-3 levels)
-- [ ] Dynamically create tasks by highlighting a note's content
-- [ ] Account management (change name, change password)
-- [ ] Forgot password flow (SOON)
-- [ ] Auto-save on idle (guard against connection loss) (SOON)
-- [ ] Offline support
-- [ ] Game; Mods
-- [ ] Real-time collaborative editing (BIG MAYBE)
+## Not built yet
+
+- Password reset and account management (change name or password)
+- Mods: the page exists as a placeholder
